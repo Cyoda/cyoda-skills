@@ -60,13 +60,13 @@ curl -sf -X PUT $AUTH "${ENDPOINT}/api/entity/JSON/${ENTITY_ID}/${TRANSITION_NAM
 ```
 Expected: 200 response. Verify new state matches workflow definition.
 
-**Test 4 — Check transition history:**
+**Test 4 — Check entity changes:**
 ```bash
-curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/history"
+curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 ```
-Expected: history contains the transition that was just triggered.
+Expected: changes array contains at least one entry (the transition that was just triggered).
 
-**Test 5 — Point-in-time read (if history endpoint returns timestamps):**
+**Test 5 — Point-in-time read:**
 ```bash
 BEFORE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "1 minute ago" 2>/dev/null || date -u -v-1M +"%Y-%m-%dT%H:%M:%SZ")
 curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}?pointInTime=${BEFORE_TIME}"

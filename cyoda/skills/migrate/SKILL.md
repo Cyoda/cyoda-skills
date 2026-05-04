@@ -47,7 +47,7 @@ curl -sf "${ENDPOINT}/api/model/export/JSON_SCHEMA/${ENTITY_NAME}/${MODEL_VERSIO
   | tee migration/${ENTITY_NAME}_${MODEL_VERSION}_schema.json
 
 # Export workflow (states, transitions, criteria, processors)
-curl -sf "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow" \
+curl -sf "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow/export" \
   | tee migration/${ENTITY_NAME}_${MODEL_VERSION}_workflow.json
 ```
 
@@ -73,7 +73,7 @@ TOKEN=$(jq -r '.token' .cyoda/config)
 
 curl -sf \
   -H "Authorization: Bearer $TOKEN" \
-  "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow"
+  "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow/export"
 ```
 
 Classify each entity:

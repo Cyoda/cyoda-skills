@@ -28,13 +28,11 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}"
 ```
 2. Check if the transition is valid from the current state (compare against workflow definition)
 3. Check criteria: if the transition has criteria, evaluate them manually
-4. Look at entity history for previous errors:
+4. Look at entity changes for previous errors:
 ```bash
-curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/history"
+curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 ```
 5. If a processor is attached, check processor execution logs
-
-Delegate to `/cyoda:docs` for the exact history/audit endpoint paths.
 
 #### Processor Error
 
@@ -73,8 +71,8 @@ ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
 TOKEN=$(jq -r '.token // ""' .cyoda/config)
 AUTH=$([ -n "$TOKEN" ] && echo "-H 'Authorization: Bearer $TOKEN'" || echo "")
 
-# Full entity history
-curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/history"
+# Entity change history
+curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 ```
 
 **Point-in-time state lookup:**
@@ -89,4 +87,4 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}?pointInTime=2026-01-15T10:00
 - What was the entity's state at time T?
 - Has this entity been in an error state before?
 
-For exact endpoint paths, use `/cyoda:docs` to check the Cyoda history API.
+For deeper audit data (who changed what, when), use `/cyoda:docs` to look up the audit endpoints.

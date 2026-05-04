@@ -1834,13 +1834,13 @@ curl -sf -X PUT $AUTH "${ENDPOINT}/api/entity/JSON/${ENTITY_ID}/${TRANSITION_NAM
 ```
 Expected: 200 response. Verify new state matches workflow definition.
 
-**Test 4 — Check transition history:**
+**Test 4 — Check entity changes:**
 ```bash
-curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/history"
+curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 ```
-Expected: history contains the transition that was just triggered.
+Expected: changes array contains at least one entry (the transition that was just triggered).
 
-**Test 5 — Point-in-time read (if history endpoint returns timestamps):**
+**Test 5 — Point-in-time read:**
 ```bash
 BEFORE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "1 minute ago" 2>/dev/null || date -u -v-1M +"%Y-%m-%dT%H:%M:%SZ")
 curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}?pointInTime=${BEFORE_TIME}"
@@ -1968,13 +1968,11 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}"
 ```
 2. Check if the transition is valid from the current state (compare against workflow definition)
 3. Check criteria: if the transition has criteria, evaluate them manually
-4. Look at entity history for previous errors:
+4. Look at entity changes for previous errors:
 ```bash
-curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/history"
+curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 ```
 5. If a processor is attached, check processor execution logs
-
-Delegate to `/cyoda:docs` for the exact history/audit endpoint paths.
 
 #### Processor Error
 
@@ -2013,8 +2011,8 @@ ENDPOINT=$(grep CYODA_ENDPOINT .cyoda/config | cut -d= -f2-)
 TOKEN=$(grep CYODA_TOKEN .cyoda/config 2>/dev/null | cut -d= -f2-)
 AUTH=$([ -n "$TOKEN" ] && echo "-H 'Authorization: Bearer $TOKEN'" || echo "")
 
-# Full entity history
-curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/history"
+# Entity change history
+curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 ```
 
 **Point-in-time state lookup:**
@@ -2029,7 +2027,7 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}?pointInTime=2026-01-15T10:00
 - What was the entity's state at time T?
 - Has this entity been in an error state before?
 
-For exact endpoint paths, use `/cyoda:docs` to check the Cyoda history API.
+For deeper audit data (who changed what, when), use `/cyoda:docs` to look up the audit endpoints.
 ```
 
 Save to `cyoda/skills/debug/SKILL.md`.
@@ -2208,7 +2206,7 @@ MODELS=$(curl -sf "${ENDPOINT}/api/model")
 echo "$MODELS" | tee migration/models.json
 
 # For each model, export workflow (run for each entity name and version)
-curl -sf "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow" \
+curl -sf "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow/export" \
   | tee migration/${ENTITY_NAME}_${MODEL_VERSION}_workflow.json
 ```
 

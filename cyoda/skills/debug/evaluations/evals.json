@@ -26,8 +26,8 @@
       },
       "assertions": [
         { "id": "uses-observation-mode", "text": "Switches to observation mode (not debugging mode)", "type": "behavior" },
-        { "id": "calls-history-endpoint", "text": "Calls entity history endpoint for entity abc-123", "type": "behavior" },
-        { "id": "presents-history", "text": "Presents transition history in readable format with states and timestamps", "type": "format" },
+        { "id": "calls-history-endpoint", "text": "Calls the entity changes endpoint (/api/entity/{id}/changes) for entity abc-123", "type": "behavior" },
+        { "id": "presents-history", "text": "Presents entity change history in readable format with states and timestamps", "type": "format" },
         { "id": "offers-pit-lookup", "text": "Offers point-in-time lookup if needed", "type": "behavior" },
         { "id": "no-debug-framing", "text": "Does NOT treat an audit request as a debugging problem", "type": "behavior" }
       ]
