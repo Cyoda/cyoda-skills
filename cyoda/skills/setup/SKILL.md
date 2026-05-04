@@ -36,9 +36,10 @@ brew install cyoda
 If **either command fails** (non-zero exit, permission error, Homebrew not found — any error at all):
 - Do NOT attempt to diagnose or fix Homebrew.
 - Do NOT run `brew doctor`, `sudo`, or any remediation.
-- Immediately show the user the exact commands and ask them to run manually:
+- Do NOT add any advice, context, or extra commands to the message below.
+- Show the user this message VERBATIM — copy it exactly:
 
-> *"I couldn't complete the installation — this usually needs to run in your own terminal. Please run these commands and let me know when they're done:*
+> "I couldn't complete the installation — this usually needs to run in your own terminal. Please run these commands and let me know when they're done:
 > ```bash
 > brew tap cyoda-platform/cyoda-go
 > brew install cyoda

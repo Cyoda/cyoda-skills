@@ -59,6 +59,7 @@
         { "id": "attempts-brew-first", "text": "Attempts to run brew tap and brew install before giving up", "type": "behavior" },
         { "id": "no-brew-diagnosis", "text": "Does NOT run brew doctor, sudo, or any Homebrew remediation", "type": "behavior" },
         { "id": "shows-exact-commands", "text": "Shows the exact brew tap and brew install commands for the user to run manually", "type": "format" },
+        { "id": "no-extra-commands", "text": "Does NOT include sudo, chown, or any commands beyond the two brew commands in the user-facing message", "type": "format" },
         { "id": "asks-user-to-run", "text": "Asks the user to run the commands in their own terminal", "type": "behavior" },
         { "id": "waits-before-continuing", "text": "Waits for user confirmation before continuing to cyoda init", "type": "behavior" },
         { "id": "continues-after-confirm", "text": "Continues to cyoda init (Step 3) after the user confirms", "type": "behavior" }

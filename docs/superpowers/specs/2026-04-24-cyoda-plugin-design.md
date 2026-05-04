@@ -220,7 +220,7 @@ Two modes, selected at invocation:
 
 **Local (cyoda-go):**
 1. Check if already installed (dynamic injection: `which cyoda`)
-2. Install if needed: attempt `brew tap cyoda-platform/cyoda-go` then `brew install cyoda`. If either command fails for any reason (permissions, network, Homebrew not found), do NOT attempt to diagnose or fix Homebrew — immediately show the exact commands and ask the user to run them manually in their terminal. Wait for confirmation before continuing.
+2. Install if needed: attempt `brew tap cyoda-platform/cyoda-go` then `brew install cyoda`. If either command fails for any reason (permissions, network, Homebrew not found), do NOT attempt to diagnose or fix Homebrew, do NOT suggest sudo or any remediation — show the user only those two brew commands VERBATIM and ask them to run manually. Wait for confirmation before continuing.
 3. Initialize: `cyoda init` (SQLite by default)
 4. Start: `cyoda` (foreground; user opens new terminal for subsequent commands)
 5. Verify: `curl http://localhost:8080/readyz`
