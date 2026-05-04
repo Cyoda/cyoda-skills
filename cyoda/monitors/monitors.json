@@ -1,7 +1,0 @@
-[
-  {
-    "name": "Cyoda config watcher",
-    "description": "Watches .cyoda/config for changes. Notifies Claude when credentials are updated after cyoda:auth or cyoda:setup.",
-    "command": "sh -c 'PROJECT=\"$PWD\"; echo \"[cyoda-monitor] watching $PROJECT/.cyoda/config\"; LAST=\"\"; while true; do CUR=$(cat \"$PROJECT/.cyoda/config\" 2>/dev/null); if [ -n \"$CUR\" ] && [ \"$CUR\" != \"$LAST\" ]; then [ -n \"$LAST\" ] && echo \"Cyoda config updated — connection status may have changed\"; LAST=\"$CUR\"; fi; sleep 5; done'"
-  }
-]

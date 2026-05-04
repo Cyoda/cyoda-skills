@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the `cyoda` Claude Code plugin with 11 skills, a connection monitor, and plugin scaffold that replaces AI Studio for Cyoda application development.
+**Goal:** Build the `cyoda` Claude Code plugin with 11 skills and plugin scaffold that replaces AI Studio for Cyoda application development.
 
 **Architecture:** Each skill is a self-contained `SKILL.md` + supporting files. No shared code between skills — they coordinate via skill invocation. Connection state is shared via a `.cyoda/config` file read at invocation time using dynamic context injection (`!`command``). The plugin follows the `.claude-plugin/plugin.json` standard.
 
@@ -16,7 +16,6 @@
 cyoda/
 ├── .claude-plugin/plugin.json
 ├── README.md
-├── monitors/monitors.json
 ├── skills/status/SKILL.md
 ├── skills/status/evaluations/eval-1-local-connected.json
 ├── skills/status/evaluations/eval-2-cloud-production.json
@@ -366,32 +365,224 @@ git commit -m "feat: add cyoda:status skill"
 
 ---
 
-## Task 3: monitors/monitors.json
+## Task 3: Remove monitors, add 401/403 retry to API skills
+
+**Rationale:** The background monitor that watched `.cyoda/config` was removed because it fired unexpectedly during active sessions, interrupting the conversation. Token freshness is now handled reactively: any API-calling skill that gets a 401 or 403 invokes `cyoda:auth` to refresh the token and retries once.
 
 **Files:**
-- Create: `cyoda/monitors/monitors.json`
+- Delete: `cyoda/monitors/monitors.json`
+- Delete: `cyoda/monitors/evaluations/` (whole directory)
+- Modify: `cyoda/skills/status/SKILL.md`
+- Modify: `cyoda/skills/status/evaluations/evals.json` (add eval id=4)
+- Modify: `cyoda/skills/build/SKILL.md`
+- Modify: `cyoda/skills/build/evaluations/evals.json` (add eval id=11)
+- Modify: `cyoda/skills/test/SKILL.md`
+- Modify: `cyoda/skills/test/evaluations/evals.json` (add eval id=4)
+- Modify: `cyoda/skills/debug/SKILL.md`
+- Modify: `cyoda/skills/debug/evaluations/evals.json` (add eval id=4)
+- Modify: `cyoda/skills/migrate/SKILL.md`
+- Modify: `cyoda/skills/migrate/evaluations/evals.json` (add eval id=5)
 
-- [ ] **Step 1: Write monitors config**
+---
 
-```json
-[
-  {
-    "name": "cyoda-config-watcher",
-    "command": "while true; do inotifywait -qq -e modify,create .cyoda/config 2>/dev/null || fswatch -1 .cyoda/config 2>/dev/null || sleep 5; cat .cyoda/config 2>/dev/null | grep -E 'CYODA_ENDPOINT|CYODA_ENV' | tr '\\n' ' '; echo '— config updated'; done",
-    "description": "Watches .cyoda/config for changes and reports new connection config when setup or login completes"
-  }
-]
-```
-
-Save to `cyoda/monitors/monitors.json`.
-
-Note: `inotifywait` is Linux (inotify-tools), `fswatch` is macOS. The monitor attempts both and falls back to polling every 5 seconds. During implementation, verify this works cross-platform or simplify to polling-only for reliability.
-
-- [ ] **Step 2: Commit**
+- [ ] **Step 1: Remove monitors directory**
 
 ```bash
-git add cyoda/monitors/
-git commit -m "feat: add cyoda config watcher monitor"
+rm -rf cyoda/monitors/
+```
+
+---
+
+- [ ] **Step 2: Add auth error rule to `cyoda/skills/status/SKILL.md`**
+
+After the closing ` ``` ` of the "Checking reachability and version" code block (before the "Report based on output" section), insert:
+
+```markdown
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. Do not retry on any other error code.
+```
+
+---
+
+- [ ] **Step 3: Add eval id=4 to `cyoda/skills/status/evaluations/evals.json`**
+
+Append to the `"evals"` array (before the closing `]`):
+
+```json
+{
+  "id": 4,
+  "prompt": "What's my Cyoda status?",
+  "expected_output": "Detects 401 on health check, invokes cyoda:auth to refresh, then retries the status check",
+  "files": {
+    ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+  },
+  "assertions": [
+    { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when the health check returns 401 or 403", "type": "behavior" },
+    { "id": "retries-after-refresh", "text": "Retries the health check once after cyoda:auth completes", "type": "behavior" },
+    { "id": "no-unreachable-on-401", "text": "Does NOT report 'unreachable' on a 401 — treats it as an auth error, not a connectivity error", "type": "behavior" }
+  ]
+}
+```
+
+---
+
+- [ ] **Step 4: Add auth error rule to `cyoda/skills/build/SKILL.md`**
+
+After the existing "API rule:" line at the top of the skill body, append to that paragraph:
+
+```markdown
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. Do not retry on any other error code.
+```
+
+---
+
+- [ ] **Step 5: Add eval id=11 to `cyoda/skills/build/evaluations/evals.json`**
+
+Append to the `"evals"` array (after id=10, before the closing `]`):
+
+```json
+{
+  "id": 11,
+  "prompt": "/cyoda:build — add a Product entity",
+  "expected_output": "Detects 401 on GET /api/model, invokes cyoda:auth to refresh, retries the model inspection once",
+  "files": {
+    ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+  },
+  "assertions": [
+    { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when any API call returns 401 or 403", "type": "behavior" },
+    { "id": "retries-once-after-refresh", "text": "Retries the failed call exactly once after auth refresh", "type": "behavior" },
+    { "id": "no-retry-on-other-errors", "text": "Does NOT retry on 404 or 5xx — only on 401/403", "type": "behavior" }
+  ]
+}
+```
+
+---
+
+- [ ] **Step 6: Add auth error rule to `cyoda/skills/test/SKILL.md`**
+
+After the `If "endpoint":"none"` stop condition (before "If `.env` equals `production`"), insert:
+
+```markdown
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. Do not retry on any other error code.
+```
+
+---
+
+- [ ] **Step 7: Add eval id=4 to `cyoda/skills/test/evaluations/evals.json`**
+
+Append to the `"evals"` array (after id=3, before the closing `]`):
+
+```json
+{
+  "id": 4,
+  "prompt": "/cyoda:test",
+  "expected_output": "Detects 401 on test API call, invokes cyoda:auth to refresh, retries the failing call once",
+  "files": {
+    ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+  },
+  "assertions": [
+    { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when a test API call returns 401 or 403", "type": "behavior" },
+    { "id": "retries-after-refresh", "text": "Retries the failing call once after auth refresh", "type": "behavior" },
+    { "id": "surfaces-error-after-second-fail", "text": "Reports the error to the user if the retry also fails, rather than silently dropping it", "type": "behavior" }
+  ]
+}
+```
+
+---
+
+- [ ] **Step 8: Add auth error rule to `cyoda/skills/debug/SKILL.md`**
+
+After the closing ` ``` ` of the dynamic config injection block (before "Are you **debugging a problem**"), insert:
+
+```markdown
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. Do not retry on any other error code.
+```
+
+---
+
+- [ ] **Step 9: Add eval id=4 to `cyoda/skills/debug/evaluations/evals.json`**
+
+Append to the `"evals"` array (after id=3, before the closing `]`):
+
+```json
+{
+  "id": 4,
+  "prompt": "Show me the history for entity abc-123",
+  "expected_output": "Detects 401 when fetching entity history, invokes cyoda:auth to refresh, retries the history request once",
+  "files": {
+    ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+  },
+  "assertions": [
+    { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when the entity API call returns 401 or 403", "type": "behavior" },
+    { "id": "retries-after-refresh", "text": "Retries the entity history fetch once after auth refresh", "type": "behavior" },
+    { "id": "no-not-found-on-401", "text": "Does NOT report 'entity not found' on a 401 — treats it as an auth error", "type": "behavior" }
+  ]
+}
+```
+
+---
+
+- [ ] **Step 10: Add auth error rule to `cyoda/skills/migrate/SKILL.md`**
+
+After the `If not pointing to a local instance` guard (before "### Step 1 — Verify local instance is working"), insert:
+
+```markdown
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. Do not retry on any other error code.
+```
+
+---
+
+- [ ] **Step 11: Add eval id=5 to `cyoda/skills/migrate/evaluations/evals.json`**
+
+Append to the `"evals"` array (after id=4, before the closing `]`):
+
+```json
+{
+  "id": 5,
+  "prompt": "/cyoda:migrate",
+  "expected_output": "Detects 401 during export, invokes cyoda:auth to refresh, retries the export call once",
+  "files": {
+    ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+  },
+  "assertions": [
+    { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when any export or import call returns 401 or 403", "type": "behavior" },
+    { "id": "retries-after-refresh", "text": "Retries the failed call exactly once after auth refresh", "type": "behavior" },
+    { "id": "no-retry-on-other-errors", "text": "Does NOT retry on 404 or 5xx — only on 401/403", "type": "behavior" }
+  ]
+}
+```
+
+---
+
+- [ ] **Step 12: Run evals for all 5 affected skills**
+
+Use the skill-creator parallel Executor + Grader pipeline (same as Task 14). Run all 5 skills in parallel; within each skill run all evals in parallel (including the new id=4/5/11 evals).
+
+For each skill, spawn:
+- **Executor**: receives `SKILL.md` + eval `prompt` + eval `files` → saves output to `eval-workspace/<skill>/eval-<id>/output.md`
+- **Grader**: receives `output.md` + `assertions[]` + `expected_output` → saves `{ "id": "...", "passed": true|false, "evidence": "..." }` per assertion to `eval-workspace/<skill>/eval-<id>/grades.json`
+
+Aggregate results into a summary table:
+
+| Skill | Eval | Assertion | Passed | Evidence |
+|-------|------|-----------|--------|----------|
+| status | 4 | invokes-auth-on-401 | ? | ... |
+| build | 11 | retries-once-after-refresh | ? | ... |
+| ... | | | | |
+
+Flag every `passed: false`. For each failure: check if `SKILL.md` clearly states the rule; if yes, update the assertion; if not, update `SKILL.md` and re-run that skill's evals only.
+
+---
+
+- [ ] **Step 13: Commit**
+
+```bash
+git add cyoda/skills/status/SKILL.md cyoda/skills/status/evaluations/evals.json
+git add cyoda/skills/build/SKILL.md cyoda/skills/build/evaluations/evals.json
+git add cyoda/skills/test/SKILL.md cyoda/skills/test/evaluations/evals.json
+git add cyoda/skills/debug/SKILL.md cyoda/skills/debug/evaluations/evals.json
+git add cyoda/skills/migrate/SKILL.md cyoda/skills/migrate/evaluations/evals.json
+git rm -r cyoda/monitors/
+git commit -m "feat: remove monitor, add 401/403 token-refresh retry to API skills"
 ```
 
 ---
@@ -2569,7 +2760,7 @@ Expected: all 11 skills appear under the `cyoda` namespace:
 
 ```bash
 git add cyoda/
-git commit -m "feat: complete cyoda plugin — 11 skills, monitor, scaffold, eval suite passing"
+git commit -m "feat: complete cyoda plugin — 11 skills, scaffold, eval suite passing"
 ```
 
 ---
@@ -2667,3 +2858,15 @@ Identified from real user session (`_developer/conversation.md`). Three recurrin
 **Problem:** API calls hardcoded version `1` (e.g. `/api/entity/JSON/{entity}/1`). The `1` is the model version — if an entity already exists, blindly using version 1 may conflict with an existing model or miss a newer version.
 
 **Fix:** Step 1 now explicitly notes to capture the version number from the `GET /api/model` response. Step 2 adds a version decision prompt when the target entity already exists: "Update existing version N, or create a new version N+1?" New entities default to version 1. All subsequent API calls use the resolved `{version}` variable. Updated design doc to reflect `{version}` instead of `1` in endpoint examples. Added eval #9 asserting the version decision is surfaced when an entity already exists.
+
+---
+
+## Post-Launch Improvements (2026-05-04)
+
+### 1. Remove monitor, add reactive 401/403 token refresh to API skills
+
+**Problem:** `monitors/monitors.json` ran a background polling loop watching `.cyoda/config` for changes. When the config file changed (e.g., after `cyoda:auth` or `cyoda:setup`), it injected "Cyoda config updated — connection status may have changed" into the active conversation. This fired at unexpected moments during sessions, interrupting the conversation flow.
+
+The monitor's intended value was token freshness — ensuring Claude knew when credentials changed. But skills already re-read `.cyoda/config` via dynamic context injection at invocation time, so the monitor added noise without adding real freshness guarantees. The actual failure case it should have guarded against (expired JWT mid-session) was not handled by file-watching at all.
+
+**Fix:** Removed `cyoda/monitors/` entirely. Added an auth error rule to the five skills that make authenticated API calls (`cyoda:status`, `cyoda:build`, `cyoda:test`, `cyoda:debug`, `cyoda:migrate`): if any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token and retry the request once. If the retry also fails, surface the error to the user. Added eval #4 (or #11 for build, #5 for migrate) to each affected skill asserting the 401/403 retry behavior. See Task 3 for the full implementation steps.

@@ -15,6 +15,8 @@ jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
 
 If `"endpoint":"none"` or config is absent: report *"No Cyoda instance configured. Run `/cyoda:setup` first."* Stop.
 
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
+
 If `.env` equals `production`: report *"⚠️ This will run tests against a PRODUCTION instance. Tests create real entities and trigger real transitions. Proceed? (yes/no)"* Wait for explicit `yes`.
 
 ### Mode Selection

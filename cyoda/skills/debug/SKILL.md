@@ -12,6 +12,8 @@ Reading connection config:
 jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
 ```
 
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
+
 Are you **debugging a problem** or **observing entity history**?
 
 ---

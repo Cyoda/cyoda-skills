@@ -1,7 +1,7 @@
 # Cyoda Plugin Design
 
 **Date:** 2026-04-24
-**Updated:** 2026-05-02
+**Updated:** 2026-05-04
 **Status:** Implemented
 
 ## Overview
@@ -43,8 +43,6 @@ cyoda/
 │   │   └── SKILL.md
 │   └── app/
 │       └── SKILL.md
-├── monitors/
-│   └── monitors.json           ← watches .cyoda/config, notifies Claude on changes
 └── README.md
 ```
 
@@ -94,8 +92,6 @@ Then calls the version/health endpoint and reports:
 - `Connected to Local cyoda-go — v1.4.2` (local instance)
 - `Connected to Cyoda Cloud — v2.1.0 [PRODUCTION]` (cloud, with prominent production marker)
 - `Not connected — run /cyoda:setup to get started` (no config or unreachable)
-
-**Monitor**: `monitors/monitors.json` runs a background command that watches `.cyoda/config` for changes. When the file changes (e.g., after `cyoda:auth` or `cyoda:setup`), it notifies Claude with the new connection status automatically — no need for the user to re-invoke.
 
 **Status line**: During implementation, explore using Claude Code's status line configuration (`subagentStatusLine` in plugin `settings.json`) for persistent header display of connection state.
 
@@ -266,6 +262,16 @@ Newcomer orchestrator. Walks the user through the full journey by sequencing the
 7. Offer `cyoda:migrate` if user wants to move to cloud
 
 Experienced users can skip this and invoke individual skills directly.
+
+## API Error Handling
+
+Skills that make authenticated API calls follow this contract for token expiry:
+
+> If any API call returns **401 or 403**, invoke `cyoda:auth` to refresh the token, then retry the original request once. If it fails again after re-auth, surface the error to the user normally. Do not retry on any other error code.
+
+This applies to: `cyoda:status`, `cyoda:build`, `cyoda:test`, `cyoda:debug`, `cyoda:migrate`. Each skill states this rule inline — no shared wrapper, since skills are invoked in isolation.
+
+`cyoda:auth`, `cyoda:setup`, `cyoda:design`, `cyoda:compute`, `cyoda:docs`, and `cyoda:app` are unaffected (they don't make authenticated calls or handle their own auth flow).
 
 ## Authentication and Session Config
 

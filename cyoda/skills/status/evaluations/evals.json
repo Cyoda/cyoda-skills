@@ -39,6 +39,19 @@
         { "id": "suggests-setup", "text": "Directs user to run /cyoda:setup", "type": "behavior" },
         { "id": "no-crash", "text": "Does NOT crash or show a raw error instead of a helpful message", "type": "behavior" }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "What's my Cyoda status?",
+      "expected_output": "Detects 401 on health check, invokes cyoda:auth to refresh, then retries the status check",
+      "files": {
+        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+      },
+      "assertions": [
+        { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when the health check returns 401 or 403", "type": "behavior" },
+        { "id": "retries-after-refresh", "text": "Retries the health check once after cyoda:auth completes", "type": "behavior" },
+        { "id": "no-unreachable-on-401", "text": "Does NOT report 'unreachable' on a 401 — treats it as an auth error, not a connectivity error", "type": "behavior" }
+      ]
     }
   ]
 }

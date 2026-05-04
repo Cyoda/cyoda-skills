@@ -46,6 +46,19 @@
         { "id": "verifies-historical-state", "text": "Verifies historical state matches pre-transition state", "type": "behavior" },
         { "id": "no-pit-before-history", "text": "Does NOT test point-in-time before creating any entity history", "type": "behavior" }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "/cyoda:test",
+      "expected_output": "Detects 401 on test API call, invokes cyoda:auth to refresh, retries the failing call once",
+      "files": {
+        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+      },
+      "assertions": [
+        { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when a test API call returns 401 or 403", "type": "behavior" },
+        { "id": "retries-after-refresh", "text": "Retries the failing call once after auth refresh", "type": "behavior" },
+        { "id": "surfaces-error-after-second-fail", "text": "Reports the error to the user if the retry also fails, rather than silently dropping it", "type": "behavior" }
+      ]
     }
   ]
 }

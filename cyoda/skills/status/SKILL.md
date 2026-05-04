@@ -28,6 +28,8 @@ else
 fi
 ```
 
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
+
 Report based on output:
 
 - `STATUS=not_configured` → **"Not connected to Cyoda — run `/cyoda:setup` to get started"**

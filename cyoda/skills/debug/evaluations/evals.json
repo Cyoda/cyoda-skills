@@ -46,6 +46,19 @@
         { "id": "references-grpc-patterns", "text": "Points to grpc-patterns.md for reconnection guidance", "type": "behavior" },
         { "id": "no-increase-timeout", "text": "Does NOT suggest increasing the timeout without explaining the async pattern", "type": "behavior" }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Show me the history for entity abc-123",
+      "expected_output": "Detects 401 when fetching entity history, invokes cyoda:auth to refresh, retries the history request once",
+      "files": {
+        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+      },
+      "assertions": [
+        { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when the entity API call returns 401 or 403", "type": "behavior" },
+        { "id": "retries-after-refresh", "text": "Retries the entity history fetch once after auth refresh", "type": "behavior" },
+        { "id": "no-not-found-on-401", "text": "Does NOT report 'entity not found' on a 401 — treats it as an auth error", "type": "behavior" }
+      ]
     }
   ]
 }

@@ -19,6 +19,8 @@ If `.env` equals `production`: display **"⚠️ Operating against a PRODUCTION 
 
 If not pointing to a local instance (endpoint does not contain `localhost` or `127.0.0.1`): *"This skill migrates FROM local cyoda-go. Your current config points to a non-local endpoint. Are you sure you want to proceed?"*
 
+**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
+
 ### Step 1 — Verify local instance is working
 
 ```bash
