@@ -40,9 +40,10 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 
 1. Check gRPC connectivity: is your compute node registered?
 2. Check tag routing: do the node's registered tags form a superset of the transition's required tags?
-3. Check timeout: did the processor respond within 60s?
+3. Check timeout: did the processor respond within 60s? If the operation legitimately takes longer, implement the fully async pattern.
 4. Check response format: does it include `requestId` and `entityId`?
 5. Check idempotency: is the processor handling duplicate `requestId` correctly?
+6. For reconnection patterns and keep-alive implementation, see `cyoda/skills/compute/resources/grpc-patterns.md`.
 
 #### Schema Rejection
 
@@ -91,4 +92,6 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}?pointInTime=2026-01-15T10:00
 - What was the entity's state at time T?
 - Has this entity been in an error state before?
 
-For deeper audit data (who changed what, when), use `/cyoda:docs` to look up the audit endpoints.
+Before answering, invoke `cyoda:docs` to discover all available observation endpoints (audit trail, changes, point-in-time) and their query parameters. Use the endpoints as complementary sources — combine their results for a complete picture of the entity's history.
+
+When investigating transactions or diagnosing failures, use `?level=DEBUG` on the audit endpoint — it exposes step-by-step state machine execution detail: shard routing, TRANSACTION_EXEC events, each TRANSITION_MADE step, and actor identity per transaction.

@@ -22,11 +22,15 @@
       "prompt": "Show me the full history of entity abc-123 — I need to audit what happened to it",
       "expected_output": "Switches to observation mode, calls entity history endpoint for abc-123, presents transition history in readable format with states/timestamps/processor invocations, offers point-in-time lookup",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "cyoda:docs response for observation endpoints": "Available observation endpoints:\n- GET /api/entity/{entityId}/changes — full change history (transitions, processors, timestamps)\n- GET /api/entity/{entityId}?pointInTime={RFC3339} — entity state at a specific point in time\n- GET /audit/entity/{entityId} — audit trail with who changed what and when (cursor-paginated, newest first, max 180-day window). Supports ?level=DEBUG for step-by-step state machine execution detail: shard routing, TRANSACTION_EXEC events, each TRANSITION_MADE step, and actor identity per transaction."
       },
       "assertions": [
         { "id": "uses-observation-mode", "text": "Switches to observation mode (not debugging mode)", "type": "behavior" },
+        { "id": "invokes-cyoda-docs", "text": "Invokes cyoda:docs to discover all available observation endpoints before answering", "type": "behavior" },
         { "id": "calls-history-endpoint", "text": "Calls the entity changes endpoint (/api/entity/{id}/changes) for entity abc-123", "type": "behavior" },
+        { "id": "calls-audit-endpoint", "text": "Calls the audit endpoint (/audit/entity/{id}) for entity abc-123", "type": "behavior" },
+        { "id": "offers-debug-level", "text": "Mentions or offers ?level=DEBUG on the audit endpoint for transaction/failure detail", "type": "behavior" },
         { "id": "presents-history", "text": "Presents entity change history in readable format with states and timestamps", "type": "format" },
         { "id": "offers-pit-lookup", "text": "Offers point-in-time lookup if needed", "type": "behavior" },
         { "id": "no-debug-framing", "text": "Does NOT treat an audit request as a debugging problem", "type": "behavior" }

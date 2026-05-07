@@ -184,7 +184,7 @@ Systematic diagnosis and observation of Cyoda entities and workflows. Two modes 
 - Query entity transition history: full lifecycle of a specific entity
 - Point-in-time state lookup: "what state was entity X in at time T?"
 - Browse audit trail: which transitions fired, which processors ran, in what order
-- Uses Cyoda's history and point-in-time APIs directly
+- Invokes `cyoda:docs` to discover all available observation endpoints (audit, changes, point-in-time) before answering, then combines their results for a complete picture
 
 Both modes use the same underlying Cyoda APIs. Delegates to `cyoda:docs` for API reference when needed.
 
