@@ -30,6 +30,17 @@
       ]
     },
     {
+      "id": 4,
+      "prompt": "Implement a compute node for my order processor",
+      "expected_output": "Guides fetching the proto file via cyoda docs (cyoda help grpc proto), uses it to generate Go stubs, does not search for local proto files or depend on any Cyoda implementation repository",
+      "files": {},
+      "assertions": [
+        { "id": "fetches-proto-from-docs", "text": "Instructs fetching proto via documentation (cyoda help grpc proto or /cyoda:docs) rather than searching local filesystem", "type": "behavior" },
+        { "id": "no-local-file-search", "text": "Does NOT suggest searching for .proto files locally or importing a Cyoda implementation repository as a dependency", "type": "behavior" },
+        { "id": "generates-stubs", "text": "Instructs generating language-specific gRPC stubs from the fetched proto file", "type": "behavior" }
+      ]
+    },
+    {
       "id": 3,
       "prompt": "Do I need a compute node for my order approval workflow? Transitions are triggered by users clicking buttons.",
       "expected_output": "Assesses the use case, explains manual transitions don't need compute nodes, explains what would require one, concludes no compute node needed",

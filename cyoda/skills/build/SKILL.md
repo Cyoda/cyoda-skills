@@ -6,7 +6,7 @@ allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(echo *) Bash(tee *) Ba
 
 ## Cyoda Incremental Build
 
-**API rule:** Never construct or guess an API URL that is not explicitly listed in this skill. For any endpoint not listed here, invoke `cyoda:docs` to look up the correct path before making the call. Do not use curl OPTIONS for CORS diagnostics — if a SPA can't reach Cyoda, direct the user to `/cyoda:setup`.
+**API rule:** Never construct or guess an API URL that is not explicitly listed in this skill. For any endpoint not listed here, invoke `cyoda:docs` to look up the correct path before making the call.
 
 **Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
 

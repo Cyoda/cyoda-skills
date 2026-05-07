@@ -600,7 +600,7 @@ git commit -m "feat: remove monitor, add 401/403 token-refresh retry to API skil
 ```markdown
 ---
 name: docs
-description: Look up Cyoda documentation. Uses local `cyoda help` (version-specific, preferred for API details) with web docs as fallback. Synthesizes direct answers — never dumps raw output. Auto-invoked when Cyoda API questions arise.
+description: Look up Cyoda documentation. Uses local `cyoda help` (version-specific, preferred for API details) with https://docs.cyoda.net/help/ as fallback. Synthesizes direct answers — never dumps raw output. Auto-invoked when Cyoda API questions arise.
 when_to_use: When the user asks how to use a Cyoda API, what an endpoint does, how a concept works, or needs schema/protocol details.
 allowed-tools: Bash(cyoda *) Bash(which *)
 ---
@@ -614,27 +614,22 @@ which cyoda 2>/dev/null && cyoda help 2>/dev/null | head -50 || echo "CYODA_CLI_
 
 **If output contains `CYODA_CLI_NOT_INSTALLED`:**
 
-Ask the user: *"Local `cyoda` CLI is not installed. Local docs are version-specific and more accurate for API-level questions — I recommend installing it. Run `/cyoda:setup` to install cyoda-go locally, or I can proceed with the online docs (which reflect the latest version). What would you prefer?"*
+Ask the user once per session: *"Local `cyoda` CLI is not installed. It's recommended for development — run `/cyoda:setup` (local mode) to install it. Would you like to do that now, or should I use the online help at https://docs.cyoda.net/help/ to answer your question?"*
 
 - If user wants to install: invoke `/cyoda:setup` (local mode), then re-invoke this skill.
-- If user prefers web docs: fetch from https://docs.cyoda.net/ and synthesize the answer.
+- If user prefers online help (or already answered "no" earlier in this conversation): fetch `https://docs.cyoda.net/help/index.json` to discover available topics, then fetch `https://docs.cyoda.net/help/<slug>.md` for the relevant topic. URL mapping: `cyoda help A B C` → `https://docs.cyoda.net/help/a/b/c/`. This surface is a mirror of the CLI help, designed for agent access.
 
 **If cyoda CLI is installed:**
 
-1. Use the `cyoda help` output above as the primary source.
-2. For the specific question asked, also run:
-```!
-cyoda help 2>/dev/null
-```
-3. If the answer is not fully covered by local help, supplement with web docs at https://docs.cyoda.net/
-4. For gRPC/schema details, reference: https://github.com/Cyoda-platform/cyoda-docs/tree/main/src/schemas
-5. For REST API details, reference: https://docs.cyoda.net/openapi/openapi.json
+1. Use the `cyoda help` output above as the primary source to answer the user's question.
+2. If the answer is not fully covered by local help, supplement with web docs: fetch `https://docs.cyoda.net/llms.txt` first to identify the relevant page, then fetch that page directly.
+3. For gRPC/schema details, reference: https://github.com/Cyoda-platform/cyoda-docs/tree/main/src/schemas
+4. For REST API details, reference: https://docs.cyoda.net/openapi/openapi.json
 
 **Always:**
 - Synthesize a direct, specific answer to the question asked
 - Never paste raw `cyoda help` output without explanation
 - Prefer local CLI output over web docs for API-level specifics
-- Note if the web docs may differ from the installed version
 ```
 
 Save to `cyoda/skills/docs/SKILL.md`.
@@ -672,12 +667,13 @@ Save to `cyoda/skills/docs/SKILL.md`.
   },
   "expectedBehavior": [
     "Detects CLI is not installed",
-    "Asks user whether to install via /cyoda:setup or use web docs",
-    "Does not proceed without user choice",
-    "Explains why local docs are preferred"
+    "Asks user whether to install via /cyoda:setup or use the online help at https://docs.cyoda.net/help/",
+    "If user says online: fetches /help/index.json to discover topics, then fetches relevant /help/<slug>.md",
+    "Synthesizes answer from web help content"
   ],
   "antiPatterns": [
-    "Silently falling back to web docs without asking",
+    "Silently falling back to web docs without asking (first time)",
+    "Asking again if user already declined install earlier in the conversation",
     "Refusing to help until CLI is installed"
   ]
 }
@@ -2569,10 +2565,14 @@ Invoke `/cyoda:design` — describe your application and I'll guide you through 
 
 ### Step 2 — Set up your Cyoda instance
 
-Will you develop locally with cyoda-go, or connect straight to Cyoda Cloud?
+First, check if you're already connected:
 
-- **Local (recommended for development):** Run `/cyoda:setup` → choose local
-- **Cloud:** Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
+Invoke `/cyoda:status`. If already connected, confirm with the user whether to use that environment and skip to Step 3.
+
+If not connected, present both options as co-equal:
+
+- **Local cyoda-go** (recommended for development — full control, offline-capable): Run `/cyoda:setup` → choose local
+- **Cyoda Cloud via AI Studio** (fastest to start — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
 
 *(After setup is complete, run `/cyoda:status` to confirm connection.)*
 
@@ -2821,7 +2821,7 @@ Identified from real user session (`_developer/conversation.md`). Three recurrin
 
 **Problem:** Step 3 listed several possible OAuth endpoint paths ("Common paths: /oauth/token, /auth/token, /api/auth/token"), causing Claude to iterate through 6+ paths before finding the correct one. The Cyoda Cloud OAuth endpoint requires credentials in the `Authorization: Basic` header (Base64-encoded `client_id:client_secret`), not in the request body.
 
-**Fix:** Step 3 now uses the known-good pattern as the primary attempt: `POST {endpoint}/api/oauth/token` with `Authorization: Basic base64(client_id:client_secret)` header and `grant_type=client_credentials` in the form body (no credentials in body). Vague "try these paths" note replaced with a self-correction rule: "If this returns 4xx/5xx, run `cyoda help config auth` — do NOT try alternate paths." Added eval #5 asserting Basic auth header and `/api/oauth/token` on first attempt.
+**Fix:** Step 3 now uses the known-good pattern as the primary attempt: `POST {endpoint}/api/oauth/token` with `Authorization: Basic base64(client_id:client_secret)` header and `grant_type=client_credentials` in the form body (no credentials in body). Vague "try these paths" note replaced with a self-correction rule: "If this returns 4xx/5xx, run `cyoda help config auth` (or fetch `https://docs.cyoda.net/help/config/auth.md` if CLI is absent) — do NOT try alternate paths." Added eval #5 asserting Basic auth header and `/api/oauth/token` on first attempt.
 
 ### 2. Model creation before workflow import in `cyoda:build`
 
@@ -2847,13 +2847,7 @@ Identified from real user session (`_developer/conversation.md`). Three recurrin
 
 **Fix:** Added a mandatory API rule at the top of `SKILL.md`: "Never construct or guess an API URL not explicitly listed in this skill. For any other endpoint, invoke `cyoda:docs` first." The self-correction rule in Step 4 changed from "run `cyoda help models`" to "invoke `cyoda:docs`" — which handles the binary-not-found case gracefully via `cyoda:docs`'s own web fallback. Added eval #7 asserting no URL guessing for non-listed endpoints, and eval #8 asserting `cyoda:docs` is invoked on 4xx rather than retrying with guessed paths.
 
-### 2. CORS/OPTIONS diagnostics in `cyoda:build`
-
-**Problem:** The build skill used `curl -X OPTIONS` to probe CORS headers in anticipation of a file:// SPA use case. The OPTIONS probe returned misleading results (405 Method Not Allowed), triggering a long search for the cyoda binary to inspect CORS config — a 90-line dead end.
-
-**Fix:** Added explicit prohibition: "Do not use curl OPTIONS for CORS diagnostics — CORS issues are a setup concern, not a build concern. Direct the user to `/cyoda:setup`." Mirrored in design doc under `cyoda:build` API rule.
-
-### 3. Model version handling in `cyoda:build`
+### 2. Model version handling in `cyoda:build`
 
 **Problem:** API calls hardcoded version `1` (e.g. `/api/entity/JSON/{entity}/1`). The `1` is the model version — if an entity already exists, blindly using version 1 may conflict with an existing model or miss a newer version.
 
@@ -3528,8 +3522,8 @@ git commit -m "feat(skills): update config reads to ~/.config/cyoda/cyoda-plugin
       "assertions": [
         { "id": "basic-auth-header", "text": "Uses Authorization: Basic header with base64-encoded client_id:client_secret — credentials are NOT in the request body", "type": "behavior" },
         { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token on the first attempt — does NOT try /oauth/token, /auth/token, or other paths first", "type": "behavior" },
-        { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults cyoda help config auth instead", "type": "behavior" },
-        { "id": "consults-cyoda-help-on-failure", "text": "If token call fails, runs 'cyoda help config auth' before retrying — does not guess alternate paths", "type": "behavior" }
+        { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults cyoda help config auth (or https://docs.cyoda.net/help/config/auth.md if CLI absent) instead", "type": "behavior" },
+        { "id": "consults-cyoda-help-on-failure", "text": "If token call fails, runs 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying — does not guess alternate paths", "type": "behavior" }
       ]
     }
   ]
@@ -3695,3 +3689,152 @@ git add cyoda/skills/status/evaluations/evals.json \
   cyoda/skills/app/evaluations/evals.json
 git commit -m "test(skills): update eval fixtures for home-dir profile config format"
 ```
+
+---
+
+## Task 15: Web Help Fallback + Cloud-First Support
+
+**Goal:** Make the plugin usable without a locally installed `cyoda` CLI by falling back to `https://docs.cyoda.net/help/` for help content. Ask once per session to recommend local install. Present local and cloud as co-equal options in `cyoda:app`.
+
+**Files:**
+- Modify: `cyoda/skills/docs/SKILL.md`
+- Modify: `cyoda/skills/docs/evaluations/evals.json`
+- Modify: `cyoda/skills/auth/SKILL.md`
+- Modify: `cyoda/skills/auth/evaluations/evals.json`
+- Modify: `cyoda/skills/app/SKILL.md`
+- Modify: `cyoda/skills/app/evaluations/evals.json`
+
+---
+
+- [ ] **Step 1: Update `cyoda/skills/docs/SKILL.md`**
+
+Replace the `If output contains CYODA_CLI_NOT_INSTALLED` block with:
+
+```markdown
+**If output contains `CYODA_CLI_NOT_INSTALLED`:**
+
+Ask the user once per session:
+
+> *"Local `cyoda` CLI is not installed. It's recommended for development — run `/cyoda:setup` (local mode) to install it. Would you like to do that now, or should I use the online help at https://docs.cyoda.net/help/ to answer your question?"*
+
+- If user wants to install: invoke `/cyoda:setup` (local mode), then re-invoke this skill.
+- If user prefers online help (or already answered "no" earlier in this conversation): fetch `https://docs.cyoda.net/help/index.json` to discover available topics, then fetch `https://docs.cyoda.net/help/<slug>.md` for the relevant topic. URL mapping: `cyoda help A B C` → `https://docs.cyoda.net/help/a/b/c/`. This surface mirrors the CLI help and is designed for agent access.
+```
+
+Also update point 2 in the CLI-installed section — replace "fetches `https://docs.cyoda.net/llms.txt` first" supplement reference to be consistent:
+
+```markdown
+2. If the answer is not fully covered by local help, supplement: fetch `https://docs.cyoda.net/llms.txt` first to identify the relevant page, then fetch that page directly.
+```
+
+Remove the "Note if the web docs may differ from the installed version" bullet (no version pinning).
+
+- [ ] **Step 2: Update `cyoda/skills/docs/evaluations/evals.json`**
+
+Replace eval id=2 entirely:
+
+```json
+{
+  "id": 2,
+  "prompt": "What's the endpoint to trigger a transition? (cyoda CLI is not installed)",
+  "expected_output": "Asks the user whether to install cyoda locally or use the online help at https://docs.cyoda.net/help/. If user chooses online: fetches /help/index.json, then fetches the relevant /help/<slug>.md page, synthesizes the answer.",
+  "files": {},
+  "assertions": [
+    { "id": "detects-cli-missing", "text": "Detects that cyoda CLI is not installed", "type": "behavior" },
+    { "id": "asks-install-or-online", "text": "Asks the user whether to install via /cyoda:setup or use the online help at https://docs.cyoda.net/help/", "type": "behavior" },
+    { "id": "fetches-index-json", "text": "When user chooses online, fetches https://docs.cyoda.net/help/index.json to discover topics", "type": "behavior" },
+    { "id": "fetches-slug-md", "text": "Fetches https://docs.cyoda.net/help/<slug>.md for the relevant topic using the cyoda-help URL mapping", "type": "behavior" },
+    { "id": "synthesizes-answer", "text": "Synthesizes a direct answer with the transition endpoint", "type": "behavior" },
+    { "id": "does-not-block", "text": "Does NOT refuse to help — proceeds with online docs if user declines install", "type": "behavior" },
+    { "id": "does-not-ask-again", "text": "Does NOT ask again if the user already declined install earlier in the conversation", "type": "behavior" }
+  ]
+}
+```
+
+- [ ] **Step 3: Update `cyoda/skills/auth/SKILL.md`**
+
+In **Step 4 — Obtain JWT token**, replace:
+
+```markdown
+If the cyoda CLI is installed, first confirm the current-version endpoint:
+```bash
+which cyoda >/dev/null 2>&1 && cyoda help config auth --format=markdown 2>/dev/null | head -40
+```
+```
+
+With:
+
+```markdown
+First confirm the current-version endpoint:
+```bash
+which cyoda >/dev/null 2>&1 && cyoda help config auth --format=markdown 2>/dev/null | head -40 || echo "CLI_NOT_INSTALLED"
+```
+If the output contains `CLI_NOT_INSTALLED`: fetch `https://docs.cyoda.net/help/config/auth.md` for the current-version endpoint reference.
+```
+
+Also replace the on-failure line:
+
+```markdown
+If this returns 4xx/5xx: run `cyoda help config auth` to get the current-version endpoint for your installation. Do NOT try alternate paths — fix the one call based on what `cyoda help` tells you.
+```
+
+With:
+
+```markdown
+If this returns 4xx/5xx: run `cyoda help config auth` (or fetch `https://docs.cyoda.net/help/config/auth.md` if CLI is absent) to get the correct endpoint. Do NOT try alternate paths.
+```
+
+- [ ] **Step 4: Update `cyoda/skills/auth/evaluations/evals.json`**
+
+In eval id=5, update the two assertions about cyoda help fallback:
+
+```json
+{ "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults 'cyoda help config auth' or https://docs.cyoda.net/help/config/auth.md instead", "type": "behavior" },
+{ "id": "consults-help-on-failure", "text": "If token call fails, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying — does not guess alternate paths", "type": "behavior" }
+```
+
+In eval id=6, update the two assertions:
+
+```json
+{ "id": "consults-cyoda-help-on-4xx", "text": "After receiving a 4xx error, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before attempting any retry", "type": "behavior" },
+{ "id": "no-path-guessing-on-failure", "text": "Does NOT try /oauth/token, /auth/token, or any other alternate paths — only retries after reading cyoda help or web help output", "type": "behavior" }
+```
+
+- [ ] **Step 5: Update `cyoda/skills/app/SKILL.md`**
+
+In **Step 2**, replace:
+
+```markdown
+- If **not connected**: ask — "Will you develop locally with cyoda-go, or connect to Cyoda Cloud?"
+  - **Local (recommended for development):** Run `/cyoda:setup` → choose local
+  - **Cloud:** Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
+```
+
+With:
+
+```markdown
+- If **not connected**: present both options as co-equal:
+  - **Local cyoda-go** (recommended for development — full control, offline-capable): Run `/cyoda:setup` → choose local
+  - **Cyoda Cloud via AI Studio** (fastest to start — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
+```
+
+- [ ] **Step 6: Update `cyoda/skills/app/evaluations/evals.json`**
+
+In eval id=3, add assertion:
+
+```json
+{ "id": "presents-co-equal-options", "text": "Presents local cyoda-go and Cyoda Cloud as co-equal options — does not describe local as the primary default", "type": "behavior" }
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add cyoda/skills/docs/SKILL.md cyoda/skills/docs/evaluations/evals.json \
+  cyoda/skills/auth/SKILL.md cyoda/skills/auth/evaluations/evals.json \
+  cyoda/skills/app/SKILL.md cyoda/skills/app/evaluations/evals.json
+git commit -m "feat: web help fallback and cloud-first support in docs, auth, app skills"
+```
+
+- [ ] **Step 8: Run evals for cyoda:docs, cyoda:auth, cyoda:app**
+
+Follow the eval process in CLAUDE.md: spawn executor subagents (one per eval, parallel, background), then grader subagents, then aggregate. Skills to eval: `docs`, `auth`, `app`.

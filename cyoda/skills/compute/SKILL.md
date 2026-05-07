@@ -44,7 +44,7 @@ For local cyoda-go with mock auth, authentication may not be required — check 
 
 ### Schema Details
 
-For exact field names in request/response messages, use `/cyoda:docs` to fetch the current gRPC schemas from https://github.com/Cyoda-platform/cyoda-docs/tree/main/src/schemas
+Always obtain gRPC proto files and JSON schemas from the documentation — do not search for schema files locally. Use `/cyoda:docs` to fetch them: proto source is available via `cyoda help grpc proto`, and JSON schemas via `cyoda help grpc` or the schemas available in the docs. Use the proto file to generate language-specific client stubs.
 
 ### Production Requirements
 

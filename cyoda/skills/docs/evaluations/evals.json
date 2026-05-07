@@ -15,14 +15,17 @@
     },
     {
       "id": 2,
-      "prompt": "What's the endpoint to trigger a transition? (assume CLI not installed, user has chosen web docs)",
-      "expected_output": "Detects CLI is missing, user chooses web docs — fetches llms.txt first to find the relevant page, then fetches that page and synthesizes the answer.",
+      "prompt": "What's the endpoint to trigger a transition? (cyoda CLI is not installed)",
+      "expected_output": "Asks the user whether to install cyoda locally or use the online help at https://docs.cyoda.net/help/. If user chooses online: fetches /help/index.json, then fetches the relevant /help/<slug>.md page, synthesizes the answer.",
       "files": {},
       "assertions": [
-        { "id": "detects-cli-missing", "text": "Detects cyoda CLI is not installed", "type": "behavior" },
-        { "id": "fetches-llms-txt", "text": "Fetches https://docs.cyoda.net/llms.txt before fetching any other docs page", "type": "behavior" },
-        { "id": "fetches-relevant-page", "text": "Uses llms.txt to identify and fetch the specific page relevant to the question rather than fetching the root URL", "type": "behavior" },
-        { "id": "synthesizes-answer", "text": "Synthesizes a direct answer with the transition endpoint", "type": "behavior" }
+        { "id": "detects-cli-missing", "text": "Detects that cyoda CLI is not installed", "type": "behavior" },
+        { "id": "asks-install-or-online", "text": "Asks the user whether to install via /cyoda:setup or use the online help at https://docs.cyoda.net/help/", "type": "behavior" },
+        { "id": "fetches-index-json", "text": "When user chooses online, fetches https://docs.cyoda.net/help/index.json to discover topics", "type": "behavior" },
+        { "id": "fetches-slug-md", "text": "Fetches https://docs.cyoda.net/help/<slug>.md for the relevant topic using the cyoda-help URL mapping", "type": "behavior" },
+        { "id": "synthesizes-answer", "text": "Synthesizes a direct answer with the transition endpoint", "type": "behavior" },
+        { "id": "does-not-block", "text": "Does NOT refuse to help — proceeds with online docs if user declines install", "type": "behavior" },
+        { "id": "does-not-ask-again", "text": "Does NOT ask again if the user already declined install earlier in the conversation", "type": "behavior" }
       ]
     },
     {

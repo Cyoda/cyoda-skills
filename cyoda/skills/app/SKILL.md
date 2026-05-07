@@ -45,9 +45,9 @@ First, let me check if you already have a Cyoda instance configured.
 Invoke `/cyoda:status`.
 
 - If **already connected**: confirm with the user whether to use that environment and skip to Step 3.
-- If **not connected**: ask — "Will you develop locally with cyoda-go, or connect to Cyoda Cloud?"
-  - **Local (recommended for development):** Run `/cyoda:setup` → choose local
-  - **Cloud:** Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
+- If **not connected**: present both options as co-equal:
+  - **Local cyoda-go** (recommended for development — full control, offline-capable): Run `/cyoda:setup` → choose local
+  - **Cyoda Cloud via AI Studio** (fastest to start — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
 
 *(After setup is complete, run `/cyoda:status` to confirm connection.)*
 

@@ -1,7 +1,7 @@
 # Cyoda Plugin Design
 
 **Date:** 2026-04-24
-**Updated:** 2026-05-07
+**Updated:** 2026-05-07 (web help fallback + cloud-first support)
 **Status:** Implemented
 
 ## Overview
@@ -104,9 +104,11 @@ Uses dynamic context injection to check for local cyoda CLI at invocation time:
 ```
 
 **Behavior:**
-1. If cyoda CLI is not installed: asks the user whether they want to install it locally — local docs are version-specific and more accurate for API-level questions. If yes, delegates to `cyoda:setup` (local mode), then retries. If no, falls back to web docs: fetches `https://docs.cyoda.net/llms.txt` first to get a structured index, then fetches the specific page(s) relevant to the question.
-2. If cyoda CLI is installed: uses `cyoda help` output as the primary source. For anything not covered locally, fetches `https://docs.cyoda.net/llms.txt` first to identify the relevant page, then fetches that page directly.
-3. Always synthesizes a direct answer to the user's question — never dumps raw help output.
+1. If cyoda CLI is not installed: ask once per session — *"Local `cyoda` CLI is not installed. It's recommended for development — run `/cyoda:setup` (local mode) to install it. Would you like to do that now, or should I use the online help at https://docs.cyoda.net/help/ to answer your question?"* If yes → delegate to `cyoda:setup` (local mode), then re-invoke. If no → use web help (see below). "Once per session" is handled by inline conversation context — if the user already answered, skip the question.
+2. If cyoda CLI is installed: uses `cyoda help` output as the primary source.
+3. If using web help (CLI absent and user declined install): fetch `https://docs.cyoda.net/help/index.json` to discover available topics, then fetch `https://docs.cyoda.net/help/<slug>.md` for the relevant topic. URL mapping: `cyoda help A B C` → `https://docs.cyoda.net/help/a/b/c/`. The `/help/` surface is a mirror of the CLI help and is designed for agent access.
+4. For anything not covered by local or help-mirror content: fetch `https://docs.cyoda.net/llms.txt` to identify the relevant docs page, then fetch that page.
+5. Always synthesizes a direct answer to the user's question — never dumps raw output.
 
 This skill is callable by other skills (e.g., `cyoda:build` delegates here when it needs API details) and also useful as a standalone `/cyoda:docs` command.
 
@@ -140,7 +142,7 @@ Incremental build loop — supports both new additions and modifications to exis
 5. **Verify**: prompt to run `cyoda:test`, show the current entity/workflow state
 6. **Loop**: back to step 2 for the next increment
 
-**API rule**: Never construct or guess an API URL not explicitly listed in this skill. For any other endpoint (export, search, etc.), invoke `cyoda:docs` first. Do not use curl OPTIONS for CORS diagnostics — CORS issues are a setup concern, not a build concern.
+**API rule**: Never construct or guess an API URL not explicitly listed in this skill. For any other endpoint (export, search, etc.), invoke `cyoda:docs` first.
 
 Handles the full lifecycle: create → evolve → lock. This also covers the hello world / quickstart path — the user starts the loop and the first increment is simply the minimal entity + workflow.
 
@@ -201,7 +203,7 @@ Obtains a JWT token via OAuth 2.0 client credentials flow and writes the connect
      - If yes: collect them and proceed.
      - If no: direct to Cyoda AI Studio at https://ai.cyoda.net/ — ask it to "create a technical user". Return once credentials are available.
    - **Post-redeploy note**: if the environment was recently redeployed, technical users may have been deleted — credentials that previously worked may fail. In that case, recreate the technical user in AI Studio.
-6. Call OAuth token endpoint, obtain JWT. Correct endpoint: `POST {endpoint}/api/oauth/token` with `Authorization: Basic base64(client_id:client_secret)` header — credentials are NOT in the request body. If CLI is available, run `cyoda help config auth` first to confirm the current-version endpoint. On 4xx/5xx, consult `cyoda help config auth` rather than guessing alternate paths.
+6. Call OAuth token endpoint, obtain JWT. Correct endpoint: `POST {endpoint}/api/oauth/token` with `Authorization: Basic base64(client_id:client_secret)` header — credentials are NOT in the request body. If CLI is available, run `cyoda help config auth` first to confirm the current-version endpoint; if not, fetch `https://docs.cyoda.net/help/config/auth.md`. On 4xx/5xx, consult the same source rather than guessing alternate paths.
 7. Write/merge the profile into `~/.config/cyoda/cyoda-plugin-config.json` and set it as active. No `.gitignore` entries needed.
 
 Skills making API calls (`cyoda:build`, `cyoda:test`, `cyoda:migrate`) read the active profile via dynamic context injection at invocation time:
@@ -254,7 +256,7 @@ Newcomer orchestrator. Walks the user through the full journey by sequencing the
 1. Orient to Cyoda philosophy (inline, brief)
 2. Invoke `cyoda:design` for domain brainstorm
 3. **Check existing instance first**: invoke `cyoda:status` before asking local vs cloud. If already connected, confirm whether to use that environment. Only ask local/cloud if not connected.
-4. Invoke `cyoda:setup` (local or cloud, user's choice) if not already configured
+4. If not connected, present both options as co-equal: **Local cyoda-go** (recommended for development — full control, offline-capable) and **Cyoda Cloud via AI Studio** (fastest to start — no local install needed). Invoke `cyoda:setup` with the user's choice.
 5. Invoke `cyoda:build` for incremental implementation
 6. Invoke `cyoda:test` for smoke testing
 7. Offer `cyoda:migrate` if user wants to move to cloud
@@ -329,7 +331,7 @@ If the file does not exist yet, skills create it. No `.gitignore` entries are wr
 
 No Cyoda documentation is embedded in skill bodies. Instead:
 - `cyoda:docs` fetches docs dynamically (local CLI preferred, web fallback)
-- `cyoda:build` runs `cyoda help` directly in Step 4 — proactively before any curl, not as fallback
+- `cyoda:build` runs `cyoda help` directly in Step 4 — proactively before any curl, not as fallback. If CLI absent, fetches the equivalent `https://docs.cyoda.net/help/<slug>.md` page instead.
 - Other skills delegate to `cyoda:docs` for API details
 - Skills reference supporting files in their directory for examples and templates
 

@@ -95,8 +95,7 @@
       },
       "assertions": [
         { "id": "invokes-docs-for-export", "text": "Invokes cyoda:docs to look up the correct export endpoint path", "type": "behavior" },
-        { "id": "no-url-guessing", "text": "Does NOT attempt curl calls with guessed URL variants (e.g. /api/model/export/JSON/SIMPLE_VIEW/... or /api/model/export/JSON/...)", "type": "behavior" },
-        { "id": "no-options-call", "text": "Does NOT use curl OPTIONS for any diagnostic purpose", "type": "behavior" }
+        { "id": "no-url-guessing", "text": "Does NOT attempt curl calls with guessed URL variants (e.g. /api/model/export/JSON/SIMPLE_VIEW/... or /api/model/export/JSON/...)", "type": "behavior" }
       ]
     }
     ,{

@@ -36,6 +36,7 @@
       "files": {},
       "assertions": [
         { "id": "checks-status-first", "text": "Invokes /cyoda:status before asking about setup mode", "type": "behavior" },
+        { "id": "presents-co-equal-options", "text": "Presents local cyoda-go and Cyoda Cloud as co-equal options — does not describe local as the primary default or push back on cloud choice", "type": "behavior" },
         { "id": "accepts-cloud-first", "text": "Accepts cloud-first approach without pushback", "type": "behavior" },
         { "id": "guides-to-cloud-setup", "text": "Guides to /cyoda:setup in cloud mode", "type": "behavior" },
         { "id": "guides-to-login", "text": "Guides to /cyoda:auth for authentication", "type": "behavior" },

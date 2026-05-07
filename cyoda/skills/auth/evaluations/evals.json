@@ -78,22 +78,37 @@
       "assertions": [
         { "id": "basic-auth-header", "text": "Uses Authorization: Basic header with base64-encoded client_id:client_secret — credentials are NOT in the request body", "type": "behavior" },
         { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token on the first attempt — does NOT try /oauth/token, /auth/token, or other paths first", "type": "behavior" },
-        { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults cyoda help config auth instead", "type": "behavior" },
-        { "id": "consults-cyoda-help-on-failure", "text": "If token call fails, runs 'cyoda help config auth' before retrying — does not guess alternate paths", "type": "behavior" }
+        { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults 'cyoda help config auth' or https://docs.cyoda.net/help/config/auth.md instead", "type": "behavior" },
+        { "id": "consults-help-on-failure", "text": "If token call fails, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying — does not guess alternate paths", "type": "behavior" }
       ]
     },
     {
       "id": 6,
       "prompt": "/cyoda:auth — connect with client_id=bad-client and client_secret=bad-secret",
-      "expected_output": "Calls /api/oauth/token, gets a 4xx error, runs 'cyoda help config auth' to get the correct endpoint, does NOT try alternate paths like /oauth/token or /auth/token, retries with the corrected endpoint from cyoda help output",
+      "expected_output": "Calls /api/oauth/token, gets a 4xx error, consults 'cyoda help config auth' to verify the endpoint path, confirms the path is correct and the error is bad credentials, surfaces the credential error to the user — does NOT try alternate paths like /oauth/token or /auth/token, does NOT write partial credentials",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
       },
       "assertions": [
         { "id": "calls-token-endpoint-first", "text": "Calls /api/oauth/token on the first attempt before any fallback", "type": "behavior" },
-        { "id": "consults-cyoda-help-on-4xx", "text": "After receiving a 4xx error, runs 'cyoda help config auth' before attempting any retry", "type": "behavior" },
-        { "id": "no-path-guessing-on-failure", "text": "Does NOT try /oauth/token, /auth/token, or any other alternate paths — only retries after reading cyoda help output", "type": "behavior" },
-        { "id": "retries-after-help", "text": "Retries the token call using the endpoint path from cyoda help output, not a guessed path", "type": "behavior" }
+        { "id": "consults-cyoda-help-on-4xx", "text": "After receiving a 4xx error, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before attempting any retry", "type": "behavior" },
+        { "id": "no-path-guessing-on-failure", "text": "Does NOT try /oauth/token, /auth/token, or any other alternate paths — only acts after reading cyoda help or web help output", "type": "behavior" },
+        { "id": "surfaces-error-no-partial-write", "text": "Surfaces the credential error to the user and does NOT write partial credentials to the config file", "type": "behavior" }
+      ]
+    }
+  ,
+    {
+      "id": 7,
+      "prompt": "/cyoda:auth — connect to dev environment, token endpoint returns 404 on first attempt",
+      "expected_output": "Calls /api/oauth/token, gets 404 (wrong path), consults 'cyoda help config auth' to find the correct endpoint, retries with the corrected path from help output — does NOT guess alternate paths",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
+      },
+      "assertions": [
+        { "id": "calls-token-endpoint-first", "text": "Calls /api/oauth/token on the first attempt", "type": "behavior" },
+        { "id": "consults-help-on-404", "text": "After receiving a 404, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying", "type": "behavior" },
+        { "id": "retries-after-help", "text": "Retries the token call using the corrected endpoint path from help output — does NOT guess alternate paths", "type": "behavior" },
+        { "id": "no-path-guessing", "text": "Does NOT try /oauth/token, /auth/token, or any other path not sourced from cyoda help or web help output", "type": "behavior" }
       ]
     }
   ]
