@@ -150,11 +150,12 @@ Handles the full lifecycle: create → evolve → lock. This also covers the hel
 
 Guides implementation of compute nodes (external gRPC processors), language-agnostic:
 
-- gRPC connection lifecycle: join handshake (`CalculationMemberJoinEvent` → `CalculationMemberGreetEvent`), keep-alive, reconnection with exponential backoff
+- **Endpoint**: local `localhost:9090` (plaintext); cloud `grpc-{rest-host}:443` (TLS) — the gRPC hostname has a `grpc-` prefix vs the REST hostname. Do not use the REST hostname for gRPC.
+- **Always fetch schemas before implementing**: `cyoda help grpc proto` (proto for stub generation) + `cyoda help cloudevents json` (authoritative field names for every event type). Do not use field names from skill examples — they are structural guides only, not authoritative.
+- gRPC connection lifecycle: join → greet → ack → handle requests → respond to keep-alive probes → reconnect with exponential backoff. Exact event type names and payload fields come from `cyoda help cloudevents json`.
 - Tag-based routing: how tags on workflow processors/criteria map to compute node registration tags
-- Processor implementation pattern: receive `EntityProcessorCalculationRequest`, process, respond with `requestId` + `entityId`
-- Criteria implementation pattern: receive `EntityCriteriaCalculationRequest`, return boolean
-- Production requirements: idempotency via `requestId`, thread safety, timeout handling (default 60s)
+- Processor and criteria implementation patterns: structural pseudocode only; field names from schemas
+- Production requirements: idempotency via request ID, thread-safe sending via queue-based request iterator, timeout handling (default 60s)
 - Points to `cyoda:docs` for current schema details and JSON Schema files from the docs repo
 
 Compute nodes are always presented as optional — many Cyoda workflows need no external processors.

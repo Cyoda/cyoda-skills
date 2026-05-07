@@ -52,6 +52,31 @@
         { "id": "correct-conclusion", "text": "Concludes no compute node is needed for this case", "type": "behavior" },
         { "id": "no-unnecessary-recommendation", "text": "Does NOT recommend a compute node when one is not needed", "type": "behavior" }
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "My compute node connects fine locally but can't reach the gRPC endpoint on Cyoda Cloud. My REST endpoint is https://client-abc123-prod.eu.cyoda.net",
+      "expected_output": "Explains that the cloud gRPC endpoint is on a different hostname — grpc-client-abc123-prod.eu.cyoda.net:443 — not the REST hostname, and guides the user to update their compute node endpoint configuration",
+      "files": {},
+      "assertions": [
+        { "id": "identifies-hostname-difference", "text": "Identifies that cloud gRPC uses a different hostname from the REST API (grpc- prefix)", "type": "behavior" },
+        { "id": "gives-correct-endpoint", "text": "Gives the correct gRPC endpoint: grpc-client-abc123-prod.eu.cyoda.net:443", "type": "behavior" },
+        { "id": "tls-on-cloud", "text": "Notes that TLS is required for the cloud gRPC endpoint on port 443", "type": "behavior" },
+        { "id": "does-not-guess-port", "text": "Does NOT suggest guessing ports (9090, 50051) for cloud connections", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "What events do I need to handle for keep-alive and what do I send back? Also does the GreetEvent need a response?",
+      "expected_output": "Explains CalculationMemberKeepAliveEvent → EventAckResponse with sourceEventId, and that CalculationMemberGreetEvent also needs EventAckResponse acknowledgement",
+      "files": {},
+      "assertions": [
+        { "id": "correct-keepalive-type", "text": "Identifies the keep-alive event as CalculationMemberKeepAliveEvent (not KeepAliveRequest)", "type": "behavior" },
+        { "id": "correct-keepalive-response", "text": "Specifies EventAckResponse (not CalculationMemberKeepAliveResponse) as the correct response", "type": "behavior" },
+        { "id": "sourceeventid-field", "text": "Mentions sourceEventId field in the EventAckResponse linking it to the keep-alive event", "type": "behavior" },
+        { "id": "greet-ack", "text": "Explains that CalculationMemberGreetEvent also requires an EventAckResponse acknowledgement", "type": "behavior" },
+        { "id": "id-in-payload", "text": "Notes that all event text_data payloads must include an id field (BaseEvent requirement)", "type": "behavior" }
+      ]
     }
   ]
 }

@@ -42,9 +42,13 @@ Include as bearer token in gRPC metadata: `Authorization: Bearer {token}`
 
 For local cyoda-go with mock auth, authentication may not be required — check with `/cyoda:docs`.
 
-### Schema Details
+### Schema Details — Fetch Before Implementing
 
-Always obtain gRPC proto files and JSON schemas from the documentation — do not search for schema files locally. Use `/cyoda:docs` to fetch them: proto source is available via `cyoda help grpc proto`, and JSON schemas via `cyoda help grpc` or the schemas available in the docs. Use the proto file to generate language-specific client stubs.
+**Before writing any implementation code**, fetch the authoritative schemas:
+1. `cyoda help grpc proto` — CloudEvent proto definition; generate language-specific stubs from this
+2. `cyoda help cloudevents json` — JSON schemas for every event type with exact field names
+
+Do NOT rely on field names from `grpc-patterns.md` or `examples/` — those show structure and sequence only. The schemas are the authoritative source for field names, required fields, and types. Using stale example field names instead of checking the schemas is a common source of bugs.
 
 ### Production Requirements
 

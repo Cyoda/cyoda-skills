@@ -1,42 +1,35 @@
 # Compute Node Processor Implementation
 
-## What you receive
+## Fetch Schemas First
 
-`EntityProcessorCalculationRequest`:
-- `requestId` — deduplicate with this
-- `entityId` — ID of the entity being processed
-- `entityData` — current entity JSON payload
-- `transitionName` — the transition that triggered this processor
+Before implementing, run:
+```
+cyoda help cloudevents json
+```
+Look up `EntityProcessorCalculationRequest` and `EntityProcessorCalculationResponse` for the exact field names and required fields. Do not rely on the pseudocode below for field names — the schemas are authoritative.
 
-## What you return
+## Pattern
 
-`EntityProcessorCalculationResponse`:
-- `requestId` — echo the same requestId
-- `entityId` — echo the same entityId
-- `entityData` — modified entity JSON (or unchanged if no modification needed)
-- `success` — boolean
-
-## Pseudocode (language-agnostic)
+You receive a processor request for each entity transitioning through a tagged state. You process it and return a response.
 
 ```
 function handleProcessorRequest(request):
-  if alreadyProcessed(request.requestId):
-    return cachedResponse(request.requestId)
+  if alreadyProcessed(request.<requestId field>):
+    return cachedResponse(request.<requestId field>)
 
-  entity = parseJSON(request.entityData)
+  entity = parseJSON(request.<entity data field>)
 
   // your business logic here
   entity.processedAt = now()
-  entity.status = "enriched"
 
-  response = {
-    requestId: request.requestId,
-    entityId: request.entityId,
+  response = buildResponse(
+    requestId: request.<requestId field>,
+    entityId: request.<entityId field>,
     entityData: toJSON(entity),
     success: true
-  }
+  )
 
-  cacheResponse(request.requestId, response)
+  cacheResponse(request.<requestId field>, response)
   return response
 ```
 
