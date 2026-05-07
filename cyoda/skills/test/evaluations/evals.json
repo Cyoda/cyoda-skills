@@ -4,12 +4,12 @@
     {
       "id": 1,
       "prompt": "/cyoda:test",
-      "expected_output": "Reads .cyoda/config, asks guided vs automated, in automated mode runs entity creation/transition/state verification sequence and reports pass/fail per test, suggests /cyoda:debug on failure",
+      "expected_output": "Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json, asks guided vs automated, in automated mode runs entity creation/transition/state verification sequence and reports pass/fail per test, suggests /cyoda:debug on failure",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
-        { "id": "reads-config", "text": "Reads .cyoda/config for endpoint before running", "type": "behavior" },
+        { "id": "reads-config", "text": "Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json for endpoint before running", "type": "behavior" },
         { "id": "asks-mode", "text": "Asks guided vs automated mode", "type": "behavior" },
         { "id": "runs-test-sequence", "text": "In automated mode: creates entity, verifies initial state, triggers transition, checks new state", "type": "behavior" },
         { "id": "reports-per-test", "text": "Reports pass/fail per individual test", "type": "format" },
@@ -22,7 +22,7 @@
       "prompt": "/cyoda:test — guided mode, Order entity with submit transition",
       "expected_output": "Generates a fully populated smoke-test.sh with ENTITY_NAME=order and TRANSITION_NAME=submit — no placeholders remaining — with chmod and run instructions",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "generates-script", "text": "Generates populated smoke-test.sh from template", "type": "behavior" },
@@ -38,7 +38,7 @@
       "prompt": "/cyoda:test — I want to check that point-in-time queries work",
       "expected_output": "Runs transition test first to create history, then queries entity at a timestamp before the transition, verifies historical state matches pre-transition state",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "creates-history-first", "text": "Runs the transition test first to create entity history", "type": "behavior" },
@@ -52,7 +52,7 @@
       "prompt": "/cyoda:test",
       "expected_output": "Detects 401 on test API call, invokes cyoda:auth to refresh, retries the failing call once",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"token\":\"eyJexpired...\"}}}"
       },
       "assertions": [
         { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when a test API call returns 401 or 403", "type": "behavior" },

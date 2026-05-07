@@ -10,7 +10,7 @@ This migrates your entity models and workflows from local cyoda-go to Cyoda Clou
 
 Reading current local config:
 ```!
-jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
 ```
 
 If `"endpoint":"none"` or config is absent: *"No Cyoda endpoint configured. Run `/cyoda:setup` first."* Stop.
@@ -24,7 +24,8 @@ If not pointing to a local instance (endpoint does not contain `localhost` or `1
 ### Step 1 — Verify local instance is working
 
 ```bash
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 curl -sf --max-time 5 "${ENDPOINT}/readyz" || echo "UNREACHABLE"
 ```
 
@@ -36,7 +37,8 @@ Suggest running `/cyoda:test` against local before migrating to confirm everythi
 
 ```bash
 mkdir -p migration
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 
 # List all models
 MODELS=$(curl -sf "${ENDPOINT}/api/model")
@@ -61,7 +63,7 @@ Show the user what was exported — confirm both schema and workflow files exist
 
 Invoke `cyoda:setup` for cloud setup, then `cyoda:auth` for authentication.
 
-After setup: re-read `.cyoda/config` to confirm cloud endpoint is active.
+After setup: re-read `~/.config/cyoda/cyoda-plugin-config.json` to confirm cloud endpoint is active.
 
 ### Step 4 — Pre-check cloud, then import
 
@@ -70,8 +72,9 @@ After setup: re-read `.cyoda/config` to confirm cloud endpoint is active.
 For each exported entity, query the cloud instance:
 
 ```bash
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
-TOKEN=$(jq -r '.token' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 
 curl -sf \
   -H "Authorization: Bearer $TOKEN" \

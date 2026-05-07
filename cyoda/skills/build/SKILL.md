@@ -12,7 +12,7 @@ allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(echo *) Bash(tee *) Ba
 
 Reading connection config:
 ```!
-jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
 ```
 
 If `"endpoint":"none"` or config is absent: *"No Cyoda instance configured. Run `/cyoda:setup` first."* Stop.
@@ -22,8 +22,9 @@ If `.env` equals `production`: display **"⚠️ Operating against a PRODUCTION 
 ### Step 1 — Inspect current state
 
 ```!
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
-TOKEN=$(jq -r '.token // ""' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 AUTH_HEADER=$([ -n "$TOKEN" ] && echo "Authorization: Bearer $TOKEN" || echo "X-Mock-Auth: true")
 curl -sf -H "$AUTH_HEADER" "${ENDPOINT%/}/api/model" 2>/dev/null || echo "[]"
 ```
@@ -65,8 +66,9 @@ Use [templates/workflow.json](templates/workflow.json) and [templates/sample-ent
 If `.env` equals `production`: *"You're about to register this change to PRODUCTION. Type 'confirm' to proceed."* Wait for explicit `confirm`.
 
 ```bash
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
-TOKEN=$(jq -r '.token // ""' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 AUTH_HEADER=$([ -n "$TOKEN" ] && echo "-H 'Authorization: Bearer $TOKEN'" || echo "")
 
 # Known endpoint — invoke cyoda:docs for any other endpoint:
@@ -85,8 +87,9 @@ Show the response. If the call returns 4xx/5xx: invoke `cyoda:docs` to look up t
 Re-inspect the current entity/workflow state to show what changed:
 
 ```!
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
-TOKEN=$(jq -r '.token // ""' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 AUTH_HEADER=$([ -n "$TOKEN" ] && echo "Authorization: Bearer $TOKEN" || echo "X-Mock-Auth: true")
 curl -sf -H "$AUTH_HEADER" "${ENDPOINT%/}/api/model" 2>/dev/null || echo "[]"
 ```

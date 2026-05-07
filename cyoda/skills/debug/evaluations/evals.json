@@ -6,7 +6,7 @@
       "prompt": "My 'approve' transition isn't firing — the entity just stays in under_review",
       "expected_output": "Asks for entity ID, fetches current state, checks if approve transition is valid from under_review, checks criteria, checks processor logs — provides specific diagnosis not generic advice",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "asks-entity-id", "text": "Asks for the entity ID", "type": "behavior" },
@@ -22,7 +22,7 @@
       "prompt": "Show me the full history of entity abc-123 — I need to audit what happened to it",
       "expected_output": "Switches to observation mode, calls entity history endpoint for abc-123, presents transition history in readable format with states/timestamps/processor invocations, offers point-in-time lookup",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "uses-observation-mode", "text": "Switches to observation mode (not debugging mode)", "type": "behavior" },
@@ -37,7 +37,7 @@
       "prompt": "My processor keeps timing out — transitions hang for 60 seconds then fail",
       "expected_output": "Identifies 60s timeout as root cause, explains async processing pattern for long operations, checks tag routing, points to grpc-patterns.md",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "identifies-timeout", "text": "Identifies 60s timeout as the root cause", "type": "behavior" },
@@ -52,7 +52,7 @@
       "prompt": "Show me the history for entity abc-123",
       "expected_output": "Detects 401 when fetching entity history, invokes cyoda:auth to refresh, retries the history request once",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"token\":\"eyJexpired...\"}}}"
       },
       "assertions": [
         { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when the entity API call returns 401 or 403", "type": "behavior" },

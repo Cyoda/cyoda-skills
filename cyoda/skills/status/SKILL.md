@@ -9,21 +9,22 @@ allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(jq *)
 
 Current config:
 ```!
-jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
 ```
 
 Checking reachability and version:
 ```!
-ENDPOINT=$(jq -r '.endpoint // "none"' .cyoda/config 2>/dev/null || echo "none");
-ENV=$(jq -r '.env // "development"' .cyoda/config 2>/dev/null || echo "development");
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default");
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "none");
+ENV=$(jq -r --arg p "$PROFILE" '.profiles[$p].env // "development"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "development");
 if [ -z "$ENDPOINT" ] || [ "$ENDPOINT" = "none" ]; then
-  echo "STATUS=not_configured";
+  echo "STATUS=not_configured PROFILE=$PROFILE";
 else
   VERSION=$(curl -sf --max-time 3 "${ENDPOINT%/}/api/help" 2>/dev/null | jq -r '.version // ""' 2>/dev/null);
   if [ -z "$VERSION" ]; then
-    echo "STATUS=unreachable ENDPOINT=$ENDPOINT";
+    echo "STATUS=unreachable ENDPOINT=$ENDPOINT PROFILE=$PROFILE";
   else
-    echo "STATUS=connected ENDPOINT=$ENDPOINT VERSION=$VERSION ENV=${ENV:-development}";
+    echo "STATUS=connected ENDPOINT=$ENDPOINT VERSION=$VERSION ENV=${ENV:-development} PROFILE=$PROFILE";
   fi;
 fi
 ```
@@ -33,7 +34,7 @@ fi
 Report based on output:
 
 - `STATUS=not_configured` → **"Not connected to Cyoda — run `/cyoda:setup` to get started"**
-- `STATUS=unreachable` → **"Cyoda instance unreachable at {ENDPOINT} — is it running?"**
-- `STATUS=connected`, `ENV=production` → **"⚠️ Connected to Cyoda Cloud [PRODUCTION] — v{VERSION}"**
-- `STATUS=connected`, endpoint contains `localhost` → **"Connected to Local cyoda-go — v{VERSION}"**
-- `STATUS=connected`, cloud endpoint → **"Connected to Cyoda Cloud — v{VERSION}"**
+- `STATUS=unreachable` → **"Cyoda instance unreachable at {ENDPOINT} [profile: {PROFILE}] — is it running?"**
+- `STATUS=connected`, `ENV=production` → **"⚠️ Connected to Cyoda Cloud [PRODUCTION] — v{VERSION} [profile: {PROFILE}]"**
+- `STATUS=connected`, endpoint contains `localhost` → **"Connected to Local cyoda-go — v{VERSION} [profile: {PROFILE}]"**
+- `STATUS=connected`, cloud endpoint → **"Connected to Cyoda Cloud — v{VERSION} [profile: {PROFILE}]"**

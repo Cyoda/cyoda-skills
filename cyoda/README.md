@@ -20,14 +20,25 @@ Helps you build applications on [Cyoda](https://docs.cyoda.net/) — an Entity D
 
 ## Connection Config
 
-Skills share connection state via `.cyoda/config` (always gitignored):
+Skills share connection state via `~/.config/cyoda/cyoda-plugin-config.json` — a home-directory file that is never git-tracked:
 
 ```json
 {
-  "endpoint": "http://localhost:8080",
-  "token": "eyJ...",
-  "env": "development"
+  "active": "default",
+  "profiles": {
+    "default": {
+      "endpoint": "http://localhost:8080",
+      "env": "development"
+    },
+    "prod": {
+      "endpoint": "https://client-abc123-prod.eu.cyoda.net",
+      "token": "eyJ...",
+      "env": "production"
+    }
+  }
 }
 ```
 
-Run `/cyoda:setup` then `/cyoda:auth` to populate this file.
+The `"active"` key controls which profile all skills use. `token` is absent for local cyoda-go (mock auth).
+
+Run `/cyoda:setup` then `/cyoda:auth` to create a profile and set it as active.

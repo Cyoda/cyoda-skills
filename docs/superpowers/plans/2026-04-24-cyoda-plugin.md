@@ -4,7 +4,7 @@
 
 **Goal:** Build the `cyoda` Claude Code plugin with 11 skills and plugin scaffold that replaces AI Studio for Cyoda application development.
 
-**Architecture:** Each skill is a self-contained `SKILL.md` + supporting files. No shared code between skills — they coordinate via skill invocation. Connection state is shared via a `.cyoda/config` file read at invocation time using dynamic context injection (`!`command``). The plugin follows the `.claude-plugin/plugin.json` standard.
+**Architecture:** Each skill is a self-contained `SKILL.md` + supporting files. No shared code between skills — they coordinate via skill invocation. Connection state is shared via `~/.config/cyoda/cyoda-plugin-config.json` (named profiles, home directory) read at invocation time using dynamic context injection (`!`command``). The plugin follows the `.claude-plugin/plugin.json` standard.
 
 **Tech Stack:** Claude Code plugin format (SKILL.md, YAML frontmatter), JSON (evals, plugin manifest, templates), Bash (dynamic context injection, `allowed-tools`), Markdown (supporting docs)
 
@@ -2870,3 +2870,828 @@ Identified from real user session (`_developer/conversation.md`). Three recurrin
 The monitor's intended value was token freshness — ensuring Claude knew when credentials changed. But skills already re-read `.cyoda/config` via dynamic context injection at invocation time, so the monitor added noise without adding real freshness guarantees. The actual failure case it should have guarded against (expired JWT mid-session) was not handled by file-watching at all.
 
 **Fix:** Removed `cyoda/monitors/` entirely. Added an auth error rule to the five skills that make authenticated API calls (`cyoda:status`, `cyoda:build`, `cyoda:test`, `cyoda:debug`, `cyoda:migrate`): if any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token and retry the request once. If the retry also fails, surface the error to the user. Added eval #4 (or #11 for build, #5 for migrate) to each affected skill asserting the 401/403 retry behavior. See Task 3 for the full implementation steps.
+
+---
+
+## Post-Launch Improvements (2026-05-07)
+
+### 1. Move config to home directory with named profiles
+
+**Problem:** Connection config (endpoint, JWT token, env) was stored in a project-local `.cyoda/config` file. Even though gitignored, users risked accidentally committing JWT tokens to the repository — a common mistake when `.gitignore` is misconfigured or the file is explicitly staged.
+
+**Fix:** Replace `.cyoda/config` with `~/.config/cyoda/cyoda-plugin-config.json` — a home-directory file that is never git-tracked. The file uses a named-profile format with an `"active"` pointer, allowing multiple Cyoda connections (e.g. local dev + cloud production) without file-switching:
+
+```json
+{
+  "active": "default",
+  "profiles": {
+    "default": {
+      "endpoint": "http://localhost:8080",
+      "env": "development"
+    },
+    "prod": {
+      "endpoint": "https://client-abc123-prod.eu.cyoda.net",
+      "token": "eyJ...",
+      "env": "production"
+    }
+  }
+}
+```
+
+**Files to update:**
+
+- [ ] **`cyoda/README.md`** — Update Connection Config section to reference `~/.config/cyoda/cyoda-plugin-config.json` and explain the profile format.
+
+- [ ] **`cyoda/skills/setup/SKILL.md`** — Add profile selection step (list existing profiles, ask for name). Update write commands to use `~/.config/cyoda/cyoda-plugin-config.json`. Remove all `.gitignore` steps.
+
+- [ ] **`cyoda/skills/auth/SKILL.md`** — Add profile selection step. Update read/write commands to use `~/.config/cyoda/cyoda-plugin-config.json`. Update security warning (no gitignore mention). Remove `.gitignore` steps. Update description frontmatter.
+
+- [ ] **`cyoda/skills/status/SKILL.md`** — Update dynamic context injection to read active profile. Update status messages to include `[profile: <name>]`.
+
+- [ ] **`cyoda/skills/build/SKILL.md`** — Update all three dynamic context injection blocks to read active profile from `~/.config/cyoda/cyoda-plugin-config.json`.
+
+- [ ] **`cyoda/skills/test/SKILL.md`** — Update dynamic context injection to read active profile.
+
+- [ ] **`cyoda/skills/debug/SKILL.md`** — Update dynamic context injection blocks and connectivity section to reference new config path.
+
+- [ ] **`cyoda/skills/migrate/SKILL.md`** — Update all dynamic context injection blocks. Update the "re-read config" step after cloud setup.
+
+- [ ] **`cyoda/skills/compute/SKILL.md`** — Update token read to use active profile from `~/.config/cyoda/cyoda-plugin-config.json`.
+
+- [ ] **`cyoda/skills/auth/evaluations/evals.json`** — Update `files` fixtures: replace `".cyoda/config"` key with `"~/.config/cyoda/cyoda-plugin-config.json"` and JSON profile format. Update assertions referencing `.cyoda/config` path. Add assertion that no `.gitignore` entries are written.
+
+- [ ] **`cyoda/skills/setup/evaluations/evals.json`** — Same fixture and assertion updates. Add profile-selection assertion.
+
+- [ ] **`cyoda/skills/status/evaluations/evals.json`** — Update `files` fixtures to profile format. Update assertions to expect `[profile: <name>]` in output.
+
+- [ ] **`cyoda/skills/build/evaluations/evals.json`** — Update `files` fixtures to profile format.
+
+- [ ] **`cyoda/skills/test/evaluations/evals.json`** — Update `files` fixtures to profile format.
+
+- [ ] **`cyoda/skills/debug/evaluations/evals.json`** — Update `files` fixtures to profile format.
+
+- [ ] **`cyoda/skills/migrate/evaluations/evals.json`** — Update `files` fixtures to profile format.
+
+- [ ] **`cyoda/skills/app/evaluations/evals.json`** — Update `files` fixtures to profile format.
+
+**Dynamic context injection pattern (used by all reading skills):**
+
+```bash
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default")
+jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo '{"endpoint":"none"}'
+```
+
+**Write pattern (used by `cyoda:setup` and `cyoda:auth`):**
+
+```bash
+mkdir -p ~/.config/cyoda
+CONFIG_FILE=~/.config/cyoda/cyoda-plugin-config.json
+EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"$PROFILE_NAME\",\"profiles\":{}}")
+echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_DATA" \
+  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
+```
+
+- [ ] **Commit:** `git commit -m "feat: move config to ~/.config/cyoda/cyoda-plugin-config.json with named profiles"`
+
+---
+
+## Config Migration: Detailed Implementation Tasks
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Replace `.cyoda/config` with `~/.config/cyoda/cyoda-plugin-config.json` (named profiles, home directory) across all skill files, README, and evaluations.
+
+**Architecture:** Pure find-and-replace across 9 SKILL.md files + README + 8 eval files. No shared code — each file is self-contained. Two patterns govern everything: the read pattern (active profile lookup) and the write pattern (profile upsert). All other file content stays unchanged.
+
+**Tech Stack:** Markdown (SKILL.md), JSON (evals), bash/jq (inline skill commands)
+
+**Read pattern** — replaces every `jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'` block:
+```bash
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default")
+jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo '{"endpoint":"none"}'
+```
+
+**Scalar read** — replaces every `jq -r '.endpoint' .cyoda/config` pattern:
+```bash
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' ~/.config/cyoda/cyoda-plugin-config.json)
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' ~/.config/cyoda/cyoda-plugin-config.json)
+ENV=$(jq -r --arg p "$PROFILE" '.profiles[$p].env // "development"' ~/.config/cyoda/cyoda-plugin-config.json)
+```
+
+**Write pattern** — replaces every block that writes to `.cyoda/config`:
+```bash
+CONFIG_FILE=~/.config/cyoda/cyoda-plugin-config.json
+mkdir -p ~/.config/cyoda
+EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"${PROFILE_NAME}\",\"profiles\":{}}")
+echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_DATA" \
+  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
+```
+
+**Eval fixture pattern** — replaces every `".cyoda/config": "{...}"` in `files` blocks:
+- Old key: `".cyoda/config"`
+- New key: `"~/.config/cyoda/cyoda-plugin-config.json"`
+- Old value (local): `"{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"`
+- New value (local): `"{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"`
+- Old value (cloud+token): `"{\"endpoint\": \"https://...\", \"env\": \"development\", \"token\": \"eyJ...\"}"`
+- New value (cloud+token): `"{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://...\",\"env\":\"development\",\"token\":\"eyJ...\"}}}"`
+
+---
+
+### Task A: README
+
+**Files:**
+- Modify: `cyoda/README.md`
+
+- [ ] **Step 1: Replace the Connection Config section**
+
+Replace:
+```markdown
+## Connection Config
+
+Skills share connection state via `.cyoda/config` (always gitignored):
+
+```json
+{
+  "endpoint": "http://localhost:8080",
+  "token": "eyJ...",
+  "env": "development"
+}
+```
+
+Run `/cyoda:setup` then `/cyoda:auth` to populate this file.
+```
+
+With:
+```markdown
+## Connection Config
+
+Skills share connection state via `~/.config/cyoda/cyoda-plugin-config.json` — a home-directory file that is never git-tracked:
+
+```json
+{
+  "active": "default",
+  "profiles": {
+    "default": {
+      "endpoint": "http://localhost:8080",
+      "env": "development"
+    },
+    "prod": {
+      "endpoint": "https://client-abc123-prod.eu.cyoda.net",
+      "token": "eyJ...",
+      "env": "production"
+    }
+  }
+}
+```
+
+The `"active"` key controls which profile all skills use. `token` is absent for local cyoda-go (mock auth).
+
+Run `/cyoda:setup` then `/cyoda:auth` to create a profile and set it as active.
+```
+
+- [ ] **Step 2: Commit**
+```bash
+git add cyoda/README.md
+git commit -m "docs(readme): update Connection Config for home-dir profile format"
+```
+
+---
+
+### Task B: cyoda:setup SKILL.md
+
+**Files:**
+- Modify: `cyoda/skills/setup/SKILL.md`
+
+- [ ] **Step 1: Add profile selection before local write (Step 6)**
+
+Replace the local Step 6 block:
+```markdown
+**Step 6 — Write config:**
+
+```bash
+mkdir -p .cyoda
+echo '{"endpoint": "http://localhost:8080", "env": "development"}' | jq . > .cyoda/config
+grep -qxF '.cyoda/config' .gitignore 2>/dev/null || echo '.cyoda/config' >> .gitignore
+grep -qxF '.cyoda/' .gitignore 2>/dev/null || echo '.cyoda/' >> .gitignore
+```
+
+Confirm: **"Local cyoda-go is running. REST on port 8080, gRPC on port 9090. `/cyoda:auth` is not needed for local — mock auth is active."**
+```
+
+With:
+```markdown
+**Step 6 — Write config:**
+
+List existing profiles (if any):
+```bash
+jq -r '.profiles | keys[]' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "(none yet)"
+```
+
+Ask: *"Which profile name should this connection be saved under? (e.g. `default`, `local`)"*
+
+```bash
+CONFIG_FILE=~/.config/cyoda/cyoda-plugin-config.json
+mkdir -p ~/.config/cyoda
+NEW_DATA='{"endpoint": "http://localhost:8080", "env": "development"}'
+EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"${PROFILE_NAME}\",\"profiles\":{}}")
+echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_DATA" \
+  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
+```
+
+Confirm: **"Local cyoda-go is running. REST on port 8080, gRPC on port 9090. `/cyoda:auth` is not needed for local — mock auth is active."**
+```
+
+- [ ] **Step 2: Update cloud Step 3**
+
+Replace the cloud Step 3 block:
+```markdown
+**Step 3 — Write endpoint to config:**
+
+```bash
+mkdir -p .cyoda
+# Claude substitutes the endpoint URL the user provided
+echo "{\"endpoint\": \"<USER_PROVIDED_ENDPOINT>\"}" | jq . > .cyoda/config
+grep -qxF '.cyoda/config' .gitignore 2>/dev/null || echo '.cyoda/config' >> .gitignore
+grep -qxF '.cyoda/' .gitignore 2>/dev/null || echo '.cyoda/' >> .gitignore
+```
+```
+
+With:
+```markdown
+**Step 3 — Write endpoint to config:**
+
+List existing profiles (if any):
+```bash
+jq -r '.profiles | keys[]' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "(none yet)"
+```
+
+Ask: *"Which profile name should this connection be saved under? (e.g. `default`, `cloud`, `prod`)"*
+
+```bash
+CONFIG_FILE=~/.config/cyoda/cyoda-plugin-config.json
+mkdir -p ~/.config/cyoda
+# Claude substitutes the endpoint URL the user provided
+NEW_DATA="{\"endpoint\": \"<USER_PROVIDED_ENDPOINT>\"}"
+EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"${PROFILE_NAME}\",\"profiles\":{}}")
+echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_DATA" \
+  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
+```
+```
+
+- [ ] **Step 3: Update cloud verify step (after auth)**
+
+Replace:
+```bash
+curl -sf --max-time 5 \
+  -H "Authorization: Bearer $(jq -r '.token // ""' .cyoda/config)" \
+  "$(jq -r '.endpoint' .cyoda/config)/readyz" || echo "Check your endpoint and token"
+```
+
+With:
+```bash
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default")
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' ~/.config/cyoda/cyoda-plugin-config.json)
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint' ~/.config/cyoda/cyoda-plugin-config.json)
+curl -sf --max-time 5 \
+  -H "Authorization: Bearer ${TOKEN}" \
+  "${ENDPOINT}/readyz" || echo "Check your endpoint and token"
+```
+
+- [ ] **Step 4: Commit**
+```bash
+git add cyoda/skills/setup/SKILL.md
+git commit -m "feat(setup): write profile to ~/.config/cyoda/cyoda-plugin-config.json"
+```
+
+---
+
+### Task C: cyoda:auth SKILL.md
+
+**Files:**
+- Modify: `cyoda/skills/auth/SKILL.md`
+
+- [ ] **Step 1: Update description frontmatter**
+
+Replace:
+```
+description: Authenticate to Cyoda Cloud using OAuth 2.0 client credentials. Obtains a JWT token and saves it to .cyoda/config. Includes production safety guard requiring explicit confirmation before storing production credentials. Only trigger for Cyoda-specific authentication — do not trigger for generic /login commands unrelated to Cyoda.
+```
+
+With:
+```
+description: Authenticate to Cyoda Cloud using OAuth 2.0 client credentials. Obtains a JWT token and saves it to ~/.config/cyoda/cyoda-plugin-config.json under a named profile. Includes production safety guard requiring explicit confirmation before storing production credentials. Only trigger for Cyoda-specific authentication — do not trigger for generic /login commands unrelated to Cyoda.
+```
+
+Also add `Bash(mkdir *)` to `allowed-tools`.
+
+- [ ] **Step 2: Update opening read and add profile step**
+
+Replace:
+```markdown
+## Cyoda Login
+
+Reading current endpoint:
+```!
+jq -r '.endpoint // "none"' .cyoda/config 2>/dev/null || echo "none"
+```
+
+If endpoint is `none`: *"No Cyoda endpoint configured. Run `/cyoda:setup` first."* Stop.
+
+**Step 1 — Confirm environment type:**
+```
+
+With:
+```markdown
+## Cyoda Login
+
+Reading current config:
+```!
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo '{"endpoint":"none"}'
+```
+
+If `endpoint` is `none`: *"No Cyoda endpoint configured. Run `/cyoda:setup` first."* Stop.
+
+**Step 1 — Select profile:**
+
+List existing profiles:
+```bash
+jq -r '.profiles | keys[]' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "(none yet)"
+```
+
+Ask: *"Which profile should this token be saved under? Enter a name (e.g. `default`, `prod`) — existing profiles are updated, new names create a new profile."*
+
+Set `PROFILE_NAME` to the user's answer.
+
+**Step 2 — Confirm environment type:**
+```
+
+- [ ] **Step 3: Update security warning (remove gitignore mention)**
+
+Replace:
+```
+> ⚠️ **Security warning**: You are about to store production credentials in `.cyoda/config` on disk. This file will be gitignored, but it remains in plain text on your filesystem. Anyone with access to this machine can read it.
+```
+
+With:
+```
+> ⚠️ **Security warning**: You are about to store production credentials in `~/.config/cyoda/cyoda-plugin-config.json` on disk in plain text. Anyone with access to this machine can read them.
+```
+
+- [ ] **Step 4: Renumber steps 2-5 → 3-6 and update token endpoint to use profile**
+
+In the token endpoint block (formerly Step 3), replace:
+```bash
+ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
+```
+
+With:
+```bash
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint' ~/.config/cyoda/cyoda-plugin-config.json)
+```
+
+- [ ] **Step 5: Replace write block and remove gitignore steps**
+
+Replace the entire write block (formerly Step 4):
+```bash
+TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+ENV_VALUE="development"  # or "production" based on Step 1
+
+# Update .cyoda/config preserving endpoint
+jq --arg token "$TOKEN" --arg env "$ENV_VALUE" \
+  '. + {"token": $token, "env": $env}' .cyoda/config > .cyoda/config.tmp
+mv .cyoda/config.tmp .cyoda/config
+
+grep -qxF '.cyoda/config' .gitignore 2>/dev/null || echo '.cyoda/config' >> .gitignore
+grep -qxF '.cyoda/' .gitignore 2>/dev/null || echo '.cyoda/' >> .gitignore
+```
+
+With:
+```bash
+TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+ENV_VALUE="development"  # or "production" based on Step 2
+
+CONFIG_FILE=~/.config/cyoda/cyoda-plugin-config.json
+mkdir -p ~/.config/cyoda
+EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"${PROFILE_NAME}\",\"profiles\":{}}")
+EXISTING_PROFILE=$(echo "$EXISTING" | jq -r --arg p "$PROFILE_NAME" '.profiles[$p] // {}')
+NEW_PROFILE=$(echo "$EXISTING_PROFILE" | jq --arg token "$TOKEN" --arg env "$ENV_VALUE" \
+  '. + {"token": $token, "env": $env}')
+echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_PROFILE" \
+  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
+```
+
+- [ ] **Step 6: Update confirm message (formerly Step 5)**
+
+Replace:
+```
+Report: *"Authenticated successfully. Token written to `.cyoda/config`. Run `/cyoda:status` to verify the connection."*
+```
+
+With:
+```
+Report: *"Authenticated successfully. Token written to `~/.config/cyoda/cyoda-plugin-config.json` under profile `{PROFILE_NAME}`. Run `/cyoda:status` to verify the connection."*
+```
+
+- [ ] **Step 7: Commit**
+```bash
+git add cyoda/skills/auth/SKILL.md
+git commit -m "feat(auth): write token to ~/.config/cyoda/cyoda-plugin-config.json with profile selection"
+```
+
+---
+
+### Task D: cyoda:status SKILL.md
+
+**Files:**
+- Modify: `cyoda/skills/status/SKILL.md`
+
+- [ ] **Step 1: Replace both dynamic injection blocks**
+
+Replace the first block:
+```markdown
+Current config:
+```!
+jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
+```
+```
+
+With:
+```markdown
+Current config:
+```!
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo '{"endpoint":"none"}'
+```
+```
+
+Replace the second block:
+```markdown
+Checking reachability and version:
+```!
+ENDPOINT=$(jq -r '.endpoint // "none"' .cyoda/config 2>/dev/null || echo "none");
+ENV=$(jq -r '.env // "development"' .cyoda/config 2>/dev/null || echo "development");
+if [ -z "$ENDPOINT" ] || [ "$ENDPOINT" = "none" ]; then
+  echo "STATUS=not_configured";
+else
+  VERSION=$(curl -sf --max-time 3 "${ENDPOINT%/}/api/help" 2>/dev/null | jq -r '.version // ""' 2>/dev/null);
+  if [ -z "$VERSION" ]; then
+    echo "STATUS=unreachable ENDPOINT=$ENDPOINT";
+  else
+    echo "STATUS=connected ENDPOINT=$ENDPOINT VERSION=$VERSION ENV=${ENV:-development}";
+  fi;
+fi
+```
+```
+
+With:
+```markdown
+Checking reachability and version:
+```!
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default");
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "none");
+ENV=$(jq -r --arg p "$PROFILE" '.profiles[$p].env // "development"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "development");
+if [ -z "$ENDPOINT" ] || [ "$ENDPOINT" = "none" ]; then
+  echo "STATUS=not_configured PROFILE=$PROFILE";
+else
+  VERSION=$(curl -sf --max-time 3 "${ENDPOINT%/}/api/help" 2>/dev/null | jq -r '.version // ""' 2>/dev/null);
+  if [ -z "$VERSION" ]; then
+    echo "STATUS=unreachable ENDPOINT=$ENDPOINT PROFILE=$PROFILE";
+  else
+    echo "STATUS=connected ENDPOINT=$ENDPOINT VERSION=$VERSION ENV=${ENV:-development} PROFILE=$PROFILE";
+  fi;
+fi
+```
+```
+
+- [ ] **Step 2: Update report bullets to include profile name**
+
+Replace:
+```markdown
+- `STATUS=not_configured` → **"Not connected to Cyoda — run `/cyoda:setup` to get started"**
+- `STATUS=unreachable` → **"Cyoda instance unreachable at {ENDPOINT} — is it running?"**
+- `STATUS=connected`, `ENV=production` → **"⚠️ Connected to Cyoda Cloud [PRODUCTION] — v{VERSION}"**
+- `STATUS=connected`, endpoint contains `localhost` → **"Connected to Local cyoda-go — v{VERSION}"**
+- `STATUS=connected`, cloud endpoint → **"Connected to Cyoda Cloud — v{VERSION}"**
+```
+
+With:
+```markdown
+- `STATUS=not_configured` → **"Not connected to Cyoda — run `/cyoda:setup` to get started"**
+- `STATUS=unreachable` → **"Cyoda instance unreachable at {ENDPOINT} [profile: {PROFILE}] — is it running?"**
+- `STATUS=connected`, `ENV=production` → **"⚠️ Connected to Cyoda Cloud [PRODUCTION] — v{VERSION} [profile: {PROFILE}]"**
+- `STATUS=connected`, endpoint contains `localhost` → **"Connected to Local cyoda-go — v{VERSION} [profile: {PROFILE}]"**
+- `STATUS=connected`, cloud endpoint → **"Connected to Cyoda Cloud — v{VERSION} [profile: {PROFILE}]"**
+```
+
+- [ ] **Step 3: Commit**
+```bash
+git add cyoda/skills/status/SKILL.md
+git commit -m "feat(status): read active profile from ~/.config/cyoda/cyoda-plugin-config.json, show profile name"
+```
+
+---
+
+### Task E: cyoda:build, cyoda:test, cyoda:debug, cyoda:migrate, cyoda:compute SKILL.md
+
+**Files:**
+- Modify: `cyoda/skills/build/SKILL.md`
+- Modify: `cyoda/skills/test/SKILL.md`
+- Modify: `cyoda/skills/debug/SKILL.md`
+- Modify: `cyoda/skills/migrate/SKILL.md`
+- Modify: `cyoda/skills/compute/SKILL.md`
+
+All five files share the same mechanical change: replace `.cyoda/config` reads with the home-dir profile pattern. Apply the same substitution rules in each file.
+
+**Substitution rules:**
+
+| Old | New |
+|-----|-----|
+| `jq . .cyoda/config 2>/dev/null \|\| echo '{"endpoint":"none"}'` | `PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null \|\| echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null \|\| echo '{"endpoint":"none"}'` |
+| `ENDPOINT=$(jq -r '.endpoint' .cyoda/config)` | `PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null \|\| echo "default"); ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' ~/.config/cyoda/cyoda-plugin-config.json)` |
+| `TOKEN=$(jq -r '.token // ""' .cyoda/config)` | `TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' ~/.config/cyoda/cyoda-plugin-config.json)` |
+| `jq -r '.endpoint' .cyoda/config` | `jq -r --arg p "$PROFILE" '.profiles[$p].endpoint' ~/.config/cyoda/cyoda-plugin-config.json` |
+| `jq -r '.token' .cyoda/config` | `jq -r --arg p "$PROFILE" '.profiles[$p].token' ~/.config/cyoda/cyoda-plugin-config.json` |
+| `.cyoda/config` (any remaining reference in prose) | `~/.config/cyoda/cyoda-plugin-config.json` |
+
+Note: When `ENDPOINT` and `TOKEN` are extracted in the same block, define `PROFILE` once at the top of that block — do not repeat the `PROFILE=$(...)` lookup for each field.
+
+**compute/SKILL.md specific:** Line 37 also has prose — replace `Use the JWT token from `.cyoda/config`:` with `Use the JWT token from the active profile in `~/.config/cyoda/cyoda-plugin-config.json`:`.
+
+- [ ] **Step 1: Apply substitutions to `cyoda/skills/build/SKILL.md`** (3 injection blocks + 3 bash blocks)
+
+- [ ] **Step 2: Apply substitutions to `cyoda/skills/test/SKILL.md`** (1 injection block + 1 bash block)
+
+- [ ] **Step 3: Apply substitutions to `cyoda/skills/debug/SKILL.md`** (1 injection block + 2 bash blocks in observation mode + prose in connectivity section)
+
+- [ ] **Step 4: Apply substitutions to `cyoda/skills/migrate/SKILL.md`** (1 injection block + 3 bash blocks)
+
+- [ ] **Step 5: Apply substitution to `cyoda/skills/compute/SKILL.md`** (1 injection block + prose)
+
+- [ ] **Step 6: Commit**
+```bash
+git add cyoda/skills/build/SKILL.md cyoda/skills/test/SKILL.md cyoda/skills/debug/SKILL.md \
+  cyoda/skills/migrate/SKILL.md cyoda/skills/compute/SKILL.md
+git commit -m "feat(skills): update config reads to ~/.config/cyoda/cyoda-plugin-config.json across build/test/debug/migrate/compute"
+```
+
+---
+
+### Task F: auth + setup evaluations
+
+**Files:**
+- Modify: `cyoda/skills/auth/evaluations/evals.json`
+- Modify: `cyoda/skills/setup/evaluations/evals.json`
+
+**auth/evaluations/evals.json** — full new content:
+
+- [ ] **Step 1: Write new auth evals.json**
+
+```json
+{
+  "skill_name": "auth",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/cyoda:auth",
+      "expected_output": "Asks for profile name, asks dev vs production, explains M2M credentials, collects client_id and client_secret separately, calls OAuth token endpoint, writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile, confirms success without production warning",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
+      },
+      "assertions": [
+        { "id": "asks-profile-name", "text": "Asks which profile name to save the token under before proceeding", "type": "behavior" },
+        { "id": "asks-env-type", "text": "Asks whether this is development or production environment", "type": "behavior" },
+        { "id": "explains-m2m", "text": "Explains that client_id/client_secret are machine-to-machine credentials identifying the application, not a personal login", "type": "behavior" },
+        { "id": "asks-if-have-credentials", "text": "Asks whether user already has client_id and client_secret before collecting", "type": "behavior" },
+        { "id": "directs-to-ai-studio", "text": "Asks whether user already has credentials — if the user says no, would direct them to Cyoda AI Studio at https://ai.cyoda.net/; in this eval the user says yes so the redirect path is not exercised but the conditional check must be present", "type": "behavior" },
+        { "id": "collects-credentials", "text": "Collects client_id and client_secret separately, one at a time", "type": "behavior" },
+        { "id": "calls-token-endpoint", "text": "Calls OAuth token endpoint", "type": "behavior" },
+        { "id": "writes-token", "text": "Writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile", "type": "behavior" },
+        { "id": "no-echo-secret", "text": "Does NOT echo client_secret back in the conversation", "type": "behavior" },
+        { "id": "no-production-warning", "text": "Does NOT show production warning for development login", "type": "behavior" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/cyoda:auth — production environment, I accept the risk",
+      "expected_output": "Asks profile name, shows security warning, requires explicit 'yes', explains M2M credentials, collects credentials, writes token and env=production to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile, shows prominent production reminder",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}}}"
+      },
+      "assertions": [
+        { "id": "asks-profile-name", "text": "Asks which profile name to save the token under", "type": "behavior" },
+        { "id": "shows-security-warning", "text": "Shows security warning about storing production credentials on disk", "type": "behavior" },
+        { "id": "requires-explicit-yes", "text": "Requires explicit 'yes' — not any other response", "type": "behavior" },
+        { "id": "confirmation-is-own-step", "text": "Shows the security warning and asks yes/no as a distinct step even though the user pre-stated acceptance in the prompt — does NOT skip the confirmation", "type": "behavior" },
+        { "id": "explains-m2m", "text": "Explains that client_id/client_secret are M2M credentials for the application", "type": "behavior" },
+        { "id": "writes-production-env", "text": "Writes env=production to ~/.config/cyoda/cyoda-plugin-config.json after confirmation", "type": "behavior" },
+        { "id": "production-reminder", "text": "Shows prominent production reminder after successful login", "type": "format" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/cyoda:auth — production, but I'm not sure about storing credentials",
+      "expected_output": "Shows security warning, stops when user does not answer 'yes', does not write any credentials, suggests alternatives",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}}}"
+      },
+      "assertions": [
+        { "id": "shows-warning", "text": "Shows security warning before proceeding", "type": "behavior" },
+        { "id": "stops-on-non-yes", "text": "Stops when user response is not explicit 'yes'", "type": "behavior" },
+        { "id": "no-credentials-written", "text": "Does NOT write any credentials after a non-yes response", "type": "behavior" },
+        { "id": "suggests-alternatives", "text": "Suggests CYODA_TOKEN env var as an alternative to persisting credentials on disk", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/cyoda:auth — my login stopped working after the environment was redeployed",
+      "expected_output": "Recognises the post-redeploy scenario, notes that technical users may be deleted on redeploy, directs user to recreate the technical user in AI Studio before retrying",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
+      },
+      "assertions": [
+        { "id": "recognises-redeploy", "text": "Recognises the post-redeploy scenario as cause of credential failure", "type": "behavior" },
+        { "id": "notes-users-deleted", "text": "Notes that technical users may be deleted when an environment is redeployed", "type": "behavior" },
+        { "id": "directs-to-recreate", "text": "Directs user to recreate the technical user in Cyoda AI Studio at https://ai.cyoda.net/", "type": "behavior" },
+        { "id": "completes-auth", "text": "After user provides new credentials, completes the full auth flow — calls token endpoint and writes token to ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "/cyoda:auth — connect to a Cyoda Cloud dev environment with client_id=abc123 and client_secret=xyz789",
+      "expected_output": "Uses Authorization: Basic header with base64-encoded client_id:client_secret against /api/oauth/token on the first attempt, without iterating through multiple paths",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
+      },
+      "assertions": [
+        { "id": "basic-auth-header", "text": "Uses Authorization: Basic header with base64-encoded client_id:client_secret — credentials are NOT in the request body", "type": "behavior" },
+        { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token on the first attempt — does NOT try /oauth/token, /auth/token, or other paths first", "type": "behavior" },
+        { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults cyoda help config auth instead", "type": "behavior" },
+        { "id": "consults-cyoda-help-on-failure", "text": "If token call fails, runs 'cyoda help config auth' before retrying — does not guess alternate paths", "type": "behavior" }
+      ]
+    }
+  ]
+}
+```
+
+**setup/evaluations/evals.json** — full new content:
+
+- [ ] **Step 2: Write new setup evals.json**
+
+```json
+{
+  "skill_name": "setup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/cyoda:setup",
+      "expected_output": "Walks through local install: asks local vs cloud, runs brew install, runs cyoda init, verifies health, asks for profile name, writes profile to ~/.config/cyoda/cyoda-plugin-config.json, notes mock auth is active",
+      "files": {},
+      "assertions": [
+        { "id": "asks-local-vs-cloud", "text": "Asks whether user wants local or cloud setup", "type": "behavior" },
+        { "id": "runs-brew-install", "text": "Runs brew install commands for cyoda", "type": "behavior" },
+        { "id": "runs-cyoda-init", "text": "Runs cyoda init", "type": "behavior" },
+        { "id": "verifies-health", "text": "Verifies health endpoint responds", "type": "behavior" },
+        { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },
+        { "id": "writes-config", "text": "Writes profile with localhost endpoint to ~/.config/cyoda/cyoda-plugin-config.json and sets it as active", "type": "behavior" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" },
+        { "id": "notes-mock-auth", "text": "Notes mock auth is active for local — no login needed", "type": "behavior" },
+        { "id": "no-credentials", "text": "Does NOT ask for credentials on local setup", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/cyoda:setup — I want to use Cyoda Cloud",
+      "expected_output": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ to create or list environments, collects endpoint URL in the correct format (client-<hash>-<env>.eu.cyoda.net), asks for profile name, writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a profile, directs to /cyoda:auth next",
+      "files": {},
+      "assertions": [
+        { "id": "directs-to-ai-studio", "text": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ for account/environment management", "type": "behavior" },
+        { "id": "mentions-create-or-list", "text": "Mentions that the user can ask AI Studio to create, list, or redeploy environments", "type": "behavior" },
+        { "id": "collects-endpoint", "text": "Collects endpoint URL from user", "type": "behavior" },
+        { "id": "correct-endpoint-format", "text": "Uses correct endpoint format example (client-<hash>-<env>.eu.cyoda.net, not api.eu.cyoda.net)", "type": "format" },
+        { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },
+        { "id": "writes-endpoint-only", "text": "Writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a named profile — no token yet", "type": "behavior" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" },
+        { "id": "directs-to-login", "text": "Directs user to run /cyoda:auth next", "type": "behavior" },
+        { "id": "no-credentials-in-setup", "text": "Does NOT ask for credentials — that is login's job", "type": "behavior" },
+        { "id": "no-docs-signup-url", "text": "Does NOT direct user to docs.cyoda.net for sign-up", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/cyoda:setup",
+      "expected_output": "Detects existing installation, skips brew install, verifies health, asks for profile name, updates profile in ~/.config/cyoda/cyoda-plugin-config.json, reports already ready",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+      },
+      "assertions": [
+        { "id": "detects-existing", "text": "Detects cyoda is already installed", "type": "behavior" },
+        { "id": "skips-brew", "text": "Does NOT re-run brew install when already installed", "type": "behavior" },
+        { "id": "verifies-health", "text": "Verifies health endpoint", "type": "behavior" },
+        { "id": "no-force-init", "text": "Does NOT run cyoda init again without --force", "type": "behavior" },
+        { "id": "reports-ready", "text": "Reports already ready", "type": "format" }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/cyoda:setup — local install, but brew fails with a permissions error",
+      "expected_output": "Attempts brew tap and brew install, detects failure, immediately shows the two commands and asks user to run them manually, waits for confirmation, then continues to cyoda init",
+      "files": {},
+      "assertions": [
+        { "id": "attempts-brew-first", "text": "Attempts to run brew tap and brew install before giving up", "type": "behavior" },
+        { "id": "no-brew-diagnosis", "text": "Does NOT run brew doctor, sudo, or any Homebrew remediation", "type": "behavior" },
+        { "id": "shows-exact-commands", "text": "Shows the exact brew tap and brew install commands for the user to run manually", "type": "format" },
+        { "id": "no-extra-commands", "text": "Does NOT include sudo, chown, or any commands beyond the two brew commands in the user-facing message", "type": "format" },
+        { "id": "asks-user-to-run", "text": "Asks the user to run the commands in their own terminal", "type": "behavior" },
+        { "id": "waits-before-continuing", "text": "Waits for user confirmation before continuing to cyoda init", "type": "behavior" },
+        { "id": "continues-after-confirm", "text": "Continues to cyoda init (Step 3) after the user confirms", "type": "behavior" }
+      ]
+    }
+  ]
+}
+```
+
+- [ ] **Step 3: Commit**
+```bash
+git add cyoda/skills/auth/evaluations/evals.json cyoda/skills/setup/evaluations/evals.json
+git commit -m "test(auth,setup): update evals for home-dir config and profile selection"
+```
+
+---
+
+### Task G: Remaining evaluations (status, build, test, debug, migrate, app)
+
+**Files:**
+- Modify: `cyoda/skills/status/evaluations/evals.json`
+- Modify: `cyoda/skills/build/evaluations/evals.json`
+- Modify: `cyoda/skills/test/evaluations/evals.json`
+- Modify: `cyoda/skills/debug/evaluations/evals.json`
+- Modify: `cyoda/skills/migrate/evaluations/evals.json`
+- Modify: `cyoda/skills/app/evaluations/evals.json`
+
+All six files share the same mechanical change: replace `".cyoda/config"` fixture key with `"~/.config/cyoda/cyoda-plugin-config.json"` and wrap the value in the profile envelope. Apply to every `files` block in each file.
+
+Additionally for **status evals**:
+- Eval 1: Update `"reads-config"` assertion text to `"Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json for endpoint"`; add assertion `{ "id": "shows-profile-name", "text": "Includes [profile: <name>] in the status output", "type": "format" }`
+- Eval 3: Update `"detects-missing-config"` assertion text to `"Detects missing ~/.config/cyoda/cyoda-plugin-config.json or empty profiles"`
+
+For **build evals** — update `"reads-config"` assertion text in eval 1 to `"Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json for endpoint"`.
+
+For **test evals** — update `"reads-config"` assertion text in eval 1 to `"Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json for endpoint"`.
+
+- [ ] **Step 1: Update `cyoda/skills/status/evaluations/evals.json`**
+
+Apply fixture key/value substitution to evals 1, 2, 4. Update assertions in evals 1 and 3 as described above.
+
+Fixture substitutions:
+- Eval 1 `files`: `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"`
+- Eval 2 `files`: `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"production\",\"token\":\"eyJfake...\"}}}"`
+- Eval 3 `files`: `{}` (no change — empty means no config file)
+- Eval 4 `files`: `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"development\",\"token\":\"eyJexpired...\"}}}"`
+
+- [ ] **Step 2: Update `cyoda/skills/build/evaluations/evals.json`**
+
+Apply fixture key/value substitution to all 11 evals. Use these per-eval fixtures:
+- Evals 1–10 (local): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"`
+- Eval 3 (production): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"production\",\"token\":\"eyJfake...\"}}}"`
+- Eval 11 (expired token): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"development\",\"token\":\"eyJexpired...\"}}}"`
+
+Update eval 1 `"reads-config"` assertion text.
+
+- [ ] **Step 3: Update `cyoda/skills/test/evaluations/evals.json`**
+
+Apply fixture key/value substitution to all 4 evals:
+- Evals 1–3 (local): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"`
+- Eval 4 (expired token): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"development\",\"token\":\"eyJexpired...\"}}}"`
+
+Update eval 1 `"reads-config"` assertion text.
+
+- [ ] **Step 4: Update `cyoda/skills/debug/evaluations/evals.json`**
+
+Apply fixture key/value substitution to all 4 evals:
+- Evals 1–3 (local): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"`
+- Eval 4 (expired token): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"development\",\"token\":\"eyJexpired...\"}}}"`
+
+- [ ] **Step 5: Update `cyoda/skills/migrate/evaluations/evals.json`**
+
+Apply fixture key/value substitution to all 5 evals:
+- Evals 1–4 (local): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"`
+- Eval 5 (expired token): `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\",\"token\":\"eyJexpired...\"}}}"`
+
+- [ ] **Step 6: Update `cyoda/skills/app/evaluations/evals.json`**
+
+Only eval 4 has a `files` fixture. Replace:
+- `"~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"`
+
+- [ ] **Step 7: Commit**
+```bash
+git add cyoda/skills/status/evaluations/evals.json \
+  cyoda/skills/build/evaluations/evals.json \
+  cyoda/skills/test/evaluations/evals.json \
+  cyoda/skills/debug/evaluations/evals.json \
+  cyoda/skills/migrate/evaluations/evals.json \
+  cyoda/skills/app/evaluations/evals.json
+git commit -m "test(skills): update eval fixtures for home-dir profile config format"
+```

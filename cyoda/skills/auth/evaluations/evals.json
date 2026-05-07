@@ -4,36 +4,40 @@
     {
       "id": 1,
       "prompt": "/cyoda:auth",
-      "expected_output": "Asks dev vs production, explains M2M credentials and directs to AI Studio if user doesn't have them, collects client_id and client_secret separately, calls OAuth token endpoint, writes token and env=development as JSON fields to .cyoda/config, confirms success without production warning",
+      "expected_output": "Asks for profile name, asks dev vs production, explains M2M credentials, collects client_id and client_secret separately, calls OAuth token endpoint, writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile, confirms success without production warning",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
       },
       "assertions": [
+        { "id": "asks-profile-name", "text": "Asks which profile name to save the token under before proceeding", "type": "behavior" },
         { "id": "asks-env-type", "text": "Asks whether this is development or production environment", "type": "behavior" },
         { "id": "explains-m2m", "text": "Explains that client_id/client_secret are machine-to-machine credentials identifying the application, not a personal login", "type": "behavior" },
         { "id": "asks-if-have-credentials", "text": "Asks whether user already has client_id and client_secret before collecting", "type": "behavior" },
         { "id": "directs-to-ai-studio", "text": "Asks whether user already has credentials — if the user says no, would direct them to Cyoda AI Studio at https://ai.cyoda.net/; in this eval the user says yes so the redirect path is not exercised but the conditional check must be present", "type": "behavior" },
         { "id": "collects-credentials", "text": "Collects client_id and client_secret separately, one at a time", "type": "behavior" },
         { "id": "calls-token-endpoint", "text": "Calls OAuth token endpoint", "type": "behavior" },
-        { "id": "writes-token", "text": "Writes token and env=development as JSON fields to .cyoda/config", "type": "behavior" },
+        { "id": "writes-token", "text": "Writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile", "type": "behavior" },
         { "id": "no-echo-secret", "text": "Does NOT echo client_secret back in the conversation", "type": "behavior" },
-        { "id": "no-production-warning", "text": "Does NOT show production warning for development login", "type": "behavior" }
+        { "id": "no-production-warning", "text": "Does NOT show production warning for development login", "type": "behavior" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" }
       ]
     },
     {
       "id": 2,
       "prompt": "/cyoda:auth — production environment, I accept the risk",
-      "expected_output": "Shows security warning, requires explicit 'yes', explains M2M credentials, collects credentials, writes token and env=production as JSON fields to .cyoda/config, shows prominent production reminder",
+      "expected_output": "Asks profile name, shows security warning, requires explicit 'yes', explains M2M credentials, collects credentials, writes token and env=production to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile, shows prominent production reminder",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}}}"
       },
       "assertions": [
+        { "id": "asks-profile-name", "text": "Asks which profile name to save the token under", "type": "behavior" },
         { "id": "shows-security-warning", "text": "Shows security warning about storing production credentials on disk", "type": "behavior" },
         { "id": "requires-explicit-yes", "text": "Requires explicit 'yes' — not any other response", "type": "behavior" },
         { "id": "confirmation-is-own-step", "text": "Shows the security warning and asks yes/no as a distinct step even though the user pre-stated acceptance in the prompt — does NOT skip the confirmation", "type": "behavior" },
         { "id": "explains-m2m", "text": "Explains that client_id/client_secret are M2M credentials for the application", "type": "behavior" },
-        { "id": "writes-production-env", "text": "Writes env=production as a JSON field to .cyoda/config after confirmation", "type": "behavior" },
-        { "id": "production-reminder", "text": "Shows prominent production reminder after successful login", "type": "format" }
+        { "id": "writes-production-env", "text": "Writes env=production to ~/.config/cyoda/cyoda-plugin-config.json after confirmation", "type": "behavior" },
+        { "id": "production-reminder", "text": "Shows prominent production reminder after successful login", "type": "format" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" }
       ]
     },
     {
@@ -41,7 +45,7 @@
       "prompt": "/cyoda:auth — production, but I'm not sure about storing credentials",
       "expected_output": "Shows security warning, stops when user does not answer 'yes', does not write any credentials, suggests alternatives",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}}}"
       },
       "assertions": [
         { "id": "shows-warning", "text": "Shows security warning before proceeding", "type": "behavior" },
@@ -55,13 +59,13 @@
       "prompt": "/cyoda:auth — my login stopped working after the environment was redeployed",
       "expected_output": "Recognises the post-redeploy scenario, notes that technical users may be deleted on redeploy, directs user to recreate the technical user in AI Studio before retrying",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
       },
       "assertions": [
         { "id": "recognises-redeploy", "text": "Recognises the post-redeploy scenario as cause of credential failure", "type": "behavior" },
         { "id": "notes-users-deleted", "text": "Notes that technical users may be deleted when an environment is redeployed", "type": "behavior" },
         { "id": "directs-to-recreate", "text": "Directs user to recreate the technical user in Cyoda AI Studio at https://ai.cyoda.net/", "type": "behavior" },
-        { "id": "completes-auth", "text": "After user provides new credentials, completes the full auth flow — calls token endpoint and writes token to .cyoda/config", "type": "behavior" }
+        { "id": "completes-auth", "text": "After user provides new credentials, completes the full auth flow — calls token endpoint and writes token to ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" }
       ]
     },
     {
@@ -69,13 +73,27 @@
       "prompt": "/cyoda:auth — connect to a Cyoda Cloud dev environment with client_id=abc123 and client_secret=xyz789",
       "expected_output": "Uses Authorization: Basic header with base64-encoded client_id:client_secret against /api/oauth/token on the first attempt, without iterating through multiple paths",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
       },
       "assertions": [
         { "id": "basic-auth-header", "text": "Uses Authorization: Basic header with base64-encoded client_id:client_secret — credentials are NOT in the request body", "type": "behavior" },
         { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token on the first attempt — does NOT try /oauth/token, /auth/token, or other paths first", "type": "behavior" },
         { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults cyoda help config auth instead", "type": "behavior" },
         { "id": "consults-cyoda-help-on-failure", "text": "If token call fails, runs 'cyoda help config auth' before retrying — does not guess alternate paths", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "/cyoda:auth — connect with client_id=bad-client and client_secret=bad-secret",
+      "expected_output": "Calls /api/oauth/token, gets a 4xx error, runs 'cyoda help config auth' to get the correct endpoint, does NOT try alternate paths like /oauth/token or /auth/token, retries with the corrected endpoint from cyoda help output",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
+      },
+      "assertions": [
+        { "id": "calls-token-endpoint-first", "text": "Calls /api/oauth/token on the first attempt before any fallback", "type": "behavior" },
+        { "id": "consults-cyoda-help-on-4xx", "text": "After receiving a 4xx error, runs 'cyoda help config auth' before attempting any retry", "type": "behavior" },
+        { "id": "no-path-guessing-on-failure", "text": "Does NOT try /oauth/token, /auth/token, or any other alternate paths — only retries after reading cyoda help output", "type": "behavior" },
+        { "id": "retries-after-help", "text": "Retries the token call using the endpoint path from cyoda help output, not a guessed path", "type": "behavior" }
       ]
     }
   ]

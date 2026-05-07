@@ -6,10 +6,10 @@
       "prompt": "/cyoda:build — add an Order entity with draft and submitted states",
       "expected_output": "Reads config, inspects existing models, generates workflow JSON, shows it for confirmation, and stops awaiting user approval — does not register without confirmation",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
-        { "id": "reads-config", "text": "Reads .cyoda/config for endpoint", "type": "behavior" },
+        { "id": "reads-config", "text": "Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json for endpoint", "type": "behavior" },
         { "id": "inspects-models", "text": "Inspects existing entity models on the instance", "type": "behavior" },
         { "id": "asks-clarifying", "text": "Asks minimum necessary clarifying questions before generating — may proceed directly without asking when entity name, states, and transitions are fully specified in the request", "type": "behavior" },
         { "id": "shows-config-for-confirmation", "text": "Shows generated workflow JSON for user confirmation before registering", "type": "behavior" },
@@ -21,7 +21,7 @@
       "prompt": "/cyoda:build — add a cancel transition to the Order entity",
       "expected_output": "Inspects existing Order entity, shows current states/transitions, asks which state 'cancel' transitions from, generates updated config, shows for confirmation, registers",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "inspects-existing", "text": "Inspects existing Order entity models", "type": "behavior" },
@@ -36,7 +36,7 @@
       "prompt": "/cyoda:build — add approval state to RiskAssessment",
       "expected_output": "Shows PRODUCTION warning at start, generates config normally, requires explicit 'confirm' before registering — does not block the full build loop",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"production\", \"token\": \"eyJfake...\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"production\",\"token\":\"eyJfake...\"}}}"
       },
       "assertions": [
         { "id": "shows-production-warning", "text": "Shows PRODUCTION warning at the start of the skill", "type": "behavior" },
@@ -51,7 +51,7 @@
       "prompt": "/cyoda:build — register a new ChatRoom entity with a simple workflow",
       "expected_output": "Invokes cyoda:docs for any endpoint not listed in the skill, executes the correct sample-entity-then-workflow-import sequence, and does not guess or retry alternate URLs",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "invokes-docs-for-unlisted-endpoints", "text": "Invokes cyoda:docs before calling any endpoint not explicitly listed in the skill", "type": "behavior" },
@@ -65,7 +65,7 @@
       "prompt": "/cyoda:build — register a new Order entity with draft and submitted states on a fresh instance",
       "expected_output": "Posts a sample entity to create the model in discover mode before importing the workflow — does not call workflow/import as the first API call",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "entity-post-before-workflow", "text": "POSTs a sample entity to /api/entity/JSON/{entity}/1 before calling /api/model/{entity}/1/workflow/import", "type": "behavior" },
@@ -78,7 +78,7 @@
       "prompt": "/cyoda:build — I want to add a ChatRoom entity and a Message entity",
       "expected_output": "Builds both entities in discover mode without suggesting or performing schema locking — mentions discover mode stays active during development",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "no-lock-suggestion", "text": "Does NOT suggest locking the schema during a normal development build session", "type": "behavior" },
@@ -91,7 +91,7 @@
       "prompt": "/cyoda:build — export the ChatRoom model schema so I can inspect it",
       "expected_output": "Invokes cyoda:docs to look up the export endpoint before making any curl call — does not guess the URL",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "invokes-docs-for-export", "text": "Invokes cyoda:docs to look up the correct export endpoint path", "type": "behavior" },
@@ -104,7 +104,7 @@
       "prompt": "/cyoda:build — add a Message entity with a sent state",
       "expected_output": "When a registration call returns 4xx, invokes cyoda:docs rather than retrying with guessed alternate paths",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "invokes-docs-on-4xx", "text": "On a 4xx response, invokes cyoda:docs to look up the correct endpoint before retrying", "type": "behavior" },
@@ -117,7 +117,7 @@
       "prompt": "/cyoda:build — add an archived state to the ChatRoom entity",
       "expected_output": "Detects ChatRoom already exists at version 1 and asks whether to update the existing version or create version 2 before generating any config",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "reads-existing-version", "text": "Reads the current model version from the GET /api/model response", "type": "behavior" },
@@ -131,7 +131,7 @@
       "prompt": "/cyoda:build — yes, the Order entity config looks right, please register it",
       "expected_output": "Executes the registration POST calls (sample entity then workflow import), shows the API response, re-inspects the model state, reports completion, and suggests running /cyoda:test",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "posts-sample-entity", "text": "Attempts POST to /api/entity/JSON/Order/{version} with a sample payload before the workflow import", "type": "behavior" },
@@ -146,7 +146,7 @@
       "prompt": "/cyoda:build — add a Product entity",
       "expected_output": "Detects 401 on GET /api/model, invokes cyoda:auth to refresh, retries the model inspection once",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"token\":\"eyJexpired...\"}}}"
       },
       "assertions": [
         { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when any API call returns 401 or 403", "type": "behavior" },

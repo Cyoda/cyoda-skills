@@ -10,7 +10,7 @@ allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(chmod *) Bash(bash *) 
 
 Reading connection config:
 ```!
-jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
 ```
 
 If `"endpoint":"none"` or config is absent: report *"No Cyoda instance configured. Run `/cyoda:setup` first."* Stop.
@@ -41,8 +41,9 @@ Run the following test sequence directly:
 
 **Test 1 — Create entity:**
 ```bash
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
-TOKEN=$(jq -r '.token // ""' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 AUTH=$([ -n "$TOKEN" ] && echo "-H 'Authorization: Bearer $TOKEN'" || echo "")
 curl -sf -X POST $AUTH -H 'Content-Type: application/json' \
   -d '{"smokeTest": true}' \

@@ -1,7 +1,7 @@
 # Cyoda Plugin Design
 
 **Date:** 2026-04-24
-**Updated:** 2026-05-04
+**Updated:** 2026-05-07
 **Status:** Implemented
 
 ## Overview
@@ -60,7 +60,7 @@ Each skill directory may contain `examples/`, `templates/`, and `resources/` sub
 | `cyoda:test` | User-only | fork | Smoke test: guided scripts + direct execution against running instance |
 | `cyoda:debug` | Both | inline | Diagnose: failed transitions, processor errors, connectivity |
 | `cyoda:setup` | User-only | inline | Provision Cyoda: local cyoda-go install OR cloud connection config |
-| `cyoda:auth` | User-only | inline | Obtain JWT token, write endpoint + token to `.cyoda/config` with env safety guard |
+| `cyoda:auth` | User-only | inline | Obtain JWT token, write to `~/.config/cyoda/cyoda-plugin-config.json` under named profile with env safety guard |
 | `cyoda:migrate` | User-only | inline | Lift-and-shift: export local → cloud setup → import → verify |
 | `cyoda:app` | User-only | inline | Newcomer orchestrator: orients to Cyoda philosophy, then sequences other skills |
 
@@ -83,14 +83,14 @@ Skills that provide knowledge or guidance (`cyoda:status`, `cyoda:docs`, `cyoda:
 
 Reports the current Cyoda connection status in the conversation. Auto-invoked by Claude at session start and whenever connection context is relevant (e.g., before `cyoda:build`, after `cyoda:auth`).
 
-Uses dynamic context injection to read `.cyoda/config`:
+Uses dynamic context injection to read the active profile from `~/.config/cyoda/cyoda-plugin-config.json`:
 ```
-!`jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'`
+!`PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo '{"endpoint":"none"}'`
 ```
 
-Then calls the version/health endpoint and reports:
-- `Connected to Local cyoda-go — v1.4.2` (local instance)
-- `Connected to Cyoda Cloud — v2.1.0 [PRODUCTION]` (cloud, with prominent production marker)
+Then calls the version/health endpoint and reports (including the active profile name):
+- `Connected to Local cyoda-go — v1.4.2 [profile: default]` (local instance)
+- `Connected to Cyoda Cloud — v2.1.0 [PRODUCTION] [profile: prod]` (cloud, with prominent production marker)
 - `Not connected — run /cyoda:setup to get started` (no config or unreachable)
 
 **Status line**: During implementation, explore using Claude Code's status line configuration (`subagentStatusLine` in plugin `settings.json`) for persistent header display of connection state.
@@ -188,25 +188,25 @@ Both modes use the same underlying Cyoda APIs. Delegates to `cyoda:docs` for API
 
 ### cyoda:auth
 
-Obtains a JWT token via OAuth 2.0 client credentials flow and writes connection config to `.cyoda/config`.
+Obtains a JWT token via OAuth 2.0 client credentials flow and writes the connection config to `~/.config/cyoda/cyoda-plugin-config.json` under a named profile.
 
 **Flow:**
-1. Ask: "Is this a development or production environment?"
-2. If **development**: proceed, write config with `"env": "development"`
-3. If **production**: show warning — *"Storing production credentials in a local file is a security risk. This file will be gitignored but remains on disk in plain text. Do you accept this risk?"* — require explicit `yes` before proceeding, write `"env": "production"`
-4. Explain M2M credentials, then collect them:
+1. List existing profiles (if any) from `~/.config/cyoda/cyoda-plugin-config.json`. Ask: *"Which profile? Enter a name (e.g. `default`, `prod`) — existing profiles are updated, new names create a new profile."*
+2. Ask: "Is this a development or production environment?"
+3. If **development**: proceed, write profile with `"env": "development"`
+4. If **production**: show warning — *"You are about to store production credentials on disk in plain text. Anyone with access to this machine can read them. Do you accept this risk?"* — require explicit `yes` before proceeding, write `"env": "production"`
+5. Explain M2M credentials, then collect them:
    - Explain: *"`client_id` and `client_secret` are machine-to-machine (M2M) credentials that identify your application or service to Cyoda — not a personal login. They're used by automated pipelines, compute nodes, and any service calling the Cyoda API."*
    - Ask: "Do you already have a `client_id` and `client_secret`?"
      - If yes: collect them and proceed.
      - If no: direct to Cyoda AI Studio at https://ai.cyoda.net/ — ask it to "create a technical user". Return once credentials are available.
    - **Post-redeploy note**: if the environment was recently redeployed, technical users may have been deleted — credentials that previously worked may fail. In that case, recreate the technical user in AI Studio.
-5. Call OAuth token endpoint, obtain JWT. Correct endpoint: `POST {endpoint}/api/oauth/token` with `Authorization: Basic base64(client_id:client_secret)` header — credentials are NOT in the request body. If CLI is available, run `cyoda help config auth` first to confirm the current-version endpoint. On 4xx/5xx, consult `cyoda help config auth` rather than guessing alternate paths.
-6. Merge `token` and `env` into `.cyoda/config` using `jq` (preserves existing `endpoint`)
-7. Add `.cyoda/config` and `.cyoda/` to `.gitignore` if not already present
+6. Call OAuth token endpoint, obtain JWT. Correct endpoint: `POST {endpoint}/api/oauth/token` with `Authorization: Basic base64(client_id:client_secret)` header — credentials are NOT in the request body. If CLI is available, run `cyoda help config auth` first to confirm the current-version endpoint. On 4xx/5xx, consult `cyoda help config auth` rather than guessing alternate paths.
+7. Write/merge the profile into `~/.config/cyoda/cyoda-plugin-config.json` and set it as active. No `.gitignore` entries needed.
 
-Skills making API calls (`cyoda:build`, `cyoda:test`, `cyoda:migrate`) read credentials via dynamic context injection at invocation time:
+Skills making API calls (`cyoda:build`, `cyoda:test`, `cyoda:migrate`) read the active profile via dynamic context injection at invocation time:
 ```
-!`jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'`
+!`PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo '{"endpoint":"none"}'`
 ```
 If `endpoint` is absent or `"none"`, the skill prompts the user to run `cyoda:setup` first. If `token` is absent when a cloud instance is required, the skill prompts to run `cyoda:auth`.
 
@@ -224,17 +224,15 @@ Two modes, selected at invocation:
 3. Initialize: `cyoda init` (SQLite by default)
 4. Start: `cyoda` (foreground; user opens new terminal for subsequent commands)
 5. Verify: `curl http://localhost:8080/readyz`
-6. Write `{"endpoint": "http://localhost:8080", "env": "development"}` to `.cyoda/config`
-7. Gitignore `.cyoda/config` and `.cyoda/`
-8. Confirm: mock auth is active — `cyoda:auth` not needed for local
+6. List existing profiles in `~/.config/cyoda/cyoda-plugin-config.json` (if any). Ask for a profile name, then write `{"endpoint": "http://localhost:8080", "env": "development"}` under that profile and set it as active.
+7. Confirm: mock auth is active — `cyoda:auth` not needed for local
 
 **Cloud:**
 1. Check for existing Cyoda Cloud account; if none, direct to Cyoda AI Studio at https://ai.cyoda.net/ — the user can prompt it: "create a new environment", "list my environments", or "redeploy environment X". The response provides the endpoint URL.
 2. Collect endpoint URL (format: `https://client-<hash>-<env>.eu.cyoda.net`); probe reachability before writing config
-3. Write `{"endpoint": "<url>"}` to `.cyoda/config`
-4. Gitignore `.cyoda/config` and `.cyoda/`
-5. Prompt user to run `cyoda:auth` to complete auth
-6. Verify connectivity with a test API call after login
+3. List existing profiles in `~/.config/cyoda/cyoda-plugin-config.json` (if any). Ask for a profile name, then write `{"endpoint": "<url>"}` under that profile and set it as active.
+4. Prompt user to run `cyoda:auth` to complete auth
+5. Verify connectivity with a test API call after login
 
 ### cyoda:migrate
 
@@ -275,21 +273,57 @@ This applies to: `cyoda:status`, `cyoda:build`, `cyoda:test`, `cyoda:debug`, `cy
 
 ## Authentication and Session Config
 
-Connection config is stored in a project-level `.cyoda/config` file (always gitignored):
+Connection config is stored in `~/.config/cyoda/cyoda-plugin-config.json` — a home-directory file that is never git-tracked. This replaces the former project-level `.cyoda/config`. Storing credentials in the home directory eliminates the risk of accidentally committing tokens to a repository.
+
+### File format
 
 ```json
 {
-  "endpoint": "http://localhost:8080",
-  "token": "eyJ...",
-  "env": "development"
+  "active": "default",
+  "profiles": {
+    "default": {
+      "endpoint": "http://localhost:8080",
+      "env": "development"
+    },
+    "prod": {
+      "endpoint": "https://client-abc123-prod.eu.cyoda.net",
+      "token": "eyJ...",
+      "env": "production"
+    }
+  }
 }
 ```
 
-`token` is absent for local cyoda-go (mock auth, no token needed). `env` defaults to `"development"` when absent.
+`token` is absent for local cyoda-go (mock auth, no token needed). `env` defaults to `"development"` when absent. The `"active"` key at the top level controls which profile all skills operate on.
 
-Skills read this file via dynamic context injection at invocation time using `jq`. If the file is missing or `token` is absent when a cloud instance is required, the skill prompts to run `cyoda:auth`.
+### Profile selection
 
-**Production safety rule**: `"env": "production"` is only written after explicit user confirmation. When `.env` equals `"production"`, all API-calling skills display a production reminder and `cyoda:build` requires confirmation before registering changes.
+`cyoda:setup` and `cyoda:auth` list existing profiles, ask for a profile name (new or existing), write the profile, and set it as `"active"`. All other skills read the active profile without prompting.
+
+### Reading the active profile (dynamic context injection)
+
+```bash
+PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default")
+jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo '{"endpoint":"none"}'
+```
+
+Skills display the active profile name in status messages, e.g. *"Connected to Local cyoda-go — v1.4.2 [profile: default]"*.
+
+### Writing a profile
+
+```bash
+mkdir -p ~/.config/cyoda
+CONFIG_FILE=~/.config/cyoda/cyoda-plugin-config.json
+EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo '{"active":"'"$PROFILE_NAME"'","profiles":{}}')
+echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_DATA" \
+  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
+```
+
+If the file does not exist yet, skills create it. No `.gitignore` entries are written — the home-directory location makes them unnecessary.
+
+### Production safety rule
+
+`"env": "production"` is only written after explicit user confirmation. When the active profile's `env` equals `"production"`, all API-calling skills display a production reminder and `cyoda:build` requires confirmation before registering changes.
 
 ## Documentation Strategy
 

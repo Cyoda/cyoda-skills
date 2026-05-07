@@ -4,15 +4,16 @@
     {
       "id": 1,
       "prompt": "/cyoda:setup",
-      "expected_output": "Walks through local install: asks local vs cloud, runs brew install, runs cyoda init, verifies health, writes .cyoda/config, gitignores it, notes mock auth is active",
+      "expected_output": "Walks through local install: asks local vs cloud, runs brew install, runs cyoda init, verifies health, asks for profile name, writes profile to ~/.config/cyoda/cyoda-plugin-config.json, notes mock auth is active",
       "files": {},
       "assertions": [
         { "id": "asks-local-vs-cloud", "text": "Asks whether user wants local or cloud setup", "type": "behavior" },
         { "id": "runs-brew-install", "text": "Runs brew install commands for cyoda", "type": "behavior" },
         { "id": "runs-cyoda-init", "text": "Runs cyoda init", "type": "behavior" },
         { "id": "verifies-health", "text": "Verifies health endpoint responds", "type": "behavior" },
-        { "id": "writes-config", "text": "Writes .cyoda/config with localhost endpoint", "type": "behavior" },
-        { "id": "gitignores-config", "text": "Adds .cyoda/config to .gitignore", "type": "behavior" },
+        { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },
+        { "id": "writes-config", "text": "Writes profile with localhost endpoint to ~/.config/cyoda/cyoda-plugin-config.json and sets it as active", "type": "behavior" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" },
         { "id": "notes-mock-auth", "text": "Notes mock auth is active for local — no login needed", "type": "behavior" },
         { "id": "no-credentials", "text": "Does NOT ask for credentials on local setup", "type": "behavior" }
       ]
@@ -20,16 +21,17 @@
     {
       "id": 2,
       "prompt": "/cyoda:setup — I want to use Cyoda Cloud",
-      "expected_output": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ to create or list environments, collects endpoint URL in the correct format (client-<hash>-<env>.eu.cyoda.net), writes only endpoint field to .cyoda/config as JSON, gitignores it, directs to /cyoda:auth next",
+      "expected_output": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ to create or list environments, collects endpoint URL in the correct format (client-<hash>-<env>.eu.cyoda.net), asks for profile name, writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a profile, directs to /cyoda:auth next",
       "files": {},
       "assertions": [
         { "id": "directs-to-ai-studio", "text": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ for account/environment management", "type": "behavior" },
         { "id": "mentions-create-or-list", "text": "Mentions that the user can ask AI Studio to create, list, or redeploy environments", "type": "behavior" },
         { "id": "collects-endpoint", "text": "Collects endpoint URL from user", "type": "behavior" },
         { "id": "correct-endpoint-format", "text": "Uses correct endpoint format example (client-<hash>-<env>.eu.cyoda.net, not api.eu.cyoda.net)", "type": "format" },
-        { "id": "writes-endpoint-only", "text": "Writes only endpoint field to .cyoda/config as JSON — no token yet", "type": "behavior" },
+        { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },
+        { "id": "writes-endpoint-only", "text": "Writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a named profile — no token yet", "type": "behavior" },
+        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" },
         { "id": "directs-to-login", "text": "Directs user to run /cyoda:auth next", "type": "behavior" },
-        { "id": "gitignores-config", "text": "Gitignores .cyoda/config", "type": "behavior" },
         { "id": "no-credentials-in-setup", "text": "Does NOT ask for credentials — that is login's job", "type": "behavior" },
         { "id": "no-docs-signup-url", "text": "Does NOT direct user to docs.cyoda.net for sign-up", "type": "behavior" }
       ]
@@ -37,9 +39,9 @@
     {
       "id": 3,
       "prompt": "/cyoda:setup",
-      "expected_output": "Detects existing installation, skips brew install, verifies health, updates .cyoda/config if needed, reports already ready",
+      "expected_output": "Detects existing installation, skips brew install, verifies health, asks for profile name, updates profile in ~/.config/cyoda/cyoda-plugin-config.json, reports already ready",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "detects-existing", "text": "Detects cyoda is already installed", "type": "behavior" },
@@ -48,8 +50,7 @@
         { "id": "no-force-init", "text": "Does NOT run cyoda init again without --force", "type": "behavior" },
         { "id": "reports-ready", "text": "Reports already ready", "type": "format" }
       ]
-    }
-  ,
+    },
     {
       "id": 4,
       "prompt": "/cyoda:setup — local install, but brew fails with a permissions error",

@@ -1,25 +1,36 @@
 ---
 name: auth
-description: Authenticate to Cyoda Cloud using OAuth 2.0 client credentials. Obtains a JWT token and saves it to .cyoda/config. Includes production safety guard requiring explicit confirmation before storing production credentials. Only trigger for Cyoda-specific authentication — do not trigger for generic /login commands unrelated to Cyoda.
-allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(tee *) Bash(echo *) Bash(jq *)
+description: Authenticate to Cyoda Cloud using OAuth 2.0 client credentials. Obtains a JWT token and saves it to ~/.config/cyoda/cyoda-plugin-config.json under a named profile. Includes production safety guard requiring explicit confirmation before storing production credentials. Only trigger for Cyoda-specific authentication — do not trigger for generic /login commands unrelated to Cyoda.
+allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(tee *) Bash(echo *) Bash(jq *) Bash(mkdir *)
 ---
 
 ## Cyoda Login
 
-Reading current endpoint:
+Reading current config:
 ```!
-jq -r '.endpoint // "none"' .cyoda/config 2>/dev/null || echo "none"
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
 ```
 
-If endpoint is `none`: *"No Cyoda endpoint configured. Run `/cyoda:setup` first."* Stop.
+If `endpoint` is `none`: *"No Cyoda endpoint configured. Run `/cyoda:setup` first."* Stop.
 
-**Step 1 — Confirm environment type:**
+**Step 1 — Select profile:**
+
+List existing profiles:
+```bash
+jq -r '.profiles | keys[]' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "(none yet)"
+```
+
+Ask: *"Which profile should this token be saved under? Enter a name (e.g. `default`, `prod`) — existing profiles are updated, new names create a new profile."*
+
+Set `PROFILE_NAME` to the user's answer.
+
+**Step 2 — Confirm environment type:**
 
 Ask: *"Is this a development or production environment?"*
 
 If **production**: display this warning and require explicit confirmation:
 
-> ⚠️ **Security warning**: You are about to store production credentials in `.cyoda/config` on disk. This file will be gitignored, but it remains in plain text on your filesystem. Anyone with access to this machine can read it.
+> ⚠️ **Security warning**: You are about to store production credentials in `~/.config/cyoda/cyoda-plugin-config.json` on disk in plain text. Anyone with access to this machine can read them.
 >
 > Do you accept this risk? (yes/no)
 
@@ -27,7 +38,7 @@ If user answers anything other than `yes`: stop. Do not write any credentials. S
 
 **Important:** Always show the warning and explicitly ask `yes/no` — even if the user appeared to pre-accept in their initial message. The confirmation must be its own step.
 
-**Step 2 — Explain and collect credentials:**
+**Step 3 — Explain and collect credentials:**
 
 Explain what these credentials are:
 
@@ -42,7 +53,7 @@ Ask: *"Do you already have a `client_id` and `client_secret`?"*
 
 Ask for `client_id` and `client_secret` separately, one at a time. Do not echo the secret back in the conversation.
 
-**Step 3 — Obtain JWT token:**
+**Step 4 — Obtain JWT token:**
 
 If the cyoda CLI is installed, first confirm the current-version endpoint:
 ```bash
@@ -52,7 +63,8 @@ which cyoda >/dev/null 2>&1 && cyoda help config auth --format=markdown 2>/dev/n
 Then call the token endpoint using Basic auth (client credentials in the `Authorization` header, not the request body):
 
 ```bash
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 CREDENTIALS=$(printf "%s" "${CLIENT_ID}:${CLIENT_SECRET}" | base64)
 TOKEN_RESPONSE=$(curl -sf -X POST "${ENDPOINT%/}/api/oauth/token" \
   -H "Authorization: Basic ${CREDENTIALS}" \
@@ -65,23 +77,29 @@ If this returns 4xx/5xx: run `cyoda help config auth` to get the current-version
 
 If the curl fails or returns an error: show the error and stop. Do not write partial credentials.
 
-**Step 4 — Extract and write token:**
+**Step 5 — Extract and write token:**
 
 ```bash
-TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
-ENV_VALUE="development"  # or "production" based on Step 1
+TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
+[ -z "$TOKEN" ] && echo "Error: could not extract access_token from response — aborting." && exit 1
+ENV_VALUE="development"  # or "production" based on Step 2
 
-# Update .cyoda/config preserving endpoint
-jq --arg token "$TOKEN" --arg env "$ENV_VALUE" \
-  '. + {"token": $token, "env": $env}' .cyoda/config > .cyoda/config.tmp
-mv .cyoda/config.tmp .cyoda/config
-
-grep -qxF '.cyoda/config' .gitignore 2>/dev/null || echo '.cyoda/config' >> .gitignore
-grep -qxF '.cyoda/' .gitignore 2>/dev/null || echo '.cyoda/' >> .gitignore
+CONFIG_FILE="$HOME/.config/cyoda/cyoda-plugin-config.json"
+mkdir -p "$HOME/.config/cyoda"
+EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"${PROFILE_NAME}\",\"profiles\":{}}")
+EXISTING_PROFILE=$(echo "$EXISTING" | jq -r --arg p "$PROFILE_NAME" '.profiles[$p] // {}')
+NEW_PROFILE=$(echo "$EXISTING_PROFILE" | jq --arg token "$TOKEN" --arg env "$ENV_VALUE" \
+  '. + {"token": $token, "env": $env}')
+echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_PROFILE" \
+  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
 ```
 
-**Step 5 — Confirm:**
+If the write fails with a permission error (`mkdir` fails or the redirect is denied): do NOT attempt `sudo`, `chmod`, `chown`, or any other fix. Show:
 
-Report: *"Authenticated successfully. Token written to `.cyoda/config`. Run `/cyoda:status` to verify the connection."*
+> *"Couldn't write to `~/.config/cyoda/` — you may be running in a sandbox or restricted environment. Please grant write access to that directory and try again. Would you like help with that?"*
+
+**Step 6 — Confirm:**
+
+Report: *"Authenticated successfully. Token written to `~/.config/cyoda/cyoda-plugin-config.json` under profile `{PROFILE_NAME}`. Run `/cyoda:status` to verify the connection."*
 
 If `.env` equals `production`: add prominent reminder — *"⚠️ You are now connected to a PRODUCTION instance. Changes made via `/cyoda:build` will affect live data."*

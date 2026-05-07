@@ -6,10 +6,11 @@
       "prompt": "What's my Cyoda status?",
       "expected_output": "Reports 'Connected to Local cyoda-go — vX.X.X' without a PRODUCTION marker",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
-        { "id": "reads-config", "text": "Reads .cyoda/config for endpoint", "type": "behavior" },
+        { "id": "reads-config", "text": "Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" },
+        { "id": "shows-profile-name", "text": "Shows the active profile name", "type": "behavior" },
         { "id": "calls-health", "text": "Calls health endpoint on localhost", "type": "behavior" },
         { "id": "reports-connected-local", "text": "Reports 'Connected to Local cyoda-go' with version number", "type": "format" },
         { "id": "no-production-marker", "text": "Does NOT show PRODUCTION warning", "type": "behavior" }
@@ -20,7 +21,7 @@
       "prompt": "Check my connection",
       "expected_output": "Reports connection with prominent PRODUCTION marker and version number",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"production\", \"token\": \"eyJfake...\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"production\",\"token\":\"eyJfake...\"}}}"
       },
       "assertions": [
         { "id": "reads-env-production", "text": "Reads env=production from config", "type": "behavior" },
@@ -34,7 +35,7 @@
       "expected_output": "Reports 'Not connected' and directs user to run /cyoda:setup",
       "files": {},
       "assertions": [
-        { "id": "detects-missing-config", "text": "Detects missing .cyoda/config", "type": "behavior" },
+        { "id": "detects-missing-config", "text": "Detects missing ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" },
         { "id": "reports-not-connected", "text": "Reports 'Not connected' or equivalent", "type": "format" },
         { "id": "suggests-setup", "text": "Directs user to run /cyoda:setup", "type": "behavior" },
         { "id": "no-crash", "text": "Does NOT crash or show a raw error instead of a helpful message", "type": "behavior" }
@@ -45,7 +46,7 @@
       "prompt": "What's my Cyoda status?",
       "expected_output": "Detects 401 on health check, invokes cyoda:auth to refresh, then retries the status check",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"https://api.eu.cyoda.net\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"token\":\"eyJexpired...\"}}}"
       },
       "assertions": [
         { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when the health check returns 401 or 403", "type": "behavior" },

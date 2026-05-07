@@ -47,7 +47,7 @@
       "prompt": "/cyoda:app I want to build a chat app",
       "expected_output": "In Step 2 invokes /cyoda:status, finds instance already configured, confirms with user whether to use it, and skips setup entirely",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "checks-status-first", "text": "Invokes /cyoda:status at the start of Step 2", "type": "behavior" },

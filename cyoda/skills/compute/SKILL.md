@@ -34,9 +34,9 @@ Refer to the detailed patterns reference: [resources/grpc-patterns.md](resources
 
 ### Authentication
 
-Use the JWT token from `.cyoda/config`:
+Use the JWT token from the active profile in `~/.config/cyoda/cyoda-plugin-config.json`:
 ```!
-jq -r '.token // "none — local mock auth"' .cyoda/config 2>/dev/null || echo "no token — local mock auth"
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq -r --arg p "$PROFILE" '.profiles[$p].token // "none — local mock auth"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "no token — local mock auth"
 ```
 Include as bearer token in gRPC metadata: `Authorization: Bearer {token}`
 

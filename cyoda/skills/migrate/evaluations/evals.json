@@ -6,7 +6,7 @@
       "prompt": "/cyoda:migrate",
       "expected_output": "Verifies local instance is running, exports all entity models/workflows AND JSON schemas to migration/ directory, invokes setup+login for cloud, imports each workflow, runs /cyoda:test against cloud, instructs user to update app config",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "verifies-local", "text": "Verifies local cyoda-go instance is running before doing anything", "type": "behavior" },
@@ -28,7 +28,7 @@
       "prompt": "/cyoda:migrate",
       "expected_output": "Detects local instance is unreachable, tells user to start cyoda-go first, stops gracefully without attempting export",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "detects-unreachable", "text": "Detects local instance is unreachable", "type": "behavior" },
@@ -42,7 +42,7 @@
       "prompt": "/cyoda:migrate — both my Order and Product entities already exist in cloud with old workflows",
       "expected_output": "Checks all cloud entities before importing, collects both conflicts in a single summary, asks overwrite or skip once for all conflicts, proceeds based on user choices — does not import until user decides",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "checks-cloud-before-any-import", "text": "Queries cloud for existing workflows (Phase 4a) before issuing any POST import command", "type": "behavior" },
@@ -58,7 +58,7 @@
       "prompt": "/cyoda:migrate",
       "expected_output": "All entities are new (no cloud workflows exist yet) — pre-check completes with no conflicts and proceeds to import without interrupting the user",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
       },
       "assertions": [
         { "id": "precheck-uses-cloud-endpoint", "text": "Phase 4a GET queries target the cloud endpoint (from post-setup config), not the original local endpoint", "type": "behavior" },
@@ -72,7 +72,7 @@
       "prompt": "/cyoda:migrate",
       "expected_output": "Detects 401 during export, invokes cyoda:auth to refresh, retries the export call once",
       "files": {
-        ".cyoda/config": "{\"endpoint\": \"http://localhost:8080\", \"env\": \"development\", \"token\": \"eyJexpired...\"}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"token\":\"eyJexpired...\"}}}"
       },
       "assertions": [
         { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when any export or import call returns 401 or 403", "type": "behavior" },

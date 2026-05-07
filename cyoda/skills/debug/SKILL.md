@@ -9,7 +9,7 @@ allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(jq *)
 
 Reading connection config:
 ```!
-jq . .cyoda/config 2>/dev/null || echo '{"endpoint":"none"}'
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
 ```
 
 **Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
@@ -53,11 +53,12 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 
 #### Connectivity Issues
 
-1. Check `.cyoda/config` has correct `endpoint` value
+1. Check `~/.config/cyoda/cyoda-plugin-config.json` has correct `endpoint` value
 2. For cloud: check `token` is not expired — re-run `/cyoda:auth` if needed
 3. Test endpoint directly:
 ```!
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 curl -sf --max-time 5 "${ENDPOINT}/readyz" || echo "UNREACHABLE"
 ```
 
@@ -69,8 +70,9 @@ Investigate an entity's history for audit, compliance, or investigation purposes
 
 **Browse entity lifecycle:**
 ```bash
-ENDPOINT=$(jq -r '.endpoint' .cyoda/config)
-TOKEN=$(jq -r '.token // ""' .cyoda/config)
+PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
+ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
+TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 AUTH=$([ -n "$TOKEN" ] && echo "-H 'Authorization: Bearer $TOKEN'" || echo "")
 
 # Entity change history
