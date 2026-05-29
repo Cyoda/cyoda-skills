@@ -57,7 +57,7 @@ Each skill directory may contain `examples/`, `templates/`, and `resources/` sub
 | `cyoda:design` | Both | inline | Domain brainstorm: entities, workflows, philosophy orientation |
 | `cyoda:build` | User-only | inline | Incremental build loop: inspect → brainstorm → generate → register → verify |
 | `cyoda:compute` | Both | inline | Compute node patterns: gRPC protocol, connection lifecycle, processor/criteria |
-| `cyoda:test` | User-only | fork | Smoke test: guided scripts + direct execution against running instance |
+| `cyoda:test` | User-only | inline | E2e flow: guided scripts + automated discovery-driven execution with live progress |
 | `cyoda:debug` | Both | inline | Diagnose: failed transitions, processor errors, connectivity |
 | `cyoda:setup` | User-only | inline | Provision Cyoda: local cyoda-go install OR cloud connection config |
 | `cyoda:auth` | User-only | inline | Obtain JWT token, write to `~/.config/cyoda/cyoda-plugin-config.json` under named profile with env safety guard |
@@ -162,13 +162,31 @@ Compute nodes are always presented as optional — many Cyoda workflows need no 
 
 ### cyoda:test
 
-Runs in a forked subagent (`context: fork`) to avoid polluting the main conversation context.
+Runs inline (`context: inline`) so progress is visible to the user throughout execution.
 
 Supports two modes:
-- **Guided**: generates curl commands and test scripts the user can run and reuse
-- **Automated**: executes tests directly against the running Cyoda instance when available
+- **Guided**: generates a populated `smoke-test.sh` the user can save and re-run
+- **Automated**: discovers the running instance's entities and workflows, then executes a full e2e flow with live progress output
 
-Test coverage: create entity, trigger manual transition, verify state, check transition history (point-in-time), test automatic transitions, verify processor invocation.
+**Automated mode flow:**
+
+1. Invoke `cyoda:docs` to discover entity listing, entity CRUD, workflow query, transition trigger, and changes/audit endpoints — do not hardcode any API paths
+2. Query the running instance for all registered entities and their workflow definitions
+3. If more than 3 entities: print the list and ask the user which to test (default: all)
+4. For each selected entity:
+   - Print `"Testing <entity> v<N>..."` before starting
+   - Fetch workflow definition to determine initial state and reachable manual transitions
+   - Create an entity instance with a minimal valid payload inferred from the schema; print `"  Creating entity... ✓ [id: ...]"`
+   - Verify entity is in the expected initial state; print result
+   - For each manual transition reachable on the happy path: trigger it, verify the new state matches the workflow definition, print `"  Triggering <transition>... ✓ / ✗"` with actual vs expected state on failure
+5. Print a summary table: entity | transitions tested | pass/fail
+6. Ask: *"Run debug observation to validate the audit trail? (yes/no)"* — if yes, invoke `cyoda:debug` in observation mode for the last tested entity
+
+**Error handling:**
+- Any step failure: print `✗` with actual vs expected, continue remaining steps (do not abort mid-run)
+- Entity with no workflow definition: skip and note in summary
+- `cyoda:docs` fails to return relevant endpoints: surface the error and stop
+- Auth 401/403: invoke `cyoda:auth`, retry once (standard rule)
 
 ### cyoda:debug
 
