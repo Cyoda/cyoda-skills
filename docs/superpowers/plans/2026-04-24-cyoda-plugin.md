@@ -2572,7 +2572,7 @@ Invoke `/cyoda:status`. If already connected, confirm with the user whether to u
 If not connected, present both options as co-equal:
 
 - **Local cyoda-go** (recommended for development — full control, offline-capable): Run `/cyoda:setup` → choose local
-- **Cyoda Cloud via AI Studio** (fastest to start — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
+- **Cyoda Cloud** (coming soon — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
 
 *(After setup is complete, run `/cyoda:status` to confirm connection.)*
 
@@ -2791,19 +2791,19 @@ Identified from real user session (`_developer/conversation.md`). All changes ap
 
 **Problem:** Skill asked for `client_id`/`client_secret` without explaining what they are or where to get them.
 
-**Fix:** Step 2 now explains M2M credentials (machine-to-machine, identify the application not a user), asks if user already has them, directs to AI Studio if not, and notes that credentials may be deleted on environment redeploy.
+**Fix:** Step 2 now explains M2M credentials (machine-to-machine, identify the application not a user), asks if user already has them, and notes that credentials may be deleted on environment redeploy.
 
-### 5. AI Studio guidance + correct URLs in `cyoda:setup`
+### 5. Correct endpoint format in `cyoda:setup`
 
 **Problem:** Cloud step 1 pointed to `https://docs.cyoda.net/` for sign-up (wrong) and used `https://api.eu.cyoda.net` as the endpoint example (wrong format).
 
-**Fix:** Cloud step 1 now directs to `https://ai.cyoda.net/` and explains that the user can prompt AI Studio to create/list/redeploy environments. Endpoint example updated to correct format: `https://client-<hash>-<env>.eu.cyoda.net`.
+**Fix:** Cloud step 1 now shows a coming soon notice for managed environments. Endpoint example updated to correct format: `https://client-<hash>-<env>.eu.cyoda.net`. Users who already have a provisioned endpoint can continue by entering it directly.
 
-### 6. Technical user creation via AI Studio (`cyoda:auth` + `cyoda:setup`)
+### 6. Cloud credential guidance (`cyoda:auth` + `cyoda:setup`)
 
-**Problem:** No guidance on how to create M2M credentials through AI Studio.
+**Problem:** No guidance on how to obtain M2M credentials when cloud self-service is unavailable.
 
-**Fix:** Both skills now explain that AI Studio at `https://ai.cyoda.net/` accepts conversational prompts for credential management ("create a technical user"). Also covers the post-redeploy case where credentials may need to be recreated.
+**Fix:** Both skills now explain that Cyoda Cloud credential self-service is coming soon and direct users to contact the Cyoda team to get a `client_id` and `client_secret`. Also covers the post-redeploy case where credentials may need to be recreated by contacting the team.
 
 ### 7. Proactive `cyoda help` lookup in `cyoda:build` Step 4
 
@@ -3457,7 +3457,7 @@ git commit -m "feat(skills): update config reads to ~/.config/cyoda/cyoda-plugin
         { "id": "asks-env-type", "text": "Asks whether this is development or production environment", "type": "behavior" },
         { "id": "explains-m2m", "text": "Explains that client_id/client_secret are machine-to-machine credentials identifying the application, not a personal login", "type": "behavior" },
         { "id": "asks-if-have-credentials", "text": "Asks whether user already has client_id and client_secret before collecting", "type": "behavior" },
-        { "id": "directs-to-ai-studio", "text": "Asks whether user already has credentials — if the user says no, would direct them to Cyoda AI Studio at https://ai.cyoda.net/; in this eval the user says yes so the redirect path is not exercised but the conditional check must be present", "type": "behavior" },
+        { "id": "handles-no-credentials", "text": "Asks whether user already has credentials — if the user says no, would explain cloud credential self-service is coming soon and direct them to contact the Cyoda team; in this eval the user says yes so that path is not exercised but the conditional check must be present", "type": "behavior" },
         { "id": "collects-credentials", "text": "Collects client_id and client_secret separately, one at a time", "type": "behavior" },
         { "id": "calls-token-endpoint", "text": "Calls OAuth token endpoint", "type": "behavior" },
         { "id": "writes-token", "text": "Writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile", "type": "behavior" },
@@ -3501,14 +3501,14 @@ git commit -m "feat(skills): update config reads to ~/.config/cyoda/cyoda-plugin
     {
       "id": 4,
       "prompt": "/cyoda:auth — my login stopped working after the environment was redeployed",
-      "expected_output": "Recognises the post-redeploy scenario, notes that technical users may be deleted on redeploy, directs user to recreate the technical user in AI Studio before retrying",
+      "expected_output": "Recognises the post-redeploy scenario, notes that technical users may be deleted on redeploy, directs user to contact the Cyoda team to recreate the technical user before retrying",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
       },
       "assertions": [
         { "id": "recognises-redeploy", "text": "Recognises the post-redeploy scenario as cause of credential failure", "type": "behavior" },
         { "id": "notes-users-deleted", "text": "Notes that technical users may be deleted when an environment is redeployed", "type": "behavior" },
-        { "id": "directs-to-recreate", "text": "Directs user to recreate the technical user in Cyoda AI Studio at https://ai.cyoda.net/", "type": "behavior" },
+        { "id": "directs-to-contact-team", "text": "Directs user to contact the Cyoda team to recreate the technical user — does NOT mention AI Studio or ai.cyoda.net", "type": "behavior" },
         { "id": "completes-auth", "text": "After user provides new credentials, completes the full auth flow — calls token endpoint and writes token to ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" }
       ]
     },
@@ -3521,7 +3521,7 @@ git commit -m "feat(skills): update config reads to ~/.config/cyoda/cyoda-plugin
       },
       "assertions": [
         { "id": "basic-auth-header", "text": "Uses Authorization: Basic header with base64-encoded client_id:client_secret — credentials are NOT in the request body", "type": "behavior" },
-        { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token on the first attempt — does NOT try /oauth/token, /auth/token, or other paths first", "type": "behavior" },
+        { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token as the token endpoint — does NOT try /oauth/token, /auth/token, or other guessed paths", "type": "behavior" },
         { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults cyoda help config auth (or https://docs.cyoda.net/help/config/auth.md if CLI absent) instead", "type": "behavior" },
         { "id": "consults-cyoda-help-on-failure", "text": "If token call fails, runs 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying — does not guess alternate paths", "type": "behavior" }
       ]
@@ -3558,11 +3558,12 @@ git commit -m "feat(skills): update config reads to ~/.config/cyoda/cyoda-plugin
     {
       "id": 2,
       "prompt": "/cyoda:setup — I want to use Cyoda Cloud",
-      "expected_output": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ to create or list environments, collects endpoint URL in the correct format (client-<hash>-<env>.eu.cyoda.net), asks for profile name, writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a profile, directs to /cyoda:auth next",
+      "expected_output": "Shows coming soon notice for managed cloud environments, collects endpoint URL from user (for users already provisioned by the Cyoda team), asks for profile name, writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a profile, directs to /cyoda:auth next",
       "files": {},
       "assertions": [
-        { "id": "directs-to-ai-studio", "text": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ for account/environment management", "type": "behavior" },
-        { "id": "mentions-create-or-list", "text": "Mentions that the user can ask AI Studio to create, list, or redeploy environments", "type": "behavior" },
+        { "id": "shows-coming-soon", "text": "Shows a coming soon notice explaining that managed cloud environments are not yet available for self-service provisioning", "type": "behavior" },
+        { "id": "allows-existing-endpoint", "text": "Still allows users who already have a provisioned endpoint to enter it and continue", "type": "behavior" },
+        { "id": "does-not-direct-to-ai-studio", "text": "Does NOT direct the user to ai.cyoda.net or mention AI Studio", "type": "behavior" },
         { "id": "collects-endpoint", "text": "Collects endpoint URL from user", "type": "behavior" },
         { "id": "correct-endpoint-format", "text": "Uses correct endpoint format example (client-<hash>-<env>.eu.cyoda.net, not api.eu.cyoda.net)", "type": "format" },
         { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },
@@ -3815,7 +3816,7 @@ With:
 ```markdown
 - If **not connected**: present both options as co-equal:
   - **Local cyoda-go** (recommended for development — full control, offline-capable): Run `/cyoda:setup` → choose local
-  - **Cyoda Cloud via AI Studio** (fastest to start — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
+  - **Cyoda Cloud** (coming soon — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
 ```
 
 - [ ] **Step 6: Update `cyoda/skills/app/evaluations/evals.json`**

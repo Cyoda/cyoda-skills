@@ -220,8 +220,8 @@ Obtains a JWT token via OAuth 2.0 client credentials flow and writes the connect
    - Explain: *"`client_id` and `client_secret` are machine-to-machine (M2M) credentials that identify your application or service to Cyoda — not a personal login. They're used by automated pipelines, compute nodes, and any service calling the Cyoda API."*
    - Ask: "Do you already have a `client_id` and `client_secret`?"
      - If yes: collect them and proceed.
-     - If no: direct to Cyoda AI Studio at https://ai.cyoda.net/ — ask it to "create a technical user". Return once credentials are available.
-   - **Post-redeploy note**: if the environment was recently redeployed, technical users may have been deleted — credentials that previously worked may fail. In that case, recreate the technical user in AI Studio.
+     - If no: Cyoda Cloud credential self-service is coming soon. Direct the user to contact the Cyoda team to get a `client_id` and `client_secret`. If using local cyoda-go, credentials are not needed.
+   - **Post-redeploy note**: if the environment was recently redeployed, technical users may have been deleted — credentials that previously worked may fail. In that case, contact the Cyoda team to recreate the technical user.
 6. Call OAuth token endpoint, obtain JWT. Correct endpoint: `POST {endpoint}/api/oauth/token` with `Authorization: Basic base64(client_id:client_secret)` header — credentials are NOT in the request body. If CLI is available, run `cyoda help config auth` first to confirm the current-version endpoint; if not, fetch `https://docs.cyoda.net/help/config/auth.md`. On 4xx/5xx, consult the same source rather than guessing alternate paths.
 7. Write/merge the profile into `~/.config/cyoda/cyoda-plugin-config.json` and set it as active. No `.gitignore` entries needed.
 
@@ -249,7 +249,7 @@ Two modes, selected at invocation:
 7. Confirm: mock auth is active — `cyoda:auth` not needed for local
 
 **Cloud:**
-1. Check for existing Cyoda Cloud account; if none, direct to Cyoda AI Studio at https://ai.cyoda.net/ — the user can prompt it: "create a new environment", "list my environments", or "redeploy environment X". The response provides the endpoint URL.
+1. Cyoda Cloud managed environments are coming soon. If the Cyoda team has already provisioned an environment, collect the endpoint URL. Otherwise, direct the user to local cyoda-go for now.
 2. Collect endpoint URL (format: `https://client-<hash>-<env>.eu.cyoda.net`); probe reachability before writing config
 3. List existing profiles in `~/.config/cyoda/cyoda-plugin-config.json` (if any). Ask for a profile name, then write `{"endpoint": "<url>"}` under that profile and set it as active.
 4. Prompt user to run `cyoda:auth` to complete auth
@@ -275,7 +275,7 @@ Newcomer orchestrator. Walks the user through the full journey by sequencing the
 1. Orient to Cyoda philosophy (inline, brief)
 2. Invoke `cyoda:design` for domain brainstorm
 3. **Check existing instance first**: invoke `cyoda:status` before asking local vs cloud. If already connected, confirm whether to use that environment. Only ask local/cloud if not connected.
-4. If not connected, present both options as co-equal: **Local cyoda-go** (recommended for development — full control, offline-capable) and **Cyoda Cloud via AI Studio** (fastest to start — no local install needed). Invoke `cyoda:setup` with the user's choice.
+4. If not connected, present both options: **Local cyoda-go** (recommended for development — full control, offline-capable) and **Cyoda Cloud** (coming soon — no local install needed). Invoke `cyoda:setup` with the user's choice.
 5. Invoke `cyoda:build` for incremental implementation
 6. Invoke `cyoda:test` for smoke testing
 7. Offer `cyoda:migrate` if user wants to move to cloud

@@ -47,9 +47,9 @@ Explain what these credentials are:
 Ask: *"Do you already have a `client_id` and `client_secret`?"*
 
 - **If yes**: collect them and proceed.
-- **If no**: direct the user to [Cyoda AI Studio](https://ai.cyoda.net/) — ask it to "create a technical user". Return once credentials are available.
+- **If no**: Cyoda Cloud credential self-service is coming soon. Contact the Cyoda team to get a `client_id` and `client_secret`. If you are on a local cyoda-go installation, credentials are not needed — run `/cyoda:setup` (local mode) instead.
 
-**Post-redeploy note**: if the environment was recently redeployed, existing technical users may have been deleted. If authentication fails and the environment was redeployed, recreate the technical user in AI Studio before retrying.
+**Post-redeploy note**: if the environment was recently redeployed, existing technical users may have been deleted. If authentication fails after a redeploy, contact the Cyoda team to recreate the technical user.
 
 Ask for `client_id` and `client_secret` separately, one at a time. Do not echo the secret back in the conversation.
 

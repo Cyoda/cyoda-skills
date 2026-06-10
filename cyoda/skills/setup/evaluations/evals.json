@@ -21,11 +21,12 @@
     {
       "id": 2,
       "prompt": "/cyoda:setup — I want to use Cyoda Cloud",
-      "expected_output": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ to create or list environments, collects endpoint URL in the correct format (client-<hash>-<env>.eu.cyoda.net), asks for profile name, writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a profile, directs to /cyoda:auth next",
+      "expected_output": "Shows coming soon notice for managed cloud environments, collects endpoint URL from user (for users already provisioned by the Cyoda team), asks for profile name, writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a profile, directs to /cyoda:auth next",
       "files": {},
       "assertions": [
-        { "id": "directs-to-ai-studio", "text": "Directs user to Cyoda AI Studio at https://ai.cyoda.net/ for account/environment management", "type": "behavior" },
-        { "id": "mentions-create-or-list", "text": "Mentions that the user can ask AI Studio to create, list, or redeploy environments", "type": "behavior" },
+        { "id": "shows-coming-soon", "text": "Shows a coming soon notice explaining that managed cloud environments are not yet available for self-service provisioning", "type": "behavior" },
+        { "id": "allows-existing-endpoint", "text": "Still allows users who already have a provisioned endpoint to enter it and continue", "type": "behavior" },
+        { "id": "does-not-direct-to-ai-studio", "text": "Does NOT direct the user to ai.cyoda.net or mention AI Studio", "type": "behavior" },
         { "id": "collects-endpoint", "text": "Collects endpoint URL from user", "type": "behavior" },
         { "id": "correct-endpoint-format", "text": "Uses correct endpoint format example (client-<hash>-<env>.eu.cyoda.net, not api.eu.cyoda.net)", "type": "format" },
         { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },

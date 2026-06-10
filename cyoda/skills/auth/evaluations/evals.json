@@ -13,7 +13,7 @@
         { "id": "asks-env-type", "text": "Asks whether this is development or production environment", "type": "behavior" },
         { "id": "explains-m2m", "text": "Explains that client_id/client_secret are machine-to-machine credentials identifying the application, not a personal login", "type": "behavior" },
         { "id": "asks-if-have-credentials", "text": "Asks whether user already has client_id and client_secret before collecting", "type": "behavior" },
-        { "id": "directs-to-ai-studio", "text": "Asks whether user already has credentials — if the user says no, would direct them to Cyoda AI Studio at https://ai.cyoda.net/; in this eval the user says yes so the redirect path is not exercised but the conditional check must be present", "type": "behavior" },
+        { "id": "handles-no-credentials", "text": "Asks whether user already has credentials — if the user says no, would explain cloud credential self-service is coming soon and direct them to contact the Cyoda team; in this eval the user says yes so that path is not exercised but the conditional check must be present", "type": "behavior" },
         { "id": "collects-credentials", "text": "Collects client_id and client_secret separately, one at a time", "type": "behavior" },
         { "id": "calls-token-endpoint", "text": "Calls OAuth token endpoint", "type": "behavior" },
         { "id": "writes-token", "text": "Writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile", "type": "behavior" },
@@ -57,14 +57,14 @@
     {
       "id": 4,
       "prompt": "/cyoda:auth — my login stopped working after the environment was redeployed",
-      "expected_output": "Recognises the post-redeploy scenario, notes that technical users may be deleted on redeploy, directs user to recreate the technical user in AI Studio before retrying",
+      "expected_output": "Recognises the post-redeploy scenario, notes that technical users may be deleted on redeploy, directs user to contact the Cyoda team to recreate the technical user before retrying",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
       },
       "assertions": [
         { "id": "recognises-redeploy", "text": "Recognises the post-redeploy scenario as cause of credential failure", "type": "behavior" },
         { "id": "notes-users-deleted", "text": "Notes that technical users may be deleted when an environment is redeployed", "type": "behavior" },
-        { "id": "directs-to-recreate", "text": "Directs user to recreate the technical user in Cyoda AI Studio at https://ai.cyoda.net/", "type": "behavior" },
+        { "id": "directs-to-contact-team", "text": "Directs user to contact the Cyoda team to recreate the technical user — does NOT mention AI Studio or ai.cyoda.net", "type": "behavior" },
         { "id": "completes-auth", "text": "After user provides new credentials, completes the full auth flow — calls token endpoint and writes token to ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" }
       ]
     },
@@ -77,7 +77,7 @@
       },
       "assertions": [
         { "id": "basic-auth-header", "text": "Uses Authorization: Basic header with base64-encoded client_id:client_secret — credentials are NOT in the request body", "type": "behavior" },
-        { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token on the first attempt — does NOT try /oauth/token, /auth/token, or other paths first", "type": "behavior" },
+        { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token as the token endpoint — does NOT try /oauth/token, /auth/token, or other guessed paths", "type": "behavior" },
         { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults 'cyoda help config auth' or https://docs.cyoda.net/help/config/auth.md instead", "type": "behavior" },
         { "id": "consults-help-on-failure", "text": "If token call fails, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying — does not guess alternate paths", "type": "behavior" }
       ]
