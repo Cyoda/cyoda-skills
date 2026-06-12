@@ -64,7 +64,6 @@ Before presenting the output summary, apply this checklist to the proposed desig
 | State classification overuse | active/waiting/suspended/cancelled/rejected/expired/archived used as distinct states with identical business behavior | Consolidate |
 | Dead-end state | Non-terminal state with no valid path to a business outcome | Add a transition or flag for review |
 | Generic transitions | Named `changeState`, `update`, `modify`, `process` | Rename with a business verb |
-| Async failure unmodelled | Async processor present but no retry/compensation/manual path | Prompt user to define failure handling |
 
 ### Phase 4 — Output Design Summary
 

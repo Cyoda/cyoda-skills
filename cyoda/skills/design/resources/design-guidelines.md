@@ -1,12 +1,12 @@
 # Entity Lifecycle & State Machine Design Guidelines
 
-Reference this document when reviewing a proposed entity design, or share it with users who want to understand the reasoning behind design decisions.
+Use this document when reviewing a proposed entity design, or share it with users who want to understand the reasoning behind design decisions.
 
 ## Core Summary Principles
 
 - States represent **business meaning**, not process steps.
 - Guards represent **decision logic**, not lifecycle changes.
-- Async processors represent **deferred computation + continuation**, not states.
+- Async processors represent **deferred computation and continuation**, not states.
 - Entities must remain **simple, decomposed, and responsibility-focused**.
 - Lifecycle design must avoid **state explosion and technical leakage**.
 - Business clarity is more important than process completeness.
@@ -45,7 +45,7 @@ Reference this document when reviewing a proposed entity design, or share it wit
 
 - **Terminal Accessibility** — Every non-terminal state should have at least one valid path to a business outcome.
 
-- **Graph Validation** — Validate lifecycle graphs for: unreachable states, accidental dead ends, invalid loops, missing completion paths.
+- **Graph Validation** — Validate lifecycle graphs for unreachable states, accidental dead ends, invalid loops, and missing completion paths.
 
 - **Intentional Loops** — Cycles and return paths should be intentional and explicitly documented.
 
@@ -75,7 +75,7 @@ Reference this document when reviewing a proposed entity design, or share it wit
 
 - **No Generic State Changes** — Avoid generic "Change State" operations. Every transition should have explicit business meaning.
 
-- **Multiple Transitions from a Single State** — Multiple transitions may originate from the same state. Transition selection may be based on entity data or externalized condition evaluation. Conditions should ideally be mutually exclusive. If multiple transitions may match simultaneously, the first one will win.
+- **Multiple Transitions from a Single State** — Multiple transitions may originate from the same state. Transition selection may be based on entity data or externalized condition evaluation. Conditions should ideally be mutually exclusive. If multiple transitions may match simultaneously, the first matching transition wins.
 
 - **Avoid Overlapping Guards** — Guard conditions should ideally be mutually exclusive. If multiple transitions may match simultaneously, precedence rules must be clearly documented.
 
@@ -87,13 +87,13 @@ Reference this document when reviewing a proposed entity design, or share it wit
 
 ## 5. Async Processing, External Execution & State Continuation
 
-- **No Technical States for Processing** — It is not recommended to model execution states such as: processing, calling external system, retry, queue waiting.
+- **No Technical States for Processing** — Do not model execution states such as processing, calling an external system, retrying, or waiting in a queue.
 
 - **Async Processors (Core Platform Concept)** — A transition may trigger a fully asynchronous processor. The processor may complete later, return a result, or resume/restart the state machine with new input. Use it only when necessary. If an async processor fails, the entity remains in the state reached before execution — lifecycle design must account for this explicitly.
 
-- **Async Processor is NOT a State** — It is externalized business computation. It does not define lifecycle position.
+- **An Async Processor Is NOT a State** — It is externalized business computation. It does not define lifecycle position.
 
-- **Failure Recovery Must Be Modelled** — Designers must define: retry paths, compensation actions, alternative transitions, and manual intervention paths.
+- **Failure Recovery Must Be Modeled** — Designers must define retry paths, compensation actions, alternative transitions, and manual intervention paths.
 
 - **Do Not Assume Completion** — Async processors are not guaranteed to succeed.
 
@@ -105,13 +105,13 @@ Reference this document when reviewing a proposed entity design, or share it wit
 
 ## 6. Parallel Activities & Business Progress
 
-- **Parallel Execution** — Parallel activities may be designed externally; there are no parallel transitions in the state machine.
+- **Parallel Execution** — Parallel activities may be designed externally; there are no parallel transitions within the state machine.
 
 - **Do Not Encode Parallelism in States** — Avoid combinatorial states such as: `WaitingForAAndB`, `WaitingForAOnly`, `WaitingForBOnly`.
 
 - **Track Progress Separately** — Use supporting structures or sub-entities.
 
-- **Explicit Join Conditions** — If you run parallel execution using sub-entities, you can add a scheduled loop and condition that checks for all tasks to complete — for example, by checking flags on the entity level or by calling an externalized processor.
+- **Explicit Join Conditions** — If you run parallel execution using sub-entities, you can add a scheduled loop and condition that checks whether all tasks are complete — for example, by checking flags at the entity level or by calling an externalized processor.
 
 ---
 

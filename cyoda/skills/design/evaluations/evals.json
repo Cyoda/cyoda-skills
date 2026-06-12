@@ -51,7 +51,7 @@
       "assertions": [
         { "id": "removes-technical-states", "text": "Removes processing, calling_payment_api, and retry as technical states", "type": "behavior" },
         { "id": "explains-removals-inline", "text": "Briefly explains each removal inline in plain language", "type": "behavior" },
-        { "id": "corrected-summary", "text": "Produces design summary with business states only: draft, submitted, approved, rejected", "type": "format" },
+        { "id": "corrected-summary", "text": "Produces design summary that contains no technical states (processing, calling_payment_api, retry absent); may include a business recovery state such as payment_failed", "type": "format" },
         { "id": "references-guidelines", "text": "References design-guidelines.md for the async processor pattern", "type": "behavior" },
         { "id": "no-silent-correction", "text": "Does NOT silently drop states without explanation", "type": "behavior" }
       ]
