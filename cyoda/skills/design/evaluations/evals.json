@@ -42,6 +42,19 @@
         { "id": "q5-explains-lock", "text": "Q5 explains lock mode: schema fixed, mismatches rejected", "type": "behavior" },
         { "id": "q5-can-switch", "text": "Q5 mentions you can start with discover and switch to lock later", "type": "behavior" }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "I want to model an Order entity with these states: draft, submitted, processing, calling_payment_api, retry, approved, rejected",
+      "expected_output": "Removes technical states (processing, calling_payment_api, retry) during Phase 3 design review, explains each removal inline, produces corrected design summary with business states only (draft, submitted, approved, rejected), references design-guidelines.md for async processor pattern",
+      "files": {},
+      "assertions": [
+        { "id": "removes-technical-states", "text": "Removes processing, calling_payment_api, and retry as technical states", "type": "behavior" },
+        { "id": "explains-removals-inline", "text": "Briefly explains each removal inline in plain language", "type": "behavior" },
+        { "id": "corrected-summary", "text": "Produces design summary with business states only: draft, submitted, approved, rejected", "type": "format" },
+        { "id": "references-guidelines", "text": "References design-guidelines.md for the async processor pattern", "type": "behavior" },
+        { "id": "no-silent-correction", "text": "Does NOT silently drop states without explanation", "type": "behavior" }
+      ]
     }
   ]
 }

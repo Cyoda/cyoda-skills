@@ -114,7 +114,7 @@ This skill is callable by other skills (e.g., `cyoda:build` delegates here when 
 
 ### cyoda:design
 
-Two phases:
+Three phases:
 
 **Phase 1 — Orientation** (triggered when newcomer detected, i.e., no prior Cyoda context):
 - Explain Cyoda as an EDBMS: entities are durable state machines, not rows
@@ -129,7 +129,31 @@ Two phases:
 - Do any transitions need custom logic? → compute nodes (presented as optional)
 - What does the schema look like? (discover mode for prototyping — schema evolves automatically, can switch to lock later; lock mode for production — schema fixed, mismatches rejected)
 
-Output: a structured app design that feeds into `cyoda:build`.
+**Phase 3 — Design Review** (before presenting the output summary):
+Apply the inline anti-pattern checklist from `resources/design-guidelines.md` against the proposed design. For each violation found, fix it and note the change inline in one plain-language sentence (e.g. *"I've removed `processing` — Cyoda models that as an async processor, not a business state"*). Then produce the corrected Phase 4 output summary. When a deeper explanation is useful, reference the guidelines: *"See [Entity Lifecycle & State Machine Design Guidelines](resources/design-guidelines.md) — § Async Processing."*
+
+**Anti-pattern checklist (inline in SKILL.md, applied during Phase 3):**
+
+Core principles:
+- States represent business meaning, not process steps
+- Guards represent decision logic, not lifecycle changes — prefer a guard over a new state when only the path differs, not the business condition
+- Async processors represent deferred computation, not states
+- Business clarity over process completeness — fewer clear states beat many low-value intermediate ones
+
+Anti-patterns to catch and fix:
+- **Technical states**: any state named `processing`, `calling_*`, `retry`, `queued`, `waiting_for_response` → remove, model as async processor
+- **Orthogonal dimensions as states**: priority, assignment, ownership, visibility, payment status, SLA tracking encoded as lifecycle states → extract to attributes or sub-entities
+- **Orthogonal lifecycles collapsed**: independent business concerns (different rules, ownership, reporting) combined in one lifecycle → split into separate entities
+- **Combinatorial wait states**: `WaitingForAAndB`, `WaitingForAOnly` etc. → replace with progress sub-entity or join condition
+- **Super entities**: single entity spanning multiple independent business activities → split
+- **Low-value states**: states with no clear business value → remove or merge; prefer fewer meaningful states
+- **Stateless states**: no observable business consequence (no change in allowed actions, validation, permissions, reporting) → remove or merge
+- **State classification overuse**: active/waiting/suspended/cancelled/rejected/expired/archived used as distinct states when business behavior is identical → consolidate
+- **Dead-end states**: non-terminal state with no valid path to a business outcome → add a transition or flag for review
+- **Generic transitions**: named `changeState`, `update`, `modify`, `process` → rename with a business verb
+- **Async processor failure unmodelled**: async processor present but no retry/compensation/manual intervention path → prompt user to define failure handling
+
+Output: a corrected, structured app design that feeds into `cyoda:build`.
 
 ### cyoda:build
 
@@ -391,7 +415,7 @@ Skills with non-trivial supporting files (others have only `evaluations/`):
 
 | Skill | Supporting files |
 |---|---|
-| `cyoda:design` | `resources/patterns.md` — common workflow patterns (approval flow, saga, scheduled retry, auto-transition cascade, multi-workflow models) |
+| `cyoda:design` | `resources/patterns.md` — common workflow patterns (approval flow, saga, scheduled retry, auto-transition cascade, multi-workflow models); `resources/design-guidelines.md` — full Entity Lifecycle & State Machine Design Guidelines (reference for users and Phase 3 review) |
 | `cyoda:build` | `templates/workflow.json`, `templates/sample-entity.json`, `examples/` |
 | `cyoda:compute` | `resources/grpc-patterns.md`, `examples/processor.md`, `examples/criteria.md` |
 | `cyoda:test` | `templates/smoke-test.sh` |
