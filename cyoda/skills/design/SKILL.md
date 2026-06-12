@@ -40,7 +40,33 @@ Present the compute node option neutrally — it is **optional**. Many workflows
 
 *You can always start with discover and switch to lock when you're ready to go live. Which fits where you are now?"*
 
-### Phase 3 — Output Design Summary
+### Phase 3 — Design Review
+
+Before presenting the output summary, apply this checklist to the proposed design (entities, states, transitions gathered through Q1–Q5). For each violation found, fix the design and note the change in one plain-language sentence inline — for example: *"I've removed `processing` — Cyoda models that as an async processor, not a business state."* Then produce the corrected Phase 4 summary. When a deeper explanation is useful, point the user to the guidelines: *"See [Entity Lifecycle & State Machine Design Guidelines](resources/design-guidelines.md) — § Async Processing."*
+
+**Core principles to apply:**
+- States represent business meaning, not process steps
+- Guards represent decision logic, not lifecycle changes — prefer a guard over a new state when only the path differs, not the business condition
+- Async processors represent deferred computation, not states
+- Business clarity over process completeness — fewer clear states beat many low-value intermediate ones
+
+**Anti-patterns to catch and fix:**
+
+| Anti-pattern | Signal | Fix |
+|---|---|---|
+| Technical states | State named `processing`, `calling_*`, `retry`, `queued`, `waiting_for_response` | Remove; model as async processor |
+| Orthogonal dimensions as states | Priority, assignment, ownership, visibility, payment status, SLA as lifecycle states | Extract to attributes or sub-entities |
+| Orthogonal lifecycles collapsed | Independent business concerns (different rules, ownership, reporting) in one lifecycle | Split into separate entities |
+| Combinatorial wait states | `WaitingForAAndB`, `WaitingForAOnly`, etc. | Replace with progress sub-entity or join condition |
+| Super entity | Single entity spans multiple independent business activities | Split |
+| Low-value states | State with no clear business value | Remove or merge |
+| Stateless states | No observable business consequence (no change in allowed actions, validation, permissions, reporting) | Remove or merge |
+| State classification overuse | active/waiting/suspended/cancelled/rejected/expired/archived used as distinct states with identical business behavior | Consolidate |
+| Dead-end state | Non-terminal state with no valid path to a business outcome | Add a transition or flag for review |
+| Generic transitions | Named `changeState`, `update`, `modify`, `process` | Rename with a business verb |
+| Async failure unmodelled | Async processor present but no retry/compensation/manual path | Prompt user to define failure handling |
+
+### Phase 4 — Output Design Summary
 
 Present a structured summary:
 
@@ -60,3 +86,5 @@ Suggested first increment for /cyoda:build: [EntityName] with [minimal workflow]
 Reference patterns from [patterns.md](resources/patterns.md) when relevant (e.g., if the user describes an approval process, mention the Approval Flow pattern).
 
 Offer to proceed: *"Ready to build this? Run `/cyoda:build` to start registering these models in your running Cyoda instance."*
+
+For users who want to understand the reasoning behind design decisions, share [Entity Lifecycle & State Machine Design Guidelines](resources/design-guidelines.md).
