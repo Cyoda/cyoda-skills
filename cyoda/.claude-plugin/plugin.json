@@ -1,7 +1,7 @@
 {
   "name": "cyoda",
   "description": "Build, test, and run applications on Cyoda EDBMS. Covers local cyoda-go development, Cyoda Cloud, entity/workflow design, compute nodes, testing, debugging, and lift-and-shift migration.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Cyoda Platform"
   },
