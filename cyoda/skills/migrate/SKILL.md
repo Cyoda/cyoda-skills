@@ -1,7 +1,7 @@
 ---
 name: migrate
 description: Lift-and-shift a Cyoda application from local cyoda-go to Cyoda Cloud. Exports entity models and workflows from local, sets up cloud instance, imports, and verifies. No code changes required — same API surface on both tiers.
-allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(mkdir *) Bash(tee *) Bash(jq *)
+allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(mkdir *) Bash(tee *) Bash(jq *) Bash(find *) Bash(ls *)
 ---
 
 ## Cyoda Lift-and-Shift Migration
@@ -33,10 +33,22 @@ If unreachable: *"Start local cyoda-go first (`cyoda`), then re-run this skill."
 
 Suggest running `/cyoda:test` against local before migrating to confirm everything works.
 
-### Step 2 — Export entity models, schemas, and workflows
+### Step 2 — Detect project layout, then export
+
+**Detect language (same scan-first logic as `cyoda:build` Step 3b):**
+```bash
+if [ -f "pom.xml" ] || [ -f "build.gradle" ]; then echo "java"
+elif [ -f "package.json" ] && [ -f "tsconfig.json" ]; then echo "typescript"
+elif [ -f "package.json" ]; then echo "javascript"
+elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ] || [ -f "setup.py" ]; then echo "python"
+else find . -maxdepth 4 -type d \( -name "workflow" -o -name "workflows" \) | head -1; fi
+```
+
+Resolve target directories using the same table as `cyoda:build`. For Java, detect `{pkg}` from existing source files. Fall back to TypeScript defaults if nothing is found.
+
+**Export entity models, schemas, and workflows:**
 
 ```bash
-mkdir -p migration
 PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
 ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
 
@@ -44,16 +56,18 @@ ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.c
 MODELS=$(curl -sf "${ENDPOINT}/api/model")
 echo "$MODELS" | tee migration/models.json
 
-# For each model, export both schema AND workflow (run for each entity name and version)
+# For each entity, export schema and workflow using {entity}-v{version}-{type} naming:
 
-# Export JSON Schema (field definitions)
+# Export JSON Schema (field definitions) → {config-dir}/{entity}-v{version}-schema.json
 curl -sf "${ENDPOINT}/api/model/export/JSON_SCHEMA/${ENTITY_NAME}/${MODEL_VERSION}" \
-  | tee migration/${ENTITY_NAME}_${MODEL_VERSION}_schema.json
+  | tee "${CONFIG_DIR}/${ENTITY_KEBAB}-v${MODEL_VERSION}-schema.json"
 
-# Export workflow (states, transitions, criteria, processors)
+# Export workflow → {workflow-dir}/{entity}-v{version}-workflow.json
 curl -sf "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow/export" \
-  | tee migration/${ENTITY_NAME}_${MODEL_VERSION}_workflow.json
+  | tee "${WORKFLOW_DIR}/${ENTITY_KEBAB}-v${MODEL_VERSION}-workflow.json"
 ```
+
+`ENTITY_KEBAB` is the entity name in kebab-case (e.g., `Order` → `order`, `RiskAssessment` → `risk-assessment`).
 
 Show the user what was exported — confirm both schema and workflow files exist for each entity before proceeding.
 
@@ -98,7 +112,7 @@ Execute imports only for entities marked new or overwrite. Skip the rest.
 curl -sf -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d @migration/${ENTITY_NAME}_${MODEL_VERSION}_workflow.json \
+  -d @"${WORKFLOW_DIR}/${ENTITY_KEBAB}-v${MODEL_VERSION}-workflow.json" \
   "${ENDPOINT}/api/model/${ENTITY_NAME}/${MODEL_VERSION}/workflow/import"
 ```
 

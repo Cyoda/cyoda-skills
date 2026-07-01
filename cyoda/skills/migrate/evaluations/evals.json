@@ -68,6 +68,23 @@
       ]
     },
     {
+      "id": 6,
+      "prompt": "/cyoda:migrate",
+      "expected_output": "Detects TypeScript project, exports Order v1 workflow to src/workflows/order-v1-workflow.json and schema to src/config/order-v1-schema.json, imports from those same paths",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"demo\"}",
+        "tsconfig.json": "{\"compilerOptions\":{}}"
+      },
+      "assertions": [
+        { "id": "detects-typescript", "text": "Detects TypeScript project via package.json + tsconfig.json", "type": "behavior" },
+        { "id": "workflow-export-path", "text": "Exports workflow to src/workflows/order-v1-workflow.json (not migration/Order_1_workflow.json or any underscore/flat variant)", "type": "behavior" },
+        { "id": "schema-export-path", "text": "Exports schema to src/config/order-v1-schema.json", "type": "behavior" },
+        { "id": "versioned-naming", "text": "Exported file names follow the {entity}-v{version}-{type} pattern with kebab-case entity name", "type": "behavior" },
+        { "id": "import-reads-same-path", "text": "Phase 4b import reads the workflow from the same path it was exported to", "type": "behavior" }
+      ]
+    },
+    {
       "id": 5,
       "prompt": "/cyoda:migrate",
       "expected_output": "Detects 401 during export, invokes cyoda:auth to refresh, retries the export call once",
