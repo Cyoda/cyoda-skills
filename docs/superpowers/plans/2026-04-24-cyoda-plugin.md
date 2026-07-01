@@ -3839,3 +3839,43 @@ git commit -m "feat: web help fallback and cloud-first support in docs, auth, ap
 - [ ] **Step 8: Run evals for cyoda:docs, cyoda:auth, cyoda:app**
 
 Follow the eval process in CLAUDE.md: spawn executor subagents (one per eval, parallel, background), then grader subagents, then aggregate. Skills to eval: `docs`, `auth`, `app`.
+
+---
+
+## Task: File placement conventions for `cyoda:build`
+
+**Goal:** Generated files (entity models, workflow JSON, sample data, configs) use versioned, entity-based names (`{entity}-v{version}-{type}`) and are placed in language-standard resource folders detected at runtime.
+
+**Design:** `docs/superpowers/specs/2026-04-24-cyoda-plugin-design.md` § `cyoda:build` → File placement
+
+- [ ] **Step 1: Update `cyoda/skills/build/SKILL.md`**
+
+Add a **File placement** section. The skill must:
+1. Scan the project root for `pom.xml`/`build.gradle` (Java), `package.json`+`tsconfig.json` (TS), `package.json` alone (JS), `pyproject.toml`/`requirements.txt`/`setup.py` (Python)
+2. If no build file: scan for existing `model/`, `workflow/`, `config/`, `data/` dirs and mirror that layout
+3. If nothing found: fall back to TypeScript defaults (`src/models/`, `src/workflows/`, `src/data/`, `src/config/`)
+4. Write files using pattern `{entity}-v{version}-{type}` — entity+version is the primary identifier, type suffix comes last:
+   - Model: `OrderV1.java` / `OrderV1.ts` / `order_v1_model.py` (language casing)
+   - Workflow JSON: `workflow/order-v1-workflow.json`
+   - Sample data: `data/order-v1-sample.json`
+   - Import/export config: `config/order-v1-config.json`
+   - When a new model version is created, existing versioned files are left untouched; new files are written alongside (`order-v2-workflow.json`, etc.)
+
+- [ ] **Step 2: Update `cyoda/skills/build/evaluations/evals.json`**
+
+Add evals covering:
+- Happy path: Java project (`pom.xml` present) → workflow to `src/main/resources/workflow/order.json`, model to `src/main/java/{pkg}/model/Order.java`
+- Edge case: no build file, existing `workflow/` dir found → mirrors that layout, versioned naming preserved
+- Edge case: multiple entities → each gets its own file (`workflow/order-v1-workflow.json`, `workflow/invoice-v1-workflow.json`)
+- Edge case: entity bumped to v2 → `order-v1-workflow.json` untouched, `order-v2-workflow.json` written alongside
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add cyoda/skills/build/SKILL.md cyoda/skills/build/evaluations/evals.json
+git commit -m "feat(build): scan-first file placement with entity-based naming"
+```
+
+- [ ] **Step 4: Run evals for cyoda:build**
+
+Follow the eval process in CLAUDE.md.

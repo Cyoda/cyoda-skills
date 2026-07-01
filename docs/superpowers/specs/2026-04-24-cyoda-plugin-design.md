@@ -168,6 +168,28 @@ Incremental build loop — supports both new additions and modifications to exis
 
 **API rule**: Never construct or guess an API URL not explicitly listed in this skill. For any other endpoint (export, search, etc.), invoke `cyoda:docs` first.
 
+**File placement (scan-first):**
+
+Before writing any generated file, scan the project root to detect the language and apply the matching standard layout:
+
+1. `pom.xml` or `build.gradle` → **Java**: model classes in `src/main/java/{basePackage}/model/`, JSON resources in `src/main/resources/workflow/`, `.../data/`, `.../config/`
+2. `package.json` + `tsconfig.json` → **TypeScript**: `src/models/`, `src/workflows/`, `src/data/`, `src/config/`
+3. `package.json` alone → **JavaScript**: same as TypeScript
+4. `pyproject.toml`, `requirements.txt`, or `setup.py` → **Python**: `{package}/models/`, `{package}/workflows/`, `resources/data/`, `resources/config/`
+5. No build file found → scan for existing `model/`, `workflow/`, `config/`, `data/` dirs and mirror that layout
+6. Nothing found → use TypeScript defaults as a neutral fallback
+
+File names follow the pattern `{entity}-v{version}-{type}`. The entity+version pair is the primary identifier (matching Cyoda's `(entityName, modelVersion)` tuple); the type suffix comes last:
+
+| Resource | Example (entity = `Order`, version = `1`) |
+|---|---|
+| Model file | `OrderV1.java` / `OrderV1.ts` / `order_v1_model.py` (language casing) |
+| Workflow JSON | `workflow/order-v1-workflow.json` |
+| Sample data | `data/order-v1-sample.json` |
+| Import/export config | `config/order-v1-config.json` |
+
+When a new version is created (e.g., `order` v2), the existing v1 files are left untouched and new files are written alongside them: `order-v2-workflow.json`, etc.
+
 Handles the full lifecycle: create → evolve → lock. This also covers the hello world / quickstart path — the user starts the loop and the first increment is simply the minimal entity + workflow.
 
 ### cyoda:compute

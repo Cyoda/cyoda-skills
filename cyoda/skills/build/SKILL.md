@@ -1,7 +1,7 @@
 ---
 name: build
 description: Incrementally build Cyoda entity models and workflows. Inspects the running instance, brainstorms the next change, generates config, and registers it. Supports new entities, new states, new transitions, criteria, and schema mode changes.
-allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(echo *) Bash(tee *) Bash(jq *)
+allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(echo *) Bash(tee *) Bash(jq *) Bash(find *) Bash(mkdir *) Bash(ls *)
 ---
 
 ## Cyoda Incremental Build
@@ -60,6 +60,58 @@ Based on the chosen increment, ask the minimum clarifying questions (one at a ti
 *"Does this look right? (yes to proceed, or describe changes)"*
 
 Use [templates/workflow.json](templates/workflow.json) and [templates/sample-entity.json](templates/sample-entity.json) as starting points.
+
+### Step 3b — Save generated files
+
+After the user confirms the config, detect the project layout and save all generated files before registering via API.
+
+**Detect language:**
+```bash
+if [ -f "pom.xml" ] || [ -f "build.gradle" ]; then echo "java"
+elif [ -f "package.json" ] && [ -f "tsconfig.json" ]; then echo "typescript"
+elif [ -f "package.json" ]; then echo "javascript"
+elif [ -f "pyproject.toml" ] || [ -f "requirements.txt" ] || [ -f "setup.py" ]; then echo "python"
+else find . -maxdepth 4 -type d \( -name "workflow" -o -name "workflows" \) | head -1; fi
+```
+
+**Resolve target directories:**
+
+| Detected | Workflow | Data | Config | Model |
+|---|---|---|---|---|
+| Java | `src/main/resources/workflow/` | `src/main/resources/data/` | `src/main/resources/config/` | `src/main/java/{pkg}/model/` |
+| TypeScript/JS | `src/workflows/` | `src/data/` | `src/config/` | `src/models/` |
+| Python | `{package}/workflows/` | `resources/data/` | `resources/config/` | `{package}/models/` |
+| Existing `workflow/` dir found | mirror it; derive siblings for `data/` and `config/` | | | |
+| Nothing found | fall back to TypeScript defaults | | | |
+
+For Java, detect `{pkg}` from existing source files:
+```bash
+grep -r "^package " src/main/java/ 2>/dev/null | head -1 | sed 's/^package //; s/;.*//' | tr '.' '/'
+```
+If not found, use `src/main/java/model/`.
+
+**File naming — `{entity}-v{version}-{type}`:**
+
+| Resource | Example (`Order`, v`1`) |
+|---|---|
+| Workflow JSON | `{workflow-dir}/order-v1-workflow.json` |
+| Sample entity JSON | `{data-dir}/order-v1-sample.json` |
+| Import/export config | `{config-dir}/order-v1-config.json` |
+| Java model | `{model-dir}/OrderV1.java` |
+| TypeScript model | `{model-dir}/OrderV1.ts` |
+| Python model | `{model-dir}/order_v1_model.py` |
+
+Entity name in JSON filenames uses kebab-case; code files follow language casing conventions.
+
+**Write files:**
+```bash
+mkdir -p "${TARGET_DIR}"
+echo "${GENERATED_JSON}" | tee "${TARGET_DIR}/${FILENAME}"
+```
+
+Tell the user: *"Saved to `{relative-path}`."*
+
+When a new model version is created, existing versioned files are left untouched — new files are written alongside them.
 
 ### Step 4 — Register
 
