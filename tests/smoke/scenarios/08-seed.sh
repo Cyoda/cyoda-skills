@@ -81,7 +81,70 @@ scenario_main() {
   assert_contains "$out" '"status":400' "seed prints the response body"
   case "$out" in *never*) _bad "seed stops at the first failure" "output: $out" ;; *) _ok ;; esac
 
-  # 9. JWT-mode server configured like compose.shared.yaml (key and bootstrap
+  # Helpers for fix-round cases: manifests with absolute paths into the fixture.
+  local s_order="$fx/src/data/order-v1-sample.json" w_order="$fx/src/workflows/order-v1-workflow.json"
+  local c_order="$fx/src/config/order-v1-config.json"
+  # entry <name> <sample> <workflow> <config> -> one manifest entity (JSON)
+  entry() { jq -nc --arg n "$1" --arg s "$2" --arg w "$3" --arg c "$4" \
+    '{name:$n, modelVersion:1, sample:$s, workflow:$w, config:$c}'; }
+  # manifest <file> <entry>... -> writes a manifest
+  manifest() { local f="$1"; shift; printf '%s\n' "$@" | jq -s '{manifestVersion:1, entities:.}' > "$f"; }
+  model_state() { curl -s "$BASE/model/" | jq -r --arg n "$1" '[.[] | select(.modelName == $n)][0].currentState // "MISSING"'; }
+  post_code() { curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$2" "$BASE/entity/JSON/$1/1"; }
+  local extra='{"orderId":"X-1","customerId":"CUST-1","amount":1,"giftWrap":true}'
+
+  # 9. A bad changeLevel fails before any write, even for entities listed before it.
+  printf '{"uniqueKeys":[],"changeLevel":"STRUCTRAL","env":{}}' > "$tmp/bad-cl.json"
+  manifest "$tmp/badcl-manifest.json" "$(entry firstok "$s_order" "$w_order" "$c_order")" \
+    "$(entry badcl "$s_order" "$w_order" "$tmp/bad-cl.json")"
+  out="$(CYODA_ENDPOINT="$ep" bash "$tpl/seed.sh" --manifest "$tmp/badcl-manifest.json" --env development 2>&1)"; rc=$?
+  assert_status 1 "$rc" "bad changeLevel: seed exits 1"
+  assert_contains "$out" "STRUCTRAL" "bad changeLevel: the value is named"
+  assert_eq "$(model_state firstok),$(model_state badcl)" "MISSING,MISSING" "bad changeLevel: nothing written to the instance"
+
+  # 10. A malformed workflow fails before the model is touched (no lock).
+  printf '{"nope":1}' > "$tmp/bad-workflow.json"
+  manifest "$tmp/badwf-manifest.json" "$(entry badwf "$s_order" "$tmp/bad-workflow.json" "$c_order")"
+  out="$(CYODA_ENDPOINT="$ep" bash "$tpl/seed.sh" --manifest "$tmp/badwf-manifest.json" --env development 2>&1)"; rc=$?
+  assert_status 1 "$rc" "malformed workflow: seed exits 1"
+  assert_eq "$(model_state badwf)" "MISSING" "malformed workflow: model not imported or locked"
+
+  # 11. A run that died after the lock (changeLevel not applied) is completed by a re-run.
+  curl -s -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @"$s_order" "$BASE/model/import/JSON/SAMPLE_DATA/relock/1"
+  curl -s -o /dev/null -X PUT "$BASE/model/relock/1/lock"
+  assert_status 400 "$(post_code relock "$extra")" "relock: strict before the re-run (control)"
+  manifest "$tmp/relock-manifest.json" "$(entry relock "$s_order" "$w_order" "$c_order")"
+  out="$(CYODA_ENDPOINT="$ep" bash "$tpl/seed.sh" --manifest "$tmp/relock-manifest.json" --env development 2>&1)"; rc=$?
+  assert_status 0 "$rc" "relock: re-run exits 0"
+  assert_contains "$out" "SKIPPED-MODEL relock v1 (locked)" "relock: model steps skipped"
+  assert_status 200 "$(post_code relock "$extra")" "relock: re-run applied changeLevel STRUCTURAL"
+
+  # 12. --env development on a fresh model: base STRUCTURAL applies (the production
+  #     null override doesn't), so a field outside the sample is accepted.
+  manifest "$tmp/dev-manifest.json" "$(entry orderdev "$s_order" "$w_order" "$c_order")"
+  out="$(CYODA_ENDPOINT="$ep" bash "$tpl/seed.sh" --manifest "$tmp/dev-manifest.json" --env development 2>&1)"; rc=$?
+  assert_status 0 "$rc" "env development: seed exits 0"
+  assert_contains "$out" "SEEDED orderdev v1" "env development: seeded"
+  assert_status 200 "$(post_code orderdev "$extra")" "env development: field outside the sample accepted"
+
+  # 13. The token never reaches curl's command line (it is read from a header file).
+  mkdir -p "$tmp/bin"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\nexec %q "$@"\n' "$tmp/curl-argv.log" "$(command -v curl)" > "$tmp/bin/curl"
+  chmod +x "$tmp/bin/curl"
+  out="$(PATH="$tmp/bin:$PATH" CYODA_ENDPOINT="$ep" CYODA_TOKEN_COMMAND="echo tok-NOT-IN-ARGV-42" \
+    bash "$tpl/seed.sh" --manifest "$fx/cyoda-manifest.json" --env production 2>&1)"; rc=$?
+  assert_status 0 "$rc" "argv check: seed exits 0"
+  out="$(PATH="$tmp/bin:$PATH" CYODA_ENDPOINT="$ep" CYODA_TOKEN_COMMAND="echo tok-NOT-IN-ARGV-42" \
+    bash "$tpl/verify.sh" --manifest "$fx/cyoda-manifest.json" 2>&1)"; rc=$?
+  assert_status 0 "$rc" "argv check: verify exits 0"
+  assert_eq "$(grep -c 'tok-NOT-IN-ARGV-42' "$tmp/curl-argv.log")" 0 "token not on curl's command line"
+  assert_contains "$(cat "$tmp/curl-argv.log")" "-H @" "curl reads the auth header from a file"
+  : > "$tmp/curl-argv.log"
+  CYODA_ENDPOINT="$ep" PATH="$tmp/bin:$PATH" bash "$tpl/seed.sh" --manifest "$fx/cyoda-manifest.json" --env production >/dev/null 2>&1
+  assert_eq "$(grep -c -e '-H @' -e 'Authorization' "$tmp/curl-argv.log")" 0 "no auth header when CYODA_TOKEN_COMMAND is unset"
+  unset -f entry manifest model_state post_code
+
+  # 14. JWT-mode server configured like compose.shared.yaml (key and bootstrap
   #    secret from files): no token -> 401 and exit 1; get-token.sh -> seeded.
   stop_server
   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$tmp/signing.pem" 2>/dev/null \

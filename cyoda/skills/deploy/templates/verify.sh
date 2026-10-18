@@ -12,7 +12,9 @@
 # Environment:
 #   CYODA_ENDPOINT       instance base URL, no /api (required)
 #   CYODA_TOKEN_COMMAND  command that prints a JWT, run with CYODA_ENDPOINT set
-#                        (optional; unset = no auth header, for mock auth)
+#                        (optional; unset = no auth header, for mock auth).
+#                        The token is passed to curl in a 0600 header file, not
+#                        on the command line.
 #   CYODA_ADMIN_URL      admin listener base URL, e.g. http://localhost:9091 (optional)
 #
 # Prints one OK or FAIL line per check. Exit 0 if all pass, 1 otherwise, 2 on usage.
@@ -34,6 +36,9 @@ ENDPOINT="${ENDPOINT%/}"
 ENDPOINT="${ENDPOINT%/api}"
 API="$ENDPOINT/api"
 
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
 FAILS=0
 ok() { echo "OK $*"; }
 bad() { echo "FAIL $*"; FAILS=$((FAILS + 1)); }
@@ -42,7 +47,7 @@ bad() { echo "FAIL $*"; FAILS=$((FAILS + 1)); }
 get() {
   local u="$1" out
   shift
-  out="$(curl -sS --max-time 10 -w $'\n%{http_code}' "$@" "$u" 2>&1)" || out="(unreachable)"$'\n000'
+  out="$(curl -sS --max-time 10 --connect-timeout 5 -w $'\n%{http_code}' "$@" "$u" 2>&1)" || out="(unreachable)"$'\n000'
   CODE="${out##*$'\n'}"
   BODY="${out%$'\n'*}"
 }
@@ -66,7 +71,10 @@ fi
 AUTH=()
 if [ -n "${CYODA_TOKEN_COMMAND:-}" ]; then
   if TOKEN="$(CYODA_ENDPOINT="$ENDPOINT" bash -c "$CYODA_TOKEN_COMMAND")" && [ -n "$TOKEN" ]; then
-    AUTH=(-H "Authorization: Bearer $TOKEN")
+    # Header file (0600) read with -H @file: the token never appears in `ps`.
+    (umask 077 && printf 'Authorization: Bearer %s\n' "$TOKEN" > "$TMP/auth-header")
+    unset TOKEN
+    AUTH=(-H @"$TMP/auth-header")
   else
     bad "token command failed or printed nothing: $CYODA_TOKEN_COMMAND"
   fi
