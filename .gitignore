@@ -10,3 +10,4 @@ cyoda/skills/*-workspace/
 cyoda-evals-workspace/
 # Cyoda connection config — contains credentials, always local-only
 .cyoda/
+.DS_Store

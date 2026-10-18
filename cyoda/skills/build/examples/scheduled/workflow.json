@@ -1,0 +1,23 @@
+{
+  "workflows": [
+    {
+      "version": "${SCHEMA_VERSION}",
+      "name": "ticket-expiry",
+      "initialState": "waiting",
+      "active": true,
+      "states": {
+        "waiting": {
+          "transitions": [
+            {
+              "name": "expire",
+              "next": "expired",
+              "manual": false,
+              "schedule": { "delayMs": 2000 }
+            }
+          ]
+        },
+        "expired": {}
+      }
+    }
+  ]
+}

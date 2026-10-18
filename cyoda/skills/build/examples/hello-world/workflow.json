@@ -1,0 +1,23 @@
+{
+  "workflows": [
+    {
+      "version": "${SCHEMA_VERSION}",
+      "name": "hello-world",
+      "initialState": "new",
+      "active": true,
+      "states": {
+        "new": {
+          "transitions": [
+            { "name": "start", "next": "processing", "manual": false }
+          ]
+        },
+        "processing": {
+          "transitions": [
+            { "name": "finish", "next": "completed", "manual": false }
+          ]
+        },
+        "completed": {}
+      }
+    }
+  ]
+}
