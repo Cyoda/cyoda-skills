@@ -3,112 +3,59 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "/cyoda:auth",
-      "expected_output": "Asks for profile name, asks dev vs production, explains M2M credentials, collects client_id and client_secret separately, calls OAuth token endpoint, writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile, confirms success without production warning",
+      "prompt": "/cyoda:auth — our team-dev instance needs tokens. The operator gave me an M2M client id and secret.",
+      "expected_output": "Runs cyoda-status.sh (connected, profile team-dev), probes GET /api/model/ without a token (401, so not mock), reads `cyoda help auth` WHICH PATH DO I NEED? and confirms the M2M client path, reads `auth tokens` REQUEST FLOW. Does not ask for the secret in chat: tells the developer to put CYODA_CLIENT_ID and CYODA_CLIENT_SECRET (or CYODA_CLIENT_SECRET_CMD with a keychain lookup) in the shell environment Claude Code is started from. Finds the project's scripts/ dir and copies the template to /work/shop/scripts/get-token.sh, tests it with CYODA_ENDPOINT set without printing the token, sets tokenCommand of profile team-dev to /work/shop/scripts/get-token.sh, verifies with cyoda-call.sh GET /model/ (exit 0), explains the app must mint a new token before expiry because cyoda-go issues no refresh token (pointing at `cyoda help auth tokens`), and hands off with 'next, type `/cyoda:build`'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
+        "scripts/seed.sh": "#!/usr/bin/env bash\necho seed\n",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=team-dev ENDPOINT=https://cyoda-dev.example.com ENV=development VERSION=0.8.4. Unauthenticated GET https://cyoda-dev.example.com/api/model/ returns 401. The developer has exported CYODA_CLIENT_ID and CYODA_CLIENT_SECRET in the shell that started Claude Code. get-token.sh prints a 3-part JWT. cyoda-call.sh GET /model/ then exits 0 with []."
       },
       "assertions": [
-        { "id": "asks-profile-name", "text": "Asks which profile name to save the token under before proceeding", "type": "behavior" },
-        { "id": "asks-env-type", "text": "Asks whether this is development or production environment", "type": "behavior" },
-        { "id": "explains-m2m", "text": "Explains that client_id/client_secret are machine-to-machine credentials identifying the application, not a personal login", "type": "behavior" },
-        { "id": "asks-if-have-credentials", "text": "Asks whether user already has client_id and client_secret before collecting", "type": "behavior" },
-        { "id": "handles-no-credentials", "text": "Asks whether user already has credentials — if the user says no, would explain cloud credential self-service is coming soon and direct them to contact the Cyoda team; in this eval the user says yes so that path is not exercised but the conditional check must be present", "type": "behavior" },
-        { "id": "collects-credentials", "text": "Collects client_id and client_secret separately, one at a time", "type": "behavior" },
-        { "id": "calls-token-endpoint", "text": "Calls OAuth token endpoint", "type": "behavior" },
-        { "id": "writes-token", "text": "Writes token and env=development to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile", "type": "behavior" },
-        { "id": "no-echo-secret", "text": "Does NOT echo client_secret back in the conversation", "type": "behavior" },
-        { "id": "no-production-warning", "text": "Does NOT show production warning for development login", "type": "behavior" },
-        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" }
+        { "id": "path-choice-help", "text": "Reads `cyoda help auth` section WHICH PATH DO I NEED? (via cyoda-help.sh) to choose the path, and names `auth tokens` REQUEST FLOW for the token call", "type": "behavior" },
+        { "id": "no-secret-in-chat", "text": "Does not ask the developer to paste the client secret into the conversation and never writes the secret or a token to any file", "type": "behavior" },
+        { "id": "scripts-dir", "text": "Writes get-token.sh into the existing scripts/ dir (/work/shop/scripts/get-token.sh) copied from the skill's templates/get-token.sh, and makes it executable", "type": "behavior" },
+        { "id": "token-command-absolute", "text": "Sets profile team-dev's tokenCommand to the absolute path /work/shop/scripts/get-token.sh; the profile then holds only endpoint, env and tokenCommand", "type": "behavior" },
+        { "id": "tests-script", "text": "Runs the script once with CYODA_ENDPOINT set to check it prints a token, without showing the token itself", "type": "behavior" },
+        { "id": "verifies-call", "text": "Verifies with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh GET /model/`", "type": "behavior" },
+        { "id": "no-refresh-token", "text": "Explains that cyoda-go issues no refresh token, so the developer's app must mint a new token before it expires (and on a 401), pointing at `cyoda help auth tokens`", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud or Cloud OAuth", "type": "behavior" },
+        { "id": "no-invoke", "text": "Any hand-off says 'next, type `/cyoda:<x>`' and does not say it will invoke another skill", "type": "behavior" }
       ]
     },
     {
       "id": 2,
-      "prompt": "/cyoda:auth — production environment, I accept the risk",
-      "expected_output": "Asks profile name, shows security warning, requires explicit 'yes', explains M2M credentials, collects credentials, writes token and env=production to ~/.config/cyoda/cyoda-plugin-config.json under the selected profile, shows prominent production reminder",
+      "prompt": "/cyoda:auth",
+      "expected_output": "Runs cyoda-status.sh (connected, profile default, http://localhost:8080), probes GET /api/model/ without a token and gets 200, so the instance runs mock auth. Says no token is needed, writes no script and leaves the profile unchanged. Optionally mentions that switching the instance to JWT is server config described in `cyoda help config auth`.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
+        "_simulated/instance.md": "cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4. Unauthenticated GET http://localhost:8080/api/model/ returns 200 []."
       },
       "assertions": [
-        { "id": "asks-profile-name", "text": "Asks which profile name to save the token under", "type": "behavior" },
-        { "id": "shows-security-warning", "text": "Shows security warning about storing production credentials on disk", "type": "behavior" },
-        { "id": "requires-explicit-yes", "text": "Requires explicit 'yes' — not any other response", "type": "behavior" },
-        { "id": "confirmation-is-own-step", "text": "Shows the security warning and asks yes/no as a distinct step even though the user pre-stated acceptance in the prompt — does NOT skip the confirmation", "type": "behavior" },
-        { "id": "explains-m2m", "text": "Explains that client_id/client_secret are M2M credentials for the application", "type": "behavior" },
-        { "id": "writes-production-env", "text": "Writes env=production to ~/.config/cyoda/cyoda-plugin-config.json after confirmation", "type": "behavior" },
-        { "id": "production-reminder", "text": "Shows prominent production reminder after successful login", "type": "format" },
-        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" }
+        { "id": "detects-mock", "text": "Detects mock auth from the 200 on an unauthenticated GET /api/model/", "type": "behavior" },
+        { "id": "no-token-needed", "text": "Says that no token is needed for this instance", "type": "behavior" },
+        { "id": "writes-nothing", "text": "Does not write get-token.sh and does not add a tokenCommand to the profile", "type": "behavior" },
+        { "id": "no-credentials", "text": "Does not ask for a client id, secret or password", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     },
     {
       "id": 3,
-      "prompt": "/cyoda:auth — production, but I'm not sure about storing credentials",
-      "expected_output": "Shows security warning, stops when user does not answer 'yes', does not write any credentials, suggests alternatives",
+      "prompt": "/cyoda:auth — set up tokens for team-dev",
+      "expected_output": "Same path as the M2M case up to the test run, but get-token.sh exits 1 with stderr 'get-token: token request to https://cyoda-dev.example.com/api/oauth/token failed: HTTP 401 {\"error\":\"invalid_client\",\"error_description\":\"invalid_client\"}'. The skill shows that error, explains it means the client id or secret was rejected (wrong value in the env or keychain, or the client was deleted or its secret rotated — see `cyoda help auth clients`), does not set tokenCommand, does not retry in a loop, and asks the developer to fix the credentials and say when to re-test.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-prod.eu.cyoda.net\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
+        "_simulated/instance.md": "Project root is /work/shop; it has no scripts/ dir. cyoda-status.sh prints STATUS=connected PROFILE=team-dev ENDPOINT=https://cyoda-dev.example.com ENV=development VERSION=0.8.4. Unauthenticated GET /api/model/ returns 401. The developer chooses the M2M client path. Running get-token.sh exits 1 with stderr: get-token: token request to https://cyoda-dev.example.com/api/oauth/token failed: HTTP 401 {\"error\":\"invalid_client\",\"error_description\":\"invalid_client\"}"
       },
       "assertions": [
-        { "id": "shows-warning", "text": "Shows security warning before proceeding", "type": "behavior" },
-        { "id": "stops-on-non-yes", "text": "Stops when user response is not explicit 'yes'", "type": "behavior" },
-        { "id": "no-credentials-written", "text": "Does NOT write any credentials after a non-yes response", "type": "behavior" },
-        { "id": "suggests-alternatives", "text": "Suggests CYODA_TOKEN env var as an alternative to persisting credentials on disk", "type": "behavior" }
-      ]
-    },
-    {
-      "id": 4,
-      "prompt": "/cyoda:auth — my login stopped working after the environment was redeployed",
-      "expected_output": "Recognises the post-redeploy scenario, notes that technical users may be deleted on redeploy, directs user to contact the Cyoda team to recreate the technical user before retrying",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
-      },
-      "assertions": [
-        { "id": "recognises-redeploy", "text": "Recognises the post-redeploy scenario as cause of credential failure", "type": "behavior" },
-        { "id": "notes-users-deleted", "text": "Notes that technical users may be deleted when an environment is redeployed", "type": "behavior" },
-        { "id": "directs-to-contact-team", "text": "Directs user to contact the Cyoda team to recreate the technical user — does NOT mention AI Studio or ai.cyoda.net", "type": "behavior" },
-        { "id": "completes-auth", "text": "After user provides new credentials, completes the full auth flow — calls token endpoint and writes token to ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" }
-      ]
-    },
-    {
-      "id": 5,
-      "prompt": "/cyoda:auth — connect to a Cyoda Cloud dev environment with client_id=abc123 and client_secret=xyz789",
-      "expected_output": "Uses Authorization: Basic header with base64-encoded client_id:client_secret against /api/oauth/token on the first attempt, without iterating through multiple paths",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
-      },
-      "assertions": [
-        { "id": "basic-auth-header", "text": "Uses Authorization: Basic header with base64-encoded client_id:client_secret — credentials are NOT in the request body", "type": "behavior" },
-        { "id": "correct-endpoint-first", "text": "Calls /api/oauth/token as the token endpoint — does NOT try /oauth/token, /auth/token, or other guessed paths", "type": "behavior" },
-        { "id": "no-path-guessing", "text": "Does NOT iterate through multiple token endpoint paths on failure — consults 'cyoda help config auth' or https://docs.cyoda.net/help/config/auth.md instead", "type": "behavior" },
-        { "id": "consults-help-on-failure", "text": "If token call fails, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying — does not guess alternate paths", "type": "behavior" }
-      ]
-    },
-    {
-      "id": 6,
-      "prompt": "/cyoda:auth — connect with client_id=bad-client and client_secret=bad-secret",
-      "expected_output": "Calls /api/oauth/token, gets a 4xx error, consults 'cyoda help config auth' to verify the endpoint path, confirms the path is correct and the error is bad credentials, surfaces the credential error to the user — does NOT try alternate paths like /oauth/token or /auth/token, does NOT write partial credentials",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
-      },
-      "assertions": [
-        { "id": "calls-token-endpoint-first", "text": "Calls /api/oauth/token on the first attempt before any fallback", "type": "behavior" },
-        { "id": "consults-cyoda-help-on-4xx", "text": "After receiving a 4xx error, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before attempting any retry", "type": "behavior" },
-        { "id": "no-path-guessing-on-failure", "text": "Does NOT try /oauth/token, /auth/token, or any other alternate paths — only acts after reading cyoda help or web help output", "type": "behavior" },
-        { "id": "surfaces-error-no-partial-write", "text": "Surfaces the credential error to the user and does NOT write partial credentials to the config file", "type": "behavior" }
-      ]
-    }
-  ,
-    {
-      "id": 7,
-      "prompt": "/cyoda:auth — connect to dev environment, token endpoint returns 404 on first attempt",
-      "expected_output": "Calls /api/oauth/token, gets 404 (wrong path), consults 'cyoda help config auth' to find the correct endpoint, retries with the corrected path from help output — does NOT guess alternate paths",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net\"}}}"
-      },
-      "assertions": [
-        { "id": "calls-token-endpoint-first", "text": "Calls /api/oauth/token on the first attempt", "type": "behavior" },
-        { "id": "consults-help-on-404", "text": "After receiving a 404, consults 'cyoda help config auth' or fetches https://docs.cyoda.net/help/config/auth.md before retrying", "type": "behavior" },
-        { "id": "retries-after-help", "text": "Retries the token call using the corrected endpoint path from help output — does NOT guess alternate paths", "type": "behavior" },
-        { "id": "no-path-guessing", "text": "Does NOT try /oauth/token, /auth/token, or any other path not sourced from cyoda help or web help output", "type": "behavior" }
+        { "id": "root-fallback", "text": "Writes get-token.sh at the project root (/work/shop/get-token.sh) because there is no scripts/ dir", "type": "behavior" },
+        { "id": "clear-error", "text": "Shows the 401 invalid_client error and explains it in one or two lines as rejected client credentials, naming where to check (env/keychain values, `cyoda help auth clients`)", "type": "behavior" },
+        { "id": "no-token-command-on-failure", "text": "Does not set the profile's tokenCommand while the script fails", "type": "behavior" },
+        { "id": "no-secret-in-chat", "text": "Does not ask for the secret to be pasted into the conversation as a fix", "type": "behavior" },
+        { "id": "no-retry-loop", "text": "Does not retry the token request repeatedly; waits for the developer", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     }
   ]

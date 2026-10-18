@@ -3,55 +3,65 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "What's my Cyoda status?",
-      "expected_output": "Reports 'Connected to Local cyoda-go — vX.X.X' without a PRODUCTION marker",
+      "prompt": "Am I connected to cyoda?",
+      "expected_output": "Runs ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh, which prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4 and no WARN lines, and answers with exactly 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/status.txt": "STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4"
       },
       "assertions": [
-        { "id": "reads-config", "text": "Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" },
-        { "id": "shows-profile-name", "text": "Shows the active profile name", "type": "behavior" },
-        { "id": "calls-health", "text": "Calls health endpoint on localhost", "type": "behavior" },
-        { "id": "reports-connected-local", "text": "Reports 'Connected to Local cyoda-go' with version number", "type": "format" },
-        { "id": "no-production-marker", "text": "Does NOT show PRODUCTION warning", "type": "behavior" }
+        { "id": "runs-script", "text": "Gets the status by running `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`, not by reading the config file and curling by hand", "type": "behavior" },
+        { "id": "connected-line", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'", "type": "format" },
+        { "id": "no-production-tag", "text": "Does not add a [PRODUCTION] tag", "type": "format" },
+        { "id": "no-local-cloud-label", "text": "Does not label the instance 'Local cyoda-go' vs 'Cloud' or mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     },
     {
       "id": 2,
-      "prompt": "Check my connection",
-      "expected_output": "Reports connection with prominent PRODUCTION marker and version number",
+      "prompt": "Check my Cyoda status",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com ENV=development VERSION=none BINARY_VERSION=0.8.4 and WARN=active profile staging is unreachable; run /cyoda:setup to switch to default. The skill reports the unreachable form 'cyoda-go unreachable — https://cyoda-staging.example.com [profile: staging]', prints the WARN line, and suggests 'type `/cyoda:setup`' without running it.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"production\",\"token\":\"eyJfake...\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"staging\":{\"endpoint\":\"https://cyoda-staging.example.com\",\"env\":\"development\",\"tokenCommand\":\"/work/shop/scripts/get-token.sh\"}}}",
+        "_simulated/status.txt": "STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com ENV=development VERSION=none BINARY_VERSION=0.8.4\nWARN=active profile staging is unreachable; run /cyoda:setup to switch to default"
       },
       "assertions": [
-        { "id": "reads-env-production", "text": "Reads env=production from config", "type": "behavior" },
-        { "id": "shows-production-marker", "text": "Shows PRODUCTION marker prominently in output", "type": "format" },
-        { "id": "includes-version", "text": "Includes version number in output", "type": "format" }
+        { "id": "unreachable-line", "text": "Reports 'cyoda-go unreachable — https://cyoda-staging.example.com [profile: staging]'", "type": "format" },
+        { "id": "prints-warn", "text": "Prints the WARN text 'active profile staging is unreachable; run /cyoda:setup to switch to default'", "type": "behavior" },
+        { "id": "no-switch", "text": "Does not edit the config or switch the active profile itself", "type": "behavior" },
+        { "id": "no-token-command", "text": "Does not run the profile's tokenCommand", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "Points to setup as 'type `/cyoda:setup`' and does not say it will invoke the setup skill", "type": "behavior" }
       ]
     },
     {
       "id": 3,
-      "prompt": "Am I connected to Cyoda?",
-      "expected_output": "Reports 'Not connected' and directs user to run /cyoda:setup",
-      "files": {},
+      "prompt": "/cyoda:status",
+      "expected_output": "cyoda-status.sh prints STATUS=connected PROFILE=prod ENDPOINT=https://cyoda.example.com ENV=production VERSION=0.8.4 BINARY_VERSION=0.8.4. The skill reports 'Connected to cyoda-go v0.8.4 — https://cyoda.example.com [profile: prod] [PRODUCTION]'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"prod\",\"profiles\":{\"prod\":{\"endpoint\":\"https://cyoda.example.com\",\"env\":\"production\",\"tokenCommand\":\"/work/shop/scripts/get-token.sh\"}}}",
+        "_simulated/status.txt": "STATUS=connected PROFILE=prod ENDPOINT=https://cyoda.example.com ENV=production VERSION=0.8.4 BINARY_VERSION=0.8.4"
+      },
       "assertions": [
-        { "id": "detects-missing-config", "text": "Detects missing ~/.config/cyoda/cyoda-plugin-config.json", "type": "behavior" },
-        { "id": "reports-not-connected", "text": "Reports 'Not connected' or equivalent", "type": "format" },
-        { "id": "suggests-setup", "text": "Directs user to run /cyoda:setup", "type": "behavior" },
-        { "id": "no-crash", "text": "Does NOT crash or show a raw error instead of a helpful message", "type": "behavior" }
+        { "id": "production-tag", "text": "Reports 'Connected to cyoda-go v0.8.4 — https://cyoda.example.com [profile: prod] [PRODUCTION]'", "type": "format" },
+        { "id": "self-hosted-wording", "text": "Describes the production instance as a cyoda-go instance; does not call it Cloud or managed", "type": "behavior" },
+        { "id": "no-mutation", "text": "Makes no API call other than what cyoda-status.sh does", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     },
     {
       "id": 4,
-      "prompt": "What's my Cyoda status?",
-      "expected_output": "Detects 401 on health check, invokes cyoda:auth to refresh, then retries the status check",
+      "prompt": "What cyoda version am I on?",
+      "expected_output": "cyoda-status.sh prints STATUS=connected PROFILE=team-dev ENDPOINT=https://cyoda-dev.example.com ENV=development VERSION=0.8.4 BINARY_VERSION=0.9.0 and WARN=local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance. The skill reports 'Connected to cyoda-go v0.8.4 — https://cyoda-dev.example.com [profile: team-dev]' and prints the version-mismatch warning, making clear the instance runs 0.8.4 and the local binary is 0.9.0.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"token\":\"eyJexpired...\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\",\"env\":\"development\"}}}",
+        "_simulated/status.txt": "STATUS=connected PROFILE=team-dev ENDPOINT=https://cyoda-dev.example.com ENV=development VERSION=0.8.4 BINARY_VERSION=0.9.0\nWARN=local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance"
       },
       "assertions": [
-        { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when the health check returns 401 or 403", "type": "behavior" },
-        { "id": "retries-after-refresh", "text": "Retries the health check once after cyoda:auth completes", "type": "behavior" },
-        { "id": "no-unreachable-on-401", "text": "Does NOT report 'unreachable' on a 401 — treats it as an auth error, not a connectivity error", "type": "behavior" }
+        { "id": "connected-line", "text": "Reports 'Connected to cyoda-go v0.8.4 — https://cyoda-dev.example.com [profile: team-dev]' (the instance version, not the binary version)", "type": "format" },
+        { "id": "prints-mismatch", "text": "Prints the warning 'local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance'", "type": "behavior" },
+        { "id": "no-upgrade", "text": "Does not upgrade, downgrade or reinstall anything", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     }
   ]

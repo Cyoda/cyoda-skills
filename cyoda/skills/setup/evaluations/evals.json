@@ -3,68 +3,73 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "/cyoda:setup",
-      "expected_output": "Walks through local install: asks local vs cloud, runs brew install, runs cyoda init, verifies health, asks for profile name, writes profile to ~/.config/cyoda/cyoda-plugin-config.json, notes mock auth is active",
-      "files": {},
+      "prompt": "/cyoda:setup — I want cyoda running locally on my laptop.",
+      "expected_output": "Runs cyoda-status.sh (not_configured), finds no cyoda binary, runs `brew install cyoda/cyoda-go/cyoda` (succeeds), runs `cyoda init`, starts `cyoda`, polls http://localhost:8080/api/health until {\"status\":\"UP\"}, writes the `default` profile {endpoint: http://localhost:8080, env: development} as active with no token or tokenCommand, re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]', says mock auth needs no token, and ends with 'next, type `/cyoda:build`'.",
+      "files": {
+        "_simulated/machine.md": "No `cyoda` on PATH. Homebrew is installed and `brew install cyoda/cyoda-go/cyoda` succeeds; afterwards `cyoda --version` prints `cyoda version 0.8.4 (commit e861154)`. `cyoda init` succeeds. No config file at ~/.config/cyoda/cyoda-plugin-config.json. Port 8080 is free; once `cyoda` is started, GET http://localhost:8080/api/health returns {\"status\":\"UP\"} and GET /api/help returns {\"version\":\"0.8.4\",...}."
+      },
       "assertions": [
-        { "id": "asks-local-vs-cloud", "text": "Asks whether user wants local or cloud setup", "type": "behavior" },
-        { "id": "runs-brew-install", "text": "Runs brew install commands for cyoda", "type": "behavior" },
-        { "id": "runs-cyoda-init", "text": "Runs cyoda init", "type": "behavior" },
-        { "id": "verifies-health", "text": "Verifies health endpoint responds", "type": "behavior" },
-        { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },
-        { "id": "writes-config", "text": "Writes profile with localhost endpoint to ~/.config/cyoda/cyoda-plugin-config.json and sets it as active", "type": "behavior" },
-        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" },
-        { "id": "notes-mock-auth", "text": "Notes mock auth is active for local — no login needed", "type": "behavior" },
-        { "id": "no-credentials", "text": "Does NOT ask for credentials on local setup", "type": "behavior" }
+        { "id": "status-first", "text": "Runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh` before installing anything", "type": "behavior" },
+        { "id": "brew-formula", "text": "Installs with exactly `brew install cyoda/cyoda-go/cyoda` (no `brew tap cyoda-platform/...`, no other formula name)", "type": "behavior" },
+        { "id": "init-and-start", "text": "Runs `cyoda init` and then starts the server with `cyoda`", "type": "behavior" },
+        { "id": "health-api", "text": "Verifies readiness with GET http://localhost:8080/api/health (expects {\"status\":\"UP\"}); does not probe /readyz on the API port", "type": "behavior" },
+        { "id": "default-profile", "text": "Writes ~/.config/cyoda/cyoda-plugin-config.json with active `default` and profile `default` containing only endpoint http://localhost:8080 and env development (no token, no tokenCommand)", "type": "behavior" },
+        { "id": "reports-connected", "text": "Reports the result in the form 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'", "type": "format" },
+        { "id": "mock-no-token", "text": "Says the local instance runs mock auth, so no token or /cyoda:auth is needed", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud or offer a cloud option", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:build`' (or another `/cyoda:<x>`) with a one-line reason and does not say it will invoke or run another skill itself", "type": "behavior" }
       ]
     },
     {
       "id": 2,
-      "prompt": "/cyoda:setup — I want to use Cyoda Cloud",
-      "expected_output": "Shows coming soon notice for managed cloud environments, collects endpoint URL from user (for users already provisioned by the Cyoda team), asks for profile name, writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a profile, directs to /cyoda:auth next",
-      "files": {},
+      "prompt": "/cyoda:setup",
+      "expected_output": "Finds no cyoda binary, tries `brew install cyoda/cyoda-go/cyoda`, which fails with a permission error. Does not diagnose Homebrew, does not run brew doctor or sudo. Shows the verbatim 'run it yourself' message including the install list (brew, the install.sh curl line, the release page, the Docker image ghcr.io/cyoda/cyoda) and waits for the developer before continuing with `cyoda init`.",
+      "files": {
+        "_simulated/machine.md": "No `cyoda` on PATH. `brew install cyoda/cyoda-go/cyoda` exits 1 with: `Error: Permission denied @ dir_s_mkdir - /opt/homebrew/Cellar`. No config file at ~/.config/cyoda/cyoda-plugin-config.json."
+      },
       "assertions": [
-        { "id": "shows-coming-soon", "text": "Shows a coming soon notice explaining that managed cloud environments are not yet available for self-service provisioning", "type": "behavior" },
-        { "id": "allows-existing-endpoint", "text": "Still allows users who already have a provisioned endpoint to enter it and continue", "type": "behavior" },
-        { "id": "does-not-direct-to-ai-studio", "text": "Does NOT direct the user to ai.cyoda.net or mention AI Studio", "type": "behavior" },
-        { "id": "collects-endpoint", "text": "Collects endpoint URL from user", "type": "behavior" },
-        { "id": "correct-endpoint-format", "text": "Uses correct endpoint format example (client-<hash>-<env>.eu.cyoda.net, not api.eu.cyoda.net)", "type": "format" },
-        { "id": "asks-profile-name", "text": "Asks which profile name to save this connection under", "type": "behavior" },
-        { "id": "writes-endpoint-only", "text": "Writes only endpoint field to ~/.config/cyoda/cyoda-plugin-config.json as a named profile — no token yet", "type": "behavior" },
-        { "id": "no-gitignore", "text": "Does NOT write any .gitignore entry", "type": "behavior" },
-        { "id": "directs-to-login", "text": "Directs user to run /cyoda:auth next", "type": "behavior" },
-        { "id": "no-credentials-in-setup", "text": "Does NOT ask for credentials — that is login's job", "type": "behavior" },
-        { "id": "no-docs-signup-url", "text": "Does NOT direct user to docs.cyoda.net for sign-up", "type": "behavior" }
+        { "id": "verbatim-message", "text": "Shows the message starting 'I couldn't complete the installation — this usually needs to run in your own terminal.' with `brew install cyoda/cyoda-go/cyoda`, copied verbatim from the skill", "type": "format" },
+        { "id": "install-list", "text": "The message lists all four routes: brew, `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`, the GitHub release page https://github.com/cyoda/cyoda-go/releases, and the Docker image `ghcr.io/cyoda/cyoda`", "type": "behavior" },
+        { "id": "no-remediation", "text": "Does not run `brew doctor`, `sudo`, chmod/chown, or any other Homebrew fix, and adds no extra advice to the message", "type": "behavior" },
+        { "id": "waits", "text": "Stops and waits for the developer to confirm the install before running `cyoda init`", "type": "behavior" },
+        { "id": "no-stale-tap", "text": "Does not mention `cyoda-platform/cyoda-go` or `brew tap`", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     },
     {
       "id": 3,
-      "prompt": "/cyoda:setup",
-      "expected_output": "Detects existing installation, skips brew install, verifies health, asks for profile name, updates profile in ~/.config/cyoda/cyoda-plugin-config.json, reports already ready",
+      "prompt": "/cyoda:setup — connect to our team's dev instance at https://cyoda-dev.internal.example.com/api/",
+      "expected_output": "Uses connect mode. Normalises the endpoint to https://cyoda-dev.internal.example.com (drops the trailing /api/), probes /api/health (UP), asks development or production (developer says development), asks for a profile name other than `default` (developer says team-dev), writes {endpoint, env} to profile team-dev and makes it active, probes GET /api/model/ without a token and gets 401, so it says the instance needs a token and ends with 'next, type `/cyoda:auth`'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/instance.md": "GET https://cyoda-dev.internal.example.com/api/health returns {\"status\":\"UP\"}. GET /api/help returns {\"version\":\"0.8.4\",...}. GET /api/model/ without an Authorization header returns 401. The developer answers: env development; profile name team-dev."
       },
       "assertions": [
-        { "id": "detects-existing", "text": "Detects cyoda is already installed", "type": "behavior" },
-        { "id": "skips-brew", "text": "Does NOT re-run brew install when already installed", "type": "behavior" },
-        { "id": "verifies-health", "text": "Verifies health endpoint", "type": "behavior" },
-        { "id": "no-force-init", "text": "Does NOT run cyoda init again without --force", "type": "behavior" },
-        { "id": "reports-ready", "text": "Reports already ready", "type": "format" }
+        { "id": "normalises-endpoint", "text": "Stores the endpoint as https://cyoda-dev.internal.example.com (no trailing /api or slash)", "type": "behavior" },
+        { "id": "probes-health", "text": "Probes <endpoint>/api/health before writing the profile", "type": "behavior" },
+        { "id": "asks-env", "text": "Asks whether the instance is development or production", "type": "behavior" },
+        { "id": "profile-fields", "text": "Writes profile team-dev with only endpoint and env (no token, no secret, no tokenCommand yet), keeps the existing `default` profile, and sets active to team-dev", "type": "behavior" },
+        { "id": "detects-auth", "text": "Detects that the instance is not mock auth from the 401 on an unauthenticated GET /api/model/", "type": "behavior" },
+        { "id": "no-credentials", "text": "Does not ask for a client id, secret or token", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "Hands off with 'next, type `/cyoda:auth`' and a one-line reason; does not say it will invoke the auth skill", "type": "behavior" }
       ]
     },
     {
       "id": 4,
-      "prompt": "/cyoda:setup — local install, but brew fails with a permissions error",
-      "expected_output": "Attempts brew tap and brew install, detects failure, immediately shows the two commands and asks user to run them manually, waits for confirmation, then continues to cyoda init",
-      "files": {},
+      "prompt": "/cyoda:setup",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable for the active profile `old`, with WARN lines 'profile old contains a stored token, which this plugin no longer reads; you can remove it' and 'active profile old is unreachable; run /cyoda:setup to switch to default'. The skill shows both warnings as they are, offers to switch the active profile to `default`, and on yes sets active to default (local cyoda is already installed and healthy), leaving the old profile in place, and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"old\",\"profiles\":{\"old\":{\"endpoint\":\"https://gone.example.com\",\"token\":\"eyJhbGciOiJSUzI1NiJ9.e30.sig\"},\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/instance.md": "`cyoda --version` prints `cyoda version 0.8.4`. https://gone.example.com does not answer. http://localhost:8080/api/health returns {\"status\":\"UP\"}. The developer answers yes to switching to default."
+      },
       "assertions": [
-        { "id": "attempts-brew-first", "text": "Attempts to run brew tap and brew install before giving up", "type": "behavior" },
-        { "id": "no-brew-diagnosis", "text": "Does NOT run brew doctor, sudo, or any Homebrew remediation", "type": "behavior" },
-        { "id": "shows-exact-commands", "text": "Shows the exact brew tap and brew install commands for the user to run manually", "type": "format" },
-        { "id": "no-extra-commands", "text": "Does NOT include sudo, chown, or any commands beyond the two brew commands in the user-facing message", "type": "format" },
-        { "id": "asks-user-to-run", "text": "Asks the user to run the commands in their own terminal", "type": "behavior" },
-        { "id": "waits-before-continuing", "text": "Waits for user confirmation before continuing to cyoda init", "type": "behavior" },
-        { "id": "continues-after-confirm", "text": "Continues to cyoda init (Step 3) after the user confirms", "type": "behavior" }
+        { "id": "shows-stale-token-warning", "text": "Shows the warning 'profile old contains a stored token, which this plugin no longer reads; you can remove it' in neutral wording", "type": "behavior" },
+        { "id": "offers-default", "text": "Offers to switch the active profile to `default` because `old` is unreachable", "type": "behavior" },
+        { "id": "no-token-reuse", "text": "Does not read, print, or use the stored token value", "type": "behavior" },
+        { "id": "no-silent-delete", "text": "Does not delete the old profile or its token field without the developer's yes", "type": "behavior" },
+        { "id": "skips-install", "text": "Does not reinstall cyoda, since `cyoda --version` already reports 0.8.4", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud or suggest that the old endpoint was a cloud instance", "type": "behavior" }
       ]
     }
   ]

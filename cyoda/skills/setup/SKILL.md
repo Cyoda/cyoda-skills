@@ -1,103 +1,102 @@
 ---
 name: setup
-description: Provision a Cyoda instance. Install and start a local cyoda-go. Run this first before any other cyoda skills.
-allowed-tools: Bash(brew *) Bash(cyoda *) Bash(curl *) Bash(mkdir *) Bash(tee *) Bash(grep *) Bash(cat *) Bash(jq *)
+description: Use when the developer types /cyoda:setup to install and start a local cyoda-go, to connect the plugin to an existing self-hosted cyoda-go instance, or to switch away from an unreachable or outdated connection profile.
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(brew *) Bash(cyoda *) Bash(command -v *) Bash(curl *) Bash(mkdir *) Bash(jq *) Bash(mv *) Bash(cat *) Bash(sleep *)
 disable-model-invocation: true
 ---
 
-## Cyoda Instance Setup
+# Cyoda setup
 
-Set up a local cyoda-go instance.
+Two modes: **local** (install and run cyoda-go on this machine, profile `default`) and **connect** (add a profile for a cyoda-go instance that already runs somewhere, e.g. one made with `/cyoda:deploy`). The result is a profile in the plugin config that every other skill reads.
 
----
+**Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` once the binary is installed (before that, the help mirror at https://docs.cyoda.net/help/ has the same content).
 
-### Local cyoda-go
+**The plugin stores no tokens or secrets.** A profile holds only `endpoint`, `env` (`development` | `production`) and, added later by `/cyoda:auth`, `tokenCommand`.
 
-**Step 1 — Check if already installed:**
-```!
-which cyoda 2>/dev/null && cyoda --version 2>/dev/null || echo "NOT_INSTALLED"
-```
+## Step 0 — Where things stand
 
-If already installed, skip to Step 4 (start and verify).
+Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. It prints `STATUS=… PROFILE=… ENDPOINT=… ENV=… VERSION=… BINARY_VERSION=…` and then `WARN=` lines.
 
-**Step 2 — Install via Homebrew:**
+- Show every `WARN=` line as it is, e.g. "profile old contains a stored token, which this plugin no longer reads; you can remove it". Don't read, print or reuse a stored token. Remove it only if the developer says yes: `jq 'del(.profiles["<P>"].token)'` (write it back as in [Write the profile](#write-the-profile)).
+- `STATUS=unreachable`: offer to switch the active profile to `default`: on a yes, `jq '.active = "default"'` (written back the same way), leaving the unreachable profile in place, then go to [Finish](#finish). If `default` doesn't exist or isn't running either, continue with local mode.
+- Otherwise ask which mode, unless the request already says: "Run cyoda-go **locally**, or **connect** to an instance that already runs elsewhere?"
 
-Attempt each command in sequence:
+A Cloud or migration question: say "That's not covered by this plugin" and continue.
 
-```bash
-brew tap cyoda-platform/cyoda-go
-```
+## Local mode
 
-```bash
-brew install cyoda
-```
+1. **Installed?** `command -v cyoda && cyoda --version`. If it prints a version, skip to step 3.
+2. **Install:** run `brew install cyoda/cyoda-go/cyoda`.
 
-If **either command fails** (non-zero exit, permission error, Homebrew not found — any error at all):
-- Do NOT attempt to diagnose or fix Homebrew.
-- Do NOT run `brew doctor`, `sudo`, or any remediation.
-- Do NOT add any advice, context, or extra commands to the message below.
-- Show the user this message VERBATIM — copy it exactly:
+   If it fails in any way (non-zero exit, permission error, no Homebrew): don't diagnose or fix Homebrew, don't run `brew doctor`, `sudo`, `chmod` or `chown`, and add nothing to the message below. Show it **verbatim**, then wait until the developer says it's done:
 
-> "I couldn't complete the installation — this usually needs to run in your own terminal. Please run these commands and let me know when they're done:
-> ```bash
-> brew tap cyoda-platform/cyoda-go
-> brew install cyoda
-> ```"
+   > I couldn't complete the installation — this usually needs to run in your own terminal. Please run this and let me know when it's done:
+   > ```bash
+   > brew install cyoda/cyoda-go/cyoda
+   > ```
+   > Other ways to install cyoda-go:
+   > - Homebrew: `brew install cyoda/cyoda-go/cyoda`
+   > - Install script: `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`
+   > - Release binaries: https://github.com/cyoda/cyoda-go/releases
+   > - Docker image: `ghcr.io/cyoda/cyoda` (run recipe: https://docs.cyoda.net/help/run.md, RUN MODES → Docker)
 
-Wait for the user to confirm before continuing to Step 3.
+   <!-- #684-K workaround: `cyoda help` has no install section yet. Remove this list and point to the help topic once Cyoda/cyoda-go#684 item K ships. -->
 
-If Homebrew is not available at all, check https://docs.cyoda.net/ for alternative installers.
+   After the developer confirms, check again with `cyoda --version`.
+3. **Initialise (first time only):** run `cyoda init`. If it says a user config already exists, keep it: don't pass `-force`. Read `cyoda help run --section "RUN MODES"` (Binary) and `cyoda help quickstart --section DEFAULTS` to tell the developer, in one or two lines, what `init` set up and where the data lives.
+4. **Start:** if `curl -s --max-time 2 http://localhost:8080/api/health` already returns `{"status":"UP"}`, skip this step. Otherwise start `cyoda` as a background process (the Bash tool's background mode). If the developer wants it to outlive this session, ask them to run `cyoda` in their own terminal instead. If it exits at once, show its last output. For a port clash, read `cyoda help run --section "PORT LAYOUT"`.
+5. **Verify:** poll `curl -s --max-time 2 http://localhost:8080/api/health` every second for up to 15 s until it returns `{"status":"UP"}`. The health check is `/api/health` on the API port (`cyoda help run --section "HEALTH PROBES"`).
+6. **Profile:** [write](#write-the-profile) `default` = `{"endpoint": "http://localhost:8080", "env": "development"}` and make it active. A local `default` runs mock auth, so it gets no `tokenCommand`.
+7. **Report:** go to [Finish](#finish). Add: "Mock auth is active, so no token is needed and you don't need `/cyoda:auth` for this instance."
 
-**Step 3 — Initialize (first time only):**
+## Connect mode
 
-```bash
-cyoda init
-```
+1. **Endpoint:** ask for the instance's base URL. Strip a trailing `/` and a trailing `/api`: the profile stores `https://host[:port]`, and the scripts add `/api`.
+2. **Probe:** `curl -sS --max-time 5 "<endpoint>/api/health"`. Anything other than `{"status":"UP"}`: show what came back (or the curl error), say the instance isn't reachable or isn't ready, and stop. Write no profile for an endpoint that doesn't answer.
+3. **Environment:** ask "Is this a **development** or **production** instance?" For production, say: "I'll mark it `production`. Skills will then ask before every call that changes data on it."
+4. **Profile name:** list existing names (`jq -r '.profiles | keys[]' "$CONFIG"`). Ask for a name; suggest one from the host. `default` is reserved for local. If the name exists, ask before replacing its endpoint and env.
+5. **Write** the profile with `endpoint` and `env` only, and make it active ([Write the profile](#write-the-profile)).
+6. **Auth check:** `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<endpoint>/api/model/"` with no token.
+   - `200`: mock auth, no token needed.
+   - `401` or `403`: the instance needs a token. Don't ask for credentials here; `/cyoda:auth` handles them.
+   - Anything else: show the code and point to `cyoda help errors --section "ERROR CODE INDEX"`.
+7. **Report:** go to [Finish](#finish).
 
-This creates SQLite storage at `~/.local/share/cyoda/cyoda.db` and writes a starter config.
+## Write the profile
 
-**Step 4 — Start the server:**
-
-```bash
-cyoda
-```
-
-The server runs in the foreground. Open a new terminal for subsequent commands.
-
-**Step 5 — Verify:**
-```!
-curl -sf --max-time 5 http://localhost:8080/readyz 2>/dev/null || curl -sf --max-time 5 http://localhost:9091/readyz 2>/dev/null || echo "UNREACHABLE"
-```
-
-If `UNREACHABLE`: ask the user to start cyoda in a separate terminal with `cyoda` and try again.
-
-**Step 6 — Write config:**
-
-List existing profiles (if any):
-```bash
-jq -r '.profiles | keys[]' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "(none yet)"
-```
-
-Ask: *"Which profile name should this connection be saved under? (e.g. `default`, `local`)"*
+The config is `${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}`. Keep other profiles, and keep the profile's existing `tokenCommand`. Substitute the values you collected:
 
 ```bash
-CONFIG_FILE="$HOME/.config/cyoda/cyoda-plugin-config.json"
-mkdir -p "$HOME/.config/cyoda"
-NEW_DATA='{"endpoint": "http://localhost:8080", "env": "development"}'
-# Claude substitutes the profile name the user provided for PROFILE_NAME
-EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"${PROFILE_NAME}\",\"profiles\":{}}")
-echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_DATA" \
-  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
+CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
+mkdir -p "$(dirname "$CONFIG")"
+[ -f "$CONFIG" ] || echo '{"active":"default","profiles":{}}' > "$CONFIG"
+jq --arg p "<PROFILE>" --arg ep "<ENDPOINT>" --arg env "<ENV>" \
+  '.profiles[$p] = ((.profiles[$p] // {}) + {endpoint: $ep, env: $env}) | .active = $p' \
+  "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
 ```
 
-If the write fails with a permission error (`mkdir` fails or the redirect is denied): do NOT attempt `sudo`, `chmod`, `chown`, or any other fix. Show:
+Never write `token`, `clientSecret` or any other credential into it. If `mkdir` or the write is denied, don't try `sudo`, `chmod` or `chown`. Show:
 
-> *"Couldn't write to `~/.config/cyoda/` — you may be running in a sandbox or restricted environment. Please grant write access to that directory and try again. Would you like help with that?"*
+> Couldn't write to `~/.config/cyoda/`. You may be running in a sandbox or restricted environment. Please allow write access to that directory and try again.
 
-Confirm: **"Local cyoda-go is running. REST on port 8080, gRPC on port 9090. `/cyoda:auth` is not needed for local — mock auth is active."**
+## Finish
 
----
+Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh` again and report in the `status` form:
 
-### Existing instance
+- `Connected to cyoda-go v<VERSION> — <ENDPOINT> [profile: <PROFILE>]`, plus ` [PRODUCTION]` when `ENV=production`.
+- Then every `WARN=` line, as it is.
 
-Connect to an existing instance — see Task 9.
+End with one hand-off and a one-line reason:
+- Needs a token (connect mode, step 6): "This instance requires a token. Next, type `/cyoda:auth` to set up a token script for profile `<PROFILE>`."
+- Otherwise: "next, type `/cyoda:build` to create your first entity model and workflow" (or `/cyoda:app` for the guided journey).
+
+## Common mistakes
+
+| Mistake | Fix |
+|---|---|
+| `brew tap cyoda-platform/...` or another formula name | Exactly `brew install cyoda/cyoda-go/cyoda` |
+| Fixing Homebrew after an install failure | Show the verbatim message and wait |
+| Checking `/readyz` on port 8080 | `/api/health` on the API port; `/readyz` is on the admin port |
+| Storing `.../api` as the endpoint | Store the base URL; scripts add `/api` |
+| Asking for a client secret in connect mode | Hand off: "next, type `/cyoda:auth`" |
+| Deleting an old profile or stored token unasked | Show the warning; change it only on a yes |

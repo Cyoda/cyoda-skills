@@ -1,38 +1,51 @@
 ---
 name: status
-description: Reports current Cyoda connection status. Shows "Connected to Local cyoda-go — vX.X.X" or "Not connected". Use before any operation requiring an active Cyoda instance.
-when_to_use: When the user asks about their Cyoda connection, at session start when Cyoda work is mentioned, or before build/test operations.
-allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(jq *)
+description: Use when the developer asks whether Cyoda is connected, which cyoda-go instance, profile or version is active, or why the connection fails; at the start of Cyoda work; and before an operation that needs a running cyoda-go instance.
+allowed-tools: Bash(*cyoda-status.sh*)
 ---
 
-## Cyoda Connection Status
+# Cyoda connection status
 
-Current config:
-```!
-PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
+Read-only. One script call, one status line, then the warnings.
+
+## Steps
+
+1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Don't read the config or curl the instance yourself, and don't run the profile's `tokenCommand`: the script probes the public `/api/help` only.
+2. Its first line is `STATUS=<s> PROFILE=<P> ENDPOINT=<E> ENV=<env> VERSION=<V> BINARY_VERSION=<B>`. Report exactly one line:
+
+| `STATUS` | Report |
+|---|---|
+| `connected` | `Connected to cyoda-go v<V> — <E> [profile: <P>]` |
+| `unreachable` | `cyoda-go unreachable — <E> [profile: <P>]` |
+| `not_configured` | `Not connected — type /cyoda:setup` |
+
+   - Append ` [PRODUCTION]` to a `connected` or `unreachable` line when `ENV=production`.
+   - `VERSION=unknown`: write `version unknown` in place of `v<V>`.
+   - `<V>` is the instance's version. `BINARY_VERSION` is the local `cyoda` binary; don't report it as the instance version.
+3. Print **every** `WARN=` line after the status line, as it is, one per line, prefixed `Warning: `. Don't drop, merge or reword them. The texts the script emits:
+   - `active profile <P> is unreachable; run /cyoda:setup to switch to default`
+   - `local cyoda <B> differs from instance <V>; help is read from the instance`
+   - `profile <P> contains a stored token, which this plugin no longer reads; you can remove it`
+
+Nothing else: don't switch profiles, edit the config, install or upgrade anything. When a fix needs a side effect, say which command to type: "type `/cyoda:setup`" (connection, profile switch) or "type `/cyoda:auth`" (token). Never say you'll invoke them.
+
+## Examples
+
+```
+Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]
 ```
 
-Checking reachability and version:
-```!
-PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default");
-ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "none");
-ENV=$(jq -r --arg p "$PROFILE" '.profiles[$p].env // "development"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "development");
-if [ -z "$ENDPOINT" ] || [ "$ENDPOINT" = "none" ]; then
-  echo "STATUS=not_configured PROFILE=$PROFILE";
-else
-  VERSION=$(curl -sf --max-time 3 "${ENDPOINT%/}/api/help" 2>/dev/null | jq -r '.version // ""' 2>/dev/null);
-  if [ -z "$VERSION" ]; then
-    echo "STATUS=unreachable ENDPOINT=$ENDPOINT PROFILE=$PROFILE";
-  else
-    echo "STATUS=connected ENDPOINT=$ENDPOINT VERSION=$VERSION ENV=${ENV:-development} PROFILE=$PROFILE";
-  fi;
-fi
+```
+Connected to cyoda-go v0.8.4 — https://cyoda.example.com [profile: prod] [PRODUCTION]
+Warning: local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance
 ```
 
-**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
+## Common mistakes
 
-Report based on output:
-
-- `STATUS=not_configured` → **"Not connected to Cyoda — run `/cyoda:setup` to get started"**
-- `STATUS=unreachable` → **"Cyoda instance unreachable at {ENDPOINT} [profile: {PROFILE}] — is it running?"**
-- `STATUS=connected` → **"Connected to Local cyoda-go — v{VERSION} [profile: {PROFILE}]"**
+| Mistake | Fix |
+|---|---|
+| Labels such as "Local cyoda-go" | Every instance is `cyoda-go`; production is the `[PRODUCTION]` tag only |
+| Reporting `BINARY_VERSION` as the version | Report `VERSION` (from the instance) |
+| Showing only the first warning | Print every `WARN=` line |
+| Running the tokenCommand or an authenticated call | Not needed: `/api/help` is public |
+| A Cloud or migration question | "That's not covered by this plugin" |
