@@ -74,3 +74,9 @@ open /tmp/cyoda-<skill>-review.html
 - OpenAPI: https://docs.cyoda.net/openapi/openapi.json
 - Plugins guide: https://code.claude.com/docs/en/plugins
 - Skills guide: https://code.claude.com/docs/en/skills.md
+
+## Smoke tests
+
+- `tests/smoke/run.sh [--only NN] [--allow-version]` — lint, script tests, then scenarios against a throwaway in-memory cyoda-go (needs v0.8.4)
+- `tests/smoke/lint.sh` — stale-string lint over `cyoda/` (exit 1 on any hit; needs `shellcheck`)
+- `tests/smoke/test-harness.sh` — tests for the harness itself
