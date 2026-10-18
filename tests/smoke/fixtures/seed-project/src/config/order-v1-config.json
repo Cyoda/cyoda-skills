@@ -1,0 +1,9 @@
+{
+  "uniqueKeys": [
+    { "id": "by-order-id", "fields": ["$.orderId"] }
+  ],
+  "changeLevel": "STRUCTURAL",
+  "env": {
+    "production": { "changeLevel": null }
+  }
+}

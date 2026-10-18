@@ -1,0 +1,292 @@
+{
+  "skill_name": "deploy",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/cyoda:deploy — I want to run my shop app's cyoda on my laptop in Docker, just for me",
+      "expected_output": "Checks status and the local models, reads cyoda-manifest.json, recommends Docker Compose single-user (mock auth, loopback, labelled 'anyone who can reach these ports is admin'), writes deploy/cyoda/{compose.yaml, seed.sh, verify.sh, secrets-checklist.md} from the templates with image ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4}, and ends with the ordered command list (up, health, seed, verify) without running any of them.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
+        "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
+        "tsconfig.json": "{}",
+        "cyoda-manifest.json": "{\n  \"manifestVersion\": 1,\n  \"entities\": [\n    {\n      \"name\": \"order\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/order-v1-sample.json\",\n      \"workflow\": \"src/workflows/order-v1-workflow.json\",\n      \"config\": \"src/config/order-v1-config.json\"\n    },\n    {\n      \"name\": \"customer\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/customer-v1-sample.json\",\n      \"workflow\": \"src/workflows/customer-v1-workflow.json\",\n      \"config\": \"src/config/customer-v1-config.json\"\n    }\n  ]\n}",
+        "src/data/order-v1-sample.json": "{\"orderId\": \"ORD-1001\", \"customerId\": \"CUST-1\", \"amount\": 42.5}",
+        "src/data/customer-v1-sample.json": "{\"customerId\": \"CUST-1\", \"name\": \"Ada\", \"email\": \"ada@example.com\"}",
+        "src/workflows/order-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"order-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
+        "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose single-user and says it is not production. They decline a profile."
+      },
+      "assertions": [
+        {
+          "id": "reads-manifest",
+          "text": "Reads cyoda-manifest.json and lists order v1 and customer v1 as the entities to seed",
+          "type": "behavior"
+        },
+        {
+          "id": "single-user-warning",
+          "text": "Explains that single-user is mock auth on 127.0.0.1 and that anyone who can reach the ports is admin",
+          "type": "behavior"
+        },
+        {
+          "id": "output-dir",
+          "text": "Writes the files under deploy/cyoda/ because there is no existing deploy/ or ops/ dir",
+          "type": "behavior"
+        },
+        {
+          "id": "files-written",
+          "text": "Writes compose.yaml (from compose.single-user.yaml), seed.sh, verify.sh and secrets-checklist.md into that dir",
+          "type": "behavior"
+        },
+        {
+          "id": "command-order",
+          "text": "Ends with commands in this order: docker compose up, health check on /api/health, seed.sh with --manifest and --env development, verify.sh",
+          "type": "format"
+        },
+        {
+          "id": "help-first",
+          "text": "Names at least one `cyoda help` section it relied on (e.g. run RUN MODES or PORT LAYOUT) rather than asserting facts from memory",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "writes-only",
+          "text": "Does not run docker, docker compose, helm, kubectl or openssl, and does not run seed.sh or verify.sh; it only writes files and lists the commands",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/cyoda:deploy — we need a shared cyoda instance for the team on our staging VM, staging.shop.example.com",
+      "expected_output": "Chooses Docker Compose shared: compose.yaml from compose.shared.yaml (Postgres, CYODA_IAM_MODE=jwt, CYODA_REQUIRE_JWT, CYODA_JWT_SIGNING_KEY_FILE mounted :ro, bootstrap client id from env and secret via _FILE), a filled secrets-checklist.md naming each secret and where it is read from with no values, a .gitignore for secrets/ and .env, and the ordered commands (secrets, up, health, seed with CYODA_TOKEN_COMMAND, verify). It records CYODA_COMPUTE_GRPC_ENDPOINT=staging.shop.example.com:9090 in the checklist. It doesn't generate keys.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
+        "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
+        "tsconfig.json": "{}",
+        "cyoda-manifest.json": "{\n  \"manifestVersion\": 1,\n  \"entities\": [\n    {\n      \"name\": \"order\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/order-v1-sample.json\",\n      \"workflow\": \"src/workflows/order-v1-workflow.json\",\n      \"config\": \"src/config/order-v1-config.json\"\n    },\n    {\n      \"name\": \"customer\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/customer-v1-sample.json\",\n      \"workflow\": \"src/workflows/customer-v1-workflow.json\",\n      \"config\": \"src/config/customer-v1-config.json\"\n    }\n  ]\n}",
+        "src/data/order-v1-sample.json": "{\"orderId\": \"ORD-1001\", \"customerId\": \"CUST-1\", \"amount\": 42.5}",
+        "src/data/customer-v1-sample.json": "{\"customerId\": \"CUST-1\", \"name\": \"Ada\", \"email\": \"ada@example.com\"}",
+        "src/workflows/order-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"order-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
+        "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared, says staging is not production, and has no token script yet. They decline a profile."
+      },
+      "assertions": [
+        {
+          "id": "shared-jwt",
+          "text": "The compose file uses CYODA_IAM_MODE=jwt with CYODA_JWT_SIGNING_KEY_FILE pointing at a file mounted :ro, not CYODA_REQUIRE_JWT alone and not an inline PEM",
+          "type": "behavior"
+        },
+        {
+          "id": "bootstrap-client",
+          "text": "The compose file sets the bootstrap M2M client (CYODA_BOOTSTRAP_CLIENT_ID from the environment, the secret via CYODA_BOOTSTRAP_CLIENT_SECRET_FILE)",
+          "type": "behavior"
+        },
+        {
+          "id": "no-secret-values",
+          "text": "No written file contains a secret value: no PEM, password, client secret or token; the checklist names each secret and where it is read from",
+          "type": "behavior"
+        },
+        {
+          "id": "grpc-endpoint",
+          "text": "The secrets checklist records CYODA_COMPUTE_GRPC_ENDPOINT as staging.shop.example.com:9090 for compute nodes",
+          "type": "behavior"
+        },
+        {
+          "id": "secrets-first",
+          "text": "The command list starts with creating the secrets from the checklist, then up, health, seed (with CYODA_TOKEN_COMMAND), verify",
+          "type": "format"
+        },
+        {
+          "id": "auth-handoff",
+          "text": "Because there is no token script, hands off with 'next, type `/cyoda:auth`' to create one for the bootstrap client",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "writes-only",
+          "text": "Does not run docker, docker compose, helm, kubectl or openssl, and does not run seed.sh or verify.sh; it only writes files and lists the commands",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/cyoda:deploy — production deployment for shop, compose shared on prod.shop.example.com",
+      "expected_output": "Treats the target as production. Before writing, asks for each entity whether any processor writes fields not in its sample, explaining a strict schema rejects them. For order the developer says yes (a processor adds fulfilmentNotes), and after reading the changeLevel values chooses STRUCTURAL; for customer, no. Records env.production.changeLevel = \"STRUCTURAL\" in src/config/order-v1-config.json and env.production.changeLevel = null in src/config/customer-v1-config.json, keeping other keys. The seed command uses --env production. Offers a profile with env production and writes it inactive on a yes.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
+        "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
+        "tsconfig.json": "{}",
+        "cyoda-manifest.json": "{\n  \"manifestVersion\": 1,\n  \"entities\": [\n    {\n      \"name\": \"order\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/order-v1-sample.json\",\n      \"workflow\": \"src/workflows/order-v1-workflow.json\",\n      \"config\": \"src/config/order-v1-config.json\"\n    },\n    {\n      \"name\": \"customer\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/customer-v1-sample.json\",\n      \"workflow\": \"src/workflows/customer-v1-workflow.json\",\n      \"config\": \"src/config/customer-v1-config.json\"\n    }\n  ]\n}",
+        "src/data/order-v1-sample.json": "{\"orderId\": \"ORD-1001\", \"customerId\": \"CUST-1\", \"amount\": 42.5}",
+        "src/data/customer-v1-sample.json": "{\"customerId\": \"CUST-1\", \"name\": \"Ada\", \"email\": \"ada@example.com\"}",
+        "src/workflows/order-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"order-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
+        "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared and says this is production. For order: yes, a processor adds fulfilmentNotes; they choose STRUCTURAL. For customer: no. The project has a get-token.sh at the root. They accept a profile named prod."
+      },
+      "assertions": [
+        {
+          "id": "asks-processor-fields",
+          "text": "Asks, per entity, whether any processor writes fields that are not in the sample, and says a strict schema rejects them",
+          "type": "behavior"
+        },
+        {
+          "id": "records-override",
+          "text": "Writes env.production.changeLevel = \"STRUCTURAL\" into order-v1-config.json and env.production.changeLevel = null into customer-v1-config.json, keeping uniqueKeys and the base changeLevel",
+          "type": "behavior"
+        },
+        {
+          "id": "help-for-values",
+          "text": "Reads the changeLevel values from `cyoda help models` (ENDPOINTS or LIFECYCLE) before offering them",
+          "type": "behavior"
+        },
+        {
+          "id": "env-production",
+          "text": "The seed command in the hand-over uses --env production",
+          "type": "behavior"
+        },
+        {
+          "id": "profile-inactive",
+          "text": "Writes profile prod with endpoint (no /api), env production and tokenCommand pointing at get-token.sh, no token or secret, and does not make it the active profile",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "writes-only",
+          "text": "Does not run docker, docker compose, helm, kubectl or openssl, and does not run seed.sh or verify.sh; it only writes files and lists the commands",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/cyoda:deploy — deploy this to docker",
+      "expected_output": "Status is connected but the project has no cyoda-manifest.json and the scan finds no *-v*-sample.json files. The skill explains that deploy seeds from the versioned files /cyoda:build writes, that none exist, and hands off with 'next, type `/cyoda:build`' (it can create them or export existing models). It writes no deployment files and doesn't fall back to exporting live models itself.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
+        "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. find finds no *-v*-sample.json files and there is no cyoda-manifest.json."
+      },
+      "assertions": [
+        {
+          "id": "explains-missing",
+          "text": "Explains that the seed needs the versioned model and workflow files written by /cyoda:build and that none were found",
+          "type": "behavior"
+        },
+        {
+          "id": "build-handoff",
+          "text": "Hands off with 'next, type `/cyoda:build`'",
+          "type": "behavior"
+        },
+        {
+          "id": "no-files",
+          "text": "Writes no compose file, seed.sh, verify.sh or checklist",
+          "type": "behavior"
+        },
+        {
+          "id": "no-live-export",
+          "text": "Does not export the live model or workflow to build the seed itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "writes-only",
+          "text": "Does not run docker, docker compose, helm, kubectl or openssl, and does not run seed.sh or verify.sh; it only writes files and lists the commands",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "/cyoda:deploy — put it on our Kubernetes cluster with Helm",
+      "expected_output": "Says the Helm path is coming in the next release of this skill and offers Docker Compose shared meanwhile. Does not write Helm values or run helm or kubectl.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
+        "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
+        "tsconfig.json": "{}",
+        "cyoda-manifest.json": "{\n  \"manifestVersion\": 1,\n  \"entities\": [\n    {\n      \"name\": \"order\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/order-v1-sample.json\",\n      \"workflow\": \"src/workflows/order-v1-workflow.json\",\n      \"config\": \"src/config/order-v1-config.json\"\n    },\n    {\n      \"name\": \"customer\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/customer-v1-sample.json\",\n      \"workflow\": \"src/workflows/customer-v1-workflow.json\",\n      \"config\": \"src/config/customer-v1-config.json\"\n    }\n  ]\n}",
+        "src/data/order-v1-sample.json": "{\"orderId\": \"ORD-1001\", \"customerId\": \"CUST-1\", \"amount\": 42.5}",
+        "src/data/customer-v1-sample.json": "{\"customerId\": \"CUST-1\", \"name\": \"Ada\", \"email\": \"ada@example.com\"}",
+        "src/workflows/order-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"order-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
+        "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer asks for Helm, then says they'll wait for Helm support."
+      },
+      "assertions": [
+        {
+          "id": "helm-next-release",
+          "text": "Says the Helm path is coming in the next release of this skill",
+          "type": "behavior"
+        },
+        {
+          "id": "offers-compose",
+          "text": "Offers Docker Compose shared as the option available now",
+          "type": "behavior"
+        },
+        {
+          "id": "no-helm-files",
+          "text": "Does not write a Helm values file and does not run helm or kubectl",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "writes-only",
+          "text": "Does not run docker, docker compose, helm, kubectl or openssl, and does not run seed.sh or verify.sh; it only writes files and lists the commands",
+          "type": "behavior"
+        }
+      ]
+    }
+  ]
+}
