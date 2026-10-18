@@ -17,6 +17,7 @@ Rules that are easy to get wrong:
 - `SKILL.md` files stay under 500 lines — reference supporting files rather than embedding content inline
 - Never embed Cyoda docs in skill bodies — `cyoda:docs` fetches them dynamically at runtime
 - Skills with side effects (`setup`, `build`, `test`, `migrate`, `app`) must have `disable-model-invocation: true`
+- Shared helpers live in `cyoda/scripts/`. Skills invoke them with a plain instruction "Run `${CLAUDE_PLUGIN_ROOT}/scripts/<name>.sh`" (substituted in skill markdown). Do not rely on ```! blocks expanding `${CLAUDE_PLUGIN_ROOT}` (not verified: the probe could not run in the sandbox).
 
 ## Running evals
 
