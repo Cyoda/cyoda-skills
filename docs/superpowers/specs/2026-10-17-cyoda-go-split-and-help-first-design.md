@@ -72,12 +72,7 @@ The why behind help-first: almost everything that broke between v0.6.3 and v0.8.
 | Issue | What | Effect on this work |
 |---|---|---|
 | Cyoda/cyoda-docs#134 | Getting-started fails on v0.8.4 (version, lock, empty PUT) | `docs` skill's web fallback is unreliable for these until fixed. Skills must not derive recipes from that page |
-| Cyoda/cyoda-go#677 (v0.9.0) | `help helm` / `help run` say chart unpublished, 0.1.0 | `deploy` uses the published repo `https://cyoda.github.io/cyoda-go` regardless of what help says |
-| Cyoda/cyoda-go#679 (v0.9.0) | `help workflows` says tags match ALL, code matches ANY | `compute` points at `cyoda help grpc` TAG ROUTING specifically |
-| Cyoda/cyoda-go#680 (v0.9.0) | New help topic for design best practices | `design` uses it when present, otherwise falls back to a bundled copy |
-| Cyoda/cyoda-go#681 (v0.9.0) | `help crud` says an empty-body PUT is fine ("consistent with PUT-with-empty-body"); code returns 400 | Skills use PATCH `{}` (Step 2 item 3) |
-| Cyoda/cyoda-go#682 (v0.9.0) | `help run` "Minimal install" for Helm sets no bootstrap client, so there's no admin credential to seed with | `deploy` always sets the bootstrap client |
-| Cyoda/cyoda-go#683 (v0.9.0) | Help has no install section (no brew, `install.sh` or release routes) | `setup` carries a short install list until it ships |
+| Cyoda/cyoda-go#684 (v0.9.0) | Consolidated `cyoda help` issue; supersedes #677, #679, #680, #681, #682, #683. Items: A helm chart "unpublished, 0.1.0"; B `workflows` says tags match ALL (code: ANY); C `crud` says empty-body PUT is fine (it's 400); D `run` Helm minimal install has no bootstrap client; E `config` profile files `cyoda.N.env` (code: `.env.N`); F `audit` missing `SCHEDULED_TRANSITION_*` events; G `helm` empty `gateway.parentRefs` doesn't fail; H `helm` VALUES missing `migrate.postgres.existingSecret`; I `workflows` import strictness / export not re-importable undocumented; J `responseTimeoutMs` 0 = 30 s server default; K no install section; L design best-practices topic | A, D, G: `deploy` uses the published repo, always sets the bootstrap client, sets gateway or ingress explicitly. B: `compute`/`debug` cite `cyoda help grpc` TAG ROUTING only. C: skills use PATCH `{}`. I: `build`/`deploy` reshape exports to `{importMode, workflows}`. J: `compute`/`debug` state 30 s. K: `setup` carries a short install list. L: `design` uses the topic when present, else the bundled copy. E, F, H: avoid relying on those sections |
 
 **Help audit pass (first implementation task).** Before any skill defers to a help topic, check every topic and section the skills will point to against the v0.8.4 code. Each mismatch either gets filed and added to this table, or the skill points elsewhere.
 
@@ -190,7 +185,7 @@ Update stale references, e.g. the schemas link becomes `cyoda help cloudevents j
 
 ### Best practices
 
-- Canonical copy: `cyoda/skills/design/resources/best-practices.md`. Its content is the corrected list in Cyoda/cyoda-go#680, which is the fact-checked version of `ctcc-management/docs/workflow-best-practices.md`. The file is marked "Temporary — superseded by `cyoda help <topic>` once cyoda-go#680 ships".
+- Canonical copy: `cyoda/skills/design/resources/best-practices.md`. Its content is the corrected list in Cyoda/cyoda-go#684 item L, which is the fact-checked version of `ctcc-management/docs/workflow-best-practices.md`. The file is marked "Temporary — superseded by `cyoda help <topic>` once cyoda-go#684 item L ships".
 - `design` checks for the help topic first. Probe `cyoda help workflows best-practices` and `cyoda help design`, falling back to the bundled file. When the help topic ships, a follow-up removes the bundled file.
 - Merge it with the existing `design/resources/design-guidelines.md`. Remove overlap and drop anything in `design-guidelines.md` that contradicts v0.8.4.
 - `build` references it when generating states, transitions and criteria: error states, terminal states, loopback, validation cycles, rejection reasons. `debug` references it when diagnosing: loopback to re-evaluate, error-state queries, soft delete bypassing the workflow.
@@ -252,7 +247,7 @@ The flow:
 5. **Optionally register a profile** for the new instance (endpoint and env only, see Connection config), so `status`, `build` and `debug` can target it later.
 
 Known upstream inconsistencies the skill must not trip over:
-- help says the chart is unpublished (cyoda-go#677)
+- help says the chart is unpublished (cyoda-go#684 item A)
 - the compose file's commented "production" block sets `CYODA_REQUIRE_JWT=true` without `CYODA_IAM_MODE=jwt`, and passes the PEM inline instead of via `CYODA_JWT_SIGNING_KEY_FILE`
 
 Follow help, not that block. *Builder's call: file a cyoda-go issue for the compose block if not already filed.*

@@ -85,7 +85,7 @@ cyoda/skills/build/examples/error-states/              create (scenario 3)
 cyoda/skills/build/examples/scheduled/                 create (scenario 4)
 cyoda/skills/build/examples/hello-world.md             rewrite: walkthrough referencing hello-world/ files
 cyoda/skills/debug/examples/queries.md + queries/      create (scenarios 5, 6: stats, point-in-time, soft delete payloads)
-cyoda/skills/design/resources/best-practices.md        create (content = cyoda-go#680 draft)
+cyoda/skills/design/resources/best-practices.md        create (content = cyoda-go#684 item L draft)
 cyoda/skills/design/resources/design-guidelines.md     modify: dedupe vs best-practices, fix v0.8.4 contradictions
 cyoda/skills/design/resources/patterns.md              modify: remove 3 non-existent patterns, add scheduled transitions
 cyoda/skills/compute/{examples,resources}/*            modify: tag routing, timeouts, help pointers
@@ -490,7 +490,7 @@ Invoke `superpowers:writing-skills` first.
 - Inline content is limited to order, judgment and links to `examples/`. Keep it well under 500 lines.
 - When a changed model already has entities (`MODEL_HAS_ENTITIES`), the skill proposes a new model version.
 - The skill asks which `changeLevel` the developer wants and records it in `-config.json`.
-- It points at `design/resources/best-practices.md` (or the help topic once #680 ships) for: error states, terminal states, loopback, validation cycles, rejection reasons.
+- It points at `design/resources/best-practices.md` (or the help topic once #684 item L ships) for: error states, terminal states, loopback, validation cycles, rejection reasons.
 - Hand-offs: "next, type `/cyoda:test`".
 
 - [ ] **Step 1: Write `evals.json`**
@@ -528,7 +528,7 @@ Invoke `superpowers:writing-skills` first.
 
 **Files:**
 - Rewrite: `cyoda/skills/design/SKILL.md`, `cyoda/skills/design/evaluations/evals.json`
-- Create: `cyoda/skills/design/resources/best-practices.md`. Its content is the "Draft content" section of Cyoda/cyoda-go#680 (`gh issue view 680 -R Cyoda/cyoda-go --json body`). Header line: `> Temporary — superseded by cyoda help once Cyoda/cyoda-go#680 ships.`
+- Create: `cyoda/skills/design/resources/best-practices.md`. Its content is the "Draft content" block in section "L." of Cyoda/cyoda-go#684 (`gh issue view 684 -R Cyoda/cyoda-go --json body`). Header line: `> Temporary — superseded by cyoda help once Cyoda/cyoda-go#684 item L ships.`
 - Modify: `cyoda/skills/design/resources/design-guidelines.md`. Remove anything duplicated in best-practices and anything contradicting v0.8.4 (audit §1 design rows).
 - Modify: `cyoda/skills/design/resources/patterns.md`. Remove "scheduled processor", "message-triggered transition" and "one entity in several parallel workflows". Add "scheduled transition" with a pointer to `cyoda help workflows` SCHEDULED TRANSITIONS and to `build/examples/scheduled/`.
 
@@ -586,7 +586,7 @@ Invoke `superpowers:writing-skills` first.
 - `setup`:
   - **Local mode:**
     - install via `brew install cyoda/cyoda-go/cyoda`
-    - on failure, show the verbatim "run it yourself" message, and an install list of brew, `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`, the release page and Docker `ghcr.io/cyoda/cyoda`, marked as a #683 workaround
+    - on failure, show the verbatim "run it yourself" message, and an install list of brew, `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`, the release page and Docker `ghcr.io/cyoda/cyoda`, marked as a #684-K workaround
     - `cyoda init`, start, check `/api/health`, write the `default` profile
   - **Connect mode:** endpoint → probe `/api/health` → `env` → profile. For non-mock auth: "next, type `/cyoda:auth`".
   - Surfaces `cyoda-profile.sh` warnings (stale token).
@@ -659,7 +659,7 @@ Invoke `superpowers:writing-skills` first.
   - states that soft delete bypasses the workflow
   - instance-changing fixes are handed to "type `/cyoda:build`" or applied only after an explicit yes
 - `compute`:
-  - tag routing exactly per `cyoda help grpc` TAG ROUTING, with a #679 note that `help workflows` wording is wrong
+  - tag routing exactly per `cyoda help grpc` TAG ROUTING, with a #684-B note that `help workflows` wording is wrong
   - 30 s timeout and keep-alive values via `cyoda help grpc` KEEPALIVE / `config grpc`
   - execution modes and tx-token joining via `cyoda help workflows` PROCESSORS
   - function-criterion rejection `reason` (≤ 2 KiB)
@@ -737,7 +737,7 @@ Invoke `superpowers:writing-skills` first.
 - Ends with the ordered command list: secrets → up → health → seed → verify.
 - Optionally registers a profile (`endpoint`, `env`, `tokenCommand`).
 - Exposes gRPC (compose port 9090) and records `CYODA_COMPUTE_GRPC_ENDPOINT` for compute nodes in `secrets-checklist.md`.
-- Helm/compose known-issue notes cite #677 and #682 from the Upstream table.
+- Helm/compose known-issue notes cite #684 items A, D and G from the Upstream table.
 
 - [ ] **Step 1: Write `08-seed.sh`**
 
@@ -841,7 +841,7 @@ Follow `CLAUDE.md` → Running evals, with `iteration-1` as N. Slices:
 - Chart: `helm repo add cyoda https://cyoda.github.io/cyoda-go`, with the version chosen as the chart whose appVersion equals the local binary version (`helm search repo cyoda/cyoda --versions -o json | jq`).
 - `values.yaml`:
   - `postgres.existingSecret`, `jwt.existingSecret`
-  - `bootstrap.clientId` set (#682)
+  - `bootstrap.clientId` set (#684-D); gateway or ingress set explicitly (#684-G)
   - gateway vs ingress chosen by the developer
   - replicas and HPA left at chart defaults, with comments
   - the migration job is left enabled
