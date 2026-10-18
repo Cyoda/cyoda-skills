@@ -48,7 +48,7 @@ Point your agent to this repository and ask it to read the skill files before bu
 
 - Cloud support and `migrate` are removed (parked; see `docs/history/cloud-skills.md`).
 - Run `/plugin marketplace update cyoda` to pick up this release.
--X
+- Stored tokens in ~/.config/cyoda/cyoda-plugin-config.json are no longer read.
 - New `deploy` skill.
 - Skills with side effects now start only when you type them.
 
