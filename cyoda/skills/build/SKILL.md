@@ -139,7 +139,7 @@ Read `models --section ENDPOINTS` and `workflows --section "IMPORT REQUEST"`. Th
 2. Only if `uniqueKeys` isn't empty, and only while the model is UNLOCKED: `PUT /model/{e}/{v}/unique-keys` with body `{"uniqueKeys": [...]}`.
 3. `PUT /model/{e}/{v}/lock`
 4. Only if `changeLevel` isn't null: `POST /model/{e}/{v}/changeLevel/{changeLevel}`
-5. Workflow import. Read the schema version: `cyoda-help.sh workflows schema-version versions`, then `.current`. If that exits 2, use `cyoda-call.sh GET /help/workflows/schema-version/versions`, which is the same JSON from the instance. Substitute it into a temp copy, then post that:
+5. Workflow import. Read the schema version: run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh workflows schema-version versions | jq -r .current`. This is an action, so it prints JSON and takes no `--section`. Substitute the version into a temp copy, then post that:
    ```bash
    jq --arg v "<current>" '{importMode: "MERGE", workflows: (.workflows | map(.version = $v))}' <workflow-file> > "${TMPDIR:-/tmp}/<e>-v<v>-import.json"
    ```

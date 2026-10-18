@@ -51,7 +51,30 @@ test_help_ignores_broken_token_command() {
   stop_server
 }
 
+test_help_action_from_binary() {
+  local out rc
+  out="$(bash "$S/cyoda-help.sh" workflows schema-version versions 2>"$T/err")"; rc=$?
+  assert_status 0 "$rc" "action via binary"
+  assert_eq "$(jq -r .current <<<"$out")" "1.4" "action JSON verbatim"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=binary" "binary source for action"
+  bash "$S/cyoda-help.sh" workflows schema-version versions --section X >/dev/null 2>&1
+  assert_status 6 "$?" "--section rejected for action"
+}
+
+test_help_action_from_instance() {
+  start_server || return
+  echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/a.json"
+  local out rc
+  out="$(CYODA_PLUGIN_CONFIG="$T/a.json" bash "$S/cyoda-help.sh" workflows schema-version versions 2>"$T/err")"; rc=$?
+  assert_status 0 "$rc" "action via instance"
+  assert_eq "$(jq -r .current <<<"$out")" "1.4" "instance action JSON verbatim"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "instance source for action"
+  stop_server
+}
+
 test_help_section_from_binary
+test_help_action_from_binary
+test_help_action_from_instance
 test_help_ignores_broken_token_command
 test_help_unknown_topic
 test_help_unknown_section

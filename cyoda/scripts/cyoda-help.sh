@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Look up cyoda help. Usage: cyoda-help.sh <path...> [--section <NAME>]
 # Order: active instance, local binary, docs.cyoda.net mirror.
+# Topic actions (e.g. `workflows schema-version versions`) return plain JSON
+# with no .body; it is printed verbatim (instance or binary only; the web
+# mirror has no action JSON). --section is rejected for actions (exit 6).
 # stderr line 1: SOURCE=instance|binary|web VERSION=<v>
-# Exit: 0 ok, 2 unknown topic, 6 section not found.
+# Exit: 0 ok, 2 unknown topic, 6 section not found / not applicable.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +26,15 @@ URLPATH="$(IFS=/; echo "${WORDS[*]}")"
 emit_json() { # source version json
   local source="$1" version="$2" json="$3"
   echo "SOURCE=$source VERSION=$version" >&2
+  if ! jq -e 'type == "object" and has("body")' >/dev/null 2>&1 <<<"$json"; then
+    # Topic action result: plain JSON, no sections.
+    if [ -n "$SECTION" ]; then
+      echo "'${WORDS[*]}' is an action, not a topic: its output has no sections; drop --section" >&2
+      exit 6
+    fi
+    printf '%s\n' "$json"
+    exit 0
+  fi
   if [ -z "$SECTION" ]; then
     jq -r '.body' <<<"$json"
     exit 0
@@ -45,7 +57,7 @@ if [ -n "$ep" ]; then
   ep="${ep%/}"
   if idx="$(curl -fsS --max-time 5 "$ep/api/help" 2>/dev/null)"; then
     ver="$(jq -r '.version // "unknown"' <<<"$idx" 2>/dev/null)" || ver=unknown
-    if json="$(curl -fsS --max-time 10 "$ep/api/help/$URLPATH" 2>/dev/null)" && jq -e '.body' >/dev/null 2>&1 <<<"$json"; then
+    if json="$(curl -fsS --max-time 10 "$ep/api/help/$URLPATH" 2>/dev/null)" && jq -e . >/dev/null 2>&1 <<<"$json"; then
       emit_json instance "${ver:-unknown}" "$json"
     fi
   fi
@@ -53,7 +65,7 @@ fi
 
 # 2. Local binary
 if command -v cyoda >/dev/null 2>&1; then
-  if json="$(cyoda help "${WORDS[@]}" --format=json 2>/dev/null)" && jq -e '.body' >/dev/null 2>&1 <<<"$json"; then
+  if json="$(cyoda help "${WORDS[@]}" --format=json 2>/dev/null)" && jq -e . >/dev/null 2>&1 <<<"$json"; then
     ver="$(cyoda --version 2>/dev/null | awk 'NR==1{print $3}')"
     emit_json binary "${ver:-unknown}" "$json"
   fi
