@@ -43,7 +43,16 @@ test_help_prefers_instance() {
   stop_server
 }
 
+test_help_ignores_broken_token_command() {
+  start_server || return
+  echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\",\"tokenCommand\":\"false\"}}}" >"$T/b.json"
+  CYODA_PLUGIN_CONFIG="$T/b.json" bash "$S/cyoda-help.sh" auth tokens >/dev/null 2>"$T/err"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "broken tokenCommand ignored"
+  stop_server
+}
+
 test_help_section_from_binary
+test_help_ignores_broken_token_command
 test_help_unknown_topic
 test_help_unknown_section
 test_help_prefers_instance

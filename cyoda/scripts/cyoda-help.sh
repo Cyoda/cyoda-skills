@@ -38,10 +38,17 @@ emit_json() { # source version json
   exit 0
 }
 
-# 1. Active instance
-if json="$("$HERE/cyoda-call.sh" GET "/help/$URLPATH" 2>/dev/null)" && jq -e '.body' >/dev/null 2>&1 <<<"$json"; then
-  ver="$("$HERE/cyoda-call.sh" GET /help 2>/dev/null | jq -r '.version // "unknown"' 2>/dev/null)" || ver=unknown
-  emit_json instance "${ver:-unknown}" "$json"
+# 1. Active instance. /api/help is public: plain curl, never tokenCommand.
+# One fetch of /api/help gives reachability and VERSION; one fetch gets the topic.
+ep="$("$HERE/cyoda-profile.sh" 2>/dev/null | jq -r '.endpoint // empty' 2>/dev/null)" || ep=""
+if [ -n "$ep" ]; then
+  ep="${ep%/}"
+  if idx="$(curl -fsS --max-time 5 "$ep/api/help" 2>/dev/null)"; then
+    ver="$(jq -r '.version // "unknown"' <<<"$idx" 2>/dev/null)" || ver=unknown
+    if json="$(curl -fsS --max-time 10 "$ep/api/help/$URLPATH" 2>/dev/null)" && jq -e '.body' >/dev/null 2>&1 <<<"$json"; then
+      emit_json instance "${ver:-unknown}" "$json"
+    fi
+  fi
 fi
 
 # 2. Local binary

@@ -54,7 +54,16 @@ test_status_stale_token_forwarded() {
   assert_contains "$out" "WARN=profile old contains a stored token" "forwarded"
 }
 
+test_status_ignores_broken_token_command() {
+  start_server || return
+  echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\",\"tokenCommand\":\"false\"}}}" >"$T/b.json"
+  local out; out="$(CYODA_PLUGIN_CONFIG="$T/b.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected" "broken tokenCommand ignored"
+  stop_server
+}
+
 test_status_connected
+test_status_ignores_broken_token_command
 test_status_unreachable
 test_status_not_configured
 test_status_version_mismatch
