@@ -16,7 +16,12 @@
             { "name": "finish", "next": "completed", "manual": false }
           ]
         },
-        "completed": {}
+        "completed": {
+          "transitions": [
+            { "name": "archive", "next": "archived", "manual": true }
+          ]
+        },
+        "archived": {}
       }
     }
   ]

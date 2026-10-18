@@ -3,79 +3,212 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "I need to implement a processor that calls our pricing API when an order transitions to submitted",
-      "expected_output": "Explains gRPC connection lifecycle, tag registration, processor request/response pattern, idempotency via requestId, 60s timeout with async alternative — language-agnostic throughout",
-      "files": {},
+      "prompt": "Loan applications should only move to `approved` if the applicant's credit score from our bureau API is above 700, and the caller should see why when it's refused. We write Python.",
+      "expected_output": "Decides a function criterion is needed (data not on the entity, and a user-visible reason). Fetches field names from cyoda help cloudevents json (processing/EntityCriteriaCalculationRequest/Response) and stubs from cyoda help grpc proto. Explains join (ROLE_M2M, joinedLegalEntityId, greet first, ack), keep-alive per grpc KEEPALIVE, tag routing per grpc TAG ROUTING. The handler returns matches and, on false, a reason (≤ 2 KiB) that appears in the 400 WORKFLOW_FAILED detail for a manual transition and in TRANSITION_NOT_MATCH_CRITERION audit data.reason for automated ones. Python code uses the schema names, not invented ones. Wiring the criterion into the workflow is handed off with 'next, type /cyoda:build'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+      },
       "assertions": [
-        { "id": "explains-lifecycle", "text": "Explains the gRPC connection lifecycle (join, greet, handle, keep-alive)", "type": "behavior" },
-        { "id": "explains-tag-routing", "text": "Shows how to register with the correct tags", "type": "behavior" },
-        { "id": "shows-request-response", "text": "Provides processor request/response pattern", "type": "behavior" },
-        { "id": "notes-idempotency", "text": "Notes idempotency requirement via requestId", "type": "behavior" },
-        { "id": "mentions-timeout", "text": "Mentions 60s timeout and suggests async for slow operations", "type": "behavior" },
-        { "id": "references-examples", "text": "Points to grpc-patterns.md and processor.md examples", "type": "behavior" },
-        { "id": "no-language-specific", "text": "Does NOT provide language-specific code — guidance is language-agnostic", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Fetches `cyoda help cloudevents json` (EntityCriteriaCalculationResponse) and/or `cyoda help grpc proto` before writing code, and names grpc sections (COMPUTE MEMBER PROTOCOL, TAG ROUTING or KEEPALIVE)",
+          "type": "behavior"
+        },
+        {
+          "id": "function-criterion",
+          "text": "Chooses a function criterion (not a processor, not an inline criterion), because the data isn't on the entity",
+          "type": "behavior"
+        },
+        {
+          "id": "reason-field",
+          "text": "Returns `matches: false` with a `reason` (at most 2 KiB) when refused",
+          "type": "behavior"
+        },
+        {
+          "id": "reason-surfaces",
+          "text": "Says where the reason shows up: the 400 WORKFLOW_FAILED detail for a manual transition and/or the TRANSITION_NOT_MATCH_CRITERION audit event's data.reason",
+          "type": "behavior"
+        },
+        {
+          "id": "join-protocol",
+          "text": "Covers the join: ROLE_M2M token, CalculationMemberJoinEvent with tags and joinedLegalEntityId, greet first, acknowledge",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 2,
-      "prompt": "I need to guard a transition with a check that the entity's amount is over 10000 and it's been validated by our fraud system",
-      "expected_output": "Explains criteria vs built-in options, shows criteria request/response pattern with boolean return semantics, points to criteria.md example",
-      "files": {},
+      "prompt": "Our processor config has calculationNodesTags \"billing,eu,priority\". cyoda help workflows says the node must declare all required tags. Do I really have to register all three on every node?",
+      "expected_output": "Reads grpc --section \"TAG ROUTING\" only: one overlapping tag is enough; random among matching members; empty tags match any member. Says the workflows PROCESSORS wording is wrong (#684-B). Advises distinct tags per member type for deterministic routing and identical spelling on both sides.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+      },
       "assertions": [
-        { "id": "explains-criteria-vs-builtin", "text": "Explains when built-in criteria could suffice vs custom compute criteria", "type": "behavior" },
-        { "id": "shows-request-response", "text": "Shows criteria request/response pattern", "type": "behavior" },
-        { "id": "notes-boolean-return", "text": "Notes boolean return semantics (true = criteria met)", "type": "behavior" },
-        { "id": "references-example", "text": "Points to criteria.md example", "type": "behavior" },
-        { "id": "no-language-specific", "text": "Does NOT generate language-specific code", "type": "behavior" }
-      ]
-    },
-    {
-      "id": 4,
-      "prompt": "Implement a compute node for my order processor",
-      "expected_output": "Guides fetching the proto file via cyoda docs (cyoda help grpc proto), uses it to generate Go stubs, does not search for local proto files or depend on any Cyoda implementation repository",
-      "files": {},
-      "assertions": [
-        { "id": "fetches-proto-from-docs", "text": "Instructs fetching proto via documentation (cyoda help grpc proto or /cyoda:docs) rather than searching local filesystem", "type": "behavior" },
-        { "id": "no-local-file-search", "text": "Does NOT suggest searching for .proto files locally or importing a Cyoda implementation repository as a dependency", "type": "behavior" },
-        { "id": "generates-stubs", "text": "Instructs generating language-specific gRPC stubs from the fetched proto file", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Reads `cyoda-help.sh grpc --section \"TAG ROUTING\"` and bases the answer on it",
+          "type": "behavior"
+        },
+        {
+          "id": "overlap",
+          "text": "Says one shared tag is enough; registering all three is not required",
+          "type": "behavior"
+        },
+        {
+          "id": "erratum",
+          "text": "Says the workflows PROCESSORS 'all required tags' wording is wrong and cites #684 item B",
+          "type": "behavior"
+        },
+        {
+          "id": "random-pick",
+          "text": "Mentions that several matching members are chosen at random, so distinct tags give deterministic routing",
+          "type": "behavior"
+        },
+        {
+          "id": "no-superset",
+          "text": "Does not say the node's tags must be a superset of the processor's tags",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 3,
-      "prompt": "Do I need a compute node for my order approval workflow? Transitions are triggered by users clicking buttons.",
-      "expected_output": "Assesses the use case, explains manual transitions don't need compute nodes, explains what would require one, concludes no compute node needed",
-      "files": {},
+      "prompt": "My processor calls a document-signing service that takes 40-50 seconds. It keeps failing. What should I change?",
+      "expected_output": "Reads workflows PROCESSORS and grpc KEEPALIVE / config grpc. The response timeout is responseTimeoutMs; unset or 0 is the 30 s server default (#684-J), so 40-50 s fails with DISPATCH_TIMEOUT. Recommends COMMIT_BEFORE_DISPATCH with a raised responseTimeoutMs and an idempotent processor (replays happen; the pre-callout state is visible), and keeping the stream answered (acks/keep-alive) within CYODA_KEEPALIVE_TIMEOUT (default 30 s) while the call runs. The workflow change is 'next, type /cyoda:build'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+      },
       "assertions": [
-        { "id": "assesses-use-case", "text": "Assesses the specific use case before answering", "type": "behavior" },
-        { "id": "explains-manual-no-compute", "text": "Explains that manual transitions do not need compute nodes", "type": "behavior" },
-        { "id": "explains-when-needed", "text": "Explains what scenarios would require a compute node", "type": "behavior" },
-        { "id": "correct-conclusion", "text": "Concludes no compute node is needed for this case", "type": "behavior" },
-        { "id": "no-unnecessary-recommendation", "text": "Does NOT recommend a compute node when one is not needed", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Reads `workflows --section PROCESSORS` and `grpc --section KEEPALIVE` (or `cyoda help config grpc`) for the timeout and keep-alive values",
+          "type": "behavior"
+        },
+        {
+          "id": "timeout-30s",
+          "text": "Says the default response timeout is 30 s when responseTimeoutMs is unset or 0, citing #684-J or the server default",
+          "type": "behavior"
+        },
+        {
+          "id": "no-60s",
+          "text": "Does not state a 60-second timeout or keep-alive",
+          "type": "behavior"
+        },
+        {
+          "id": "commit-before-dispatch",
+          "text": "Recommends COMMIT_BEFORE_DISPATCH (or an execution mode from workflows PROCESSORS) with a raised responseTimeoutMs",
+          "type": "behavior"
+        },
+        {
+          "id": "idempotent",
+          "text": "Says the processor must be idempotent because it can be re-dispatched",
+          "type": "behavior"
+        },
+        {
+          "id": "keepalive-while-busy",
+          "text": "Says the node must keep acknowledging/answering within CYODA_KEEPALIVE_TIMEOUT while the slow call runs",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "When an Order is paid, its Shipment (we keep shipmentId on the order) should move to `ready`, in the same transaction. How does my processor do that?",
+      "expected_output": "A processor on the order's pay transition fires a manual transition on the linked Shipment by id: PATCH /api/entity/JSON/{shipmentId}/{transition} with merge-patch, If-Match: * and {} (crud ENDPOINTS). To be in the same transaction, echo the cyodatxtoken CloudEvent extension as X-Tx-Token (HTTP) or tx-token (gRPC metadata) per cluster COMPUTE CALLBACK TRANSACTION ROUTING; which modes provide a usable transaction is in workflows PROCESSORS. The shipment transition is manual: true. Doesn't write the order itself while also returning data for it. Language-agnostic pseudocode.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+      },
+      "assertions": [
+        {
+          "id": "consults-help",
+          "text": "Names `workflows --section PROCESSORS` and the transaction-token source (`cluster` COMPUTE CALLBACK TRANSACTION ROUTING) and/or `crud --section ENDPOINTS`",
+          "type": "behavior"
+        },
+        {
+          "id": "linked-manual-transition",
+          "text": "The processor fires a manual transition on the linked Shipment by its id with PATCH `{}` (merge-patch, If-Match), not by editing the shipment's state field",
+          "type": "behavior"
+        },
+        {
+          "id": "tx-token",
+          "text": "Echoes the `cyodatxtoken` extension as `X-Tx-Token` or `tx-token` so the call joins the originating transaction, and says that without it the call commits separately",
+          "type": "behavior"
+        },
+        {
+          "id": "manual-flag",
+          "text": "Says the shipment's transition should be `manual: true`",
+          "type": "behavior"
+        },
+        {
+          "id": "language-agnostic",
+          "text": "Gives the pattern without assuming a language the developer didn't name",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 5,
-      "prompt": "My compute node connects fine locally but can't reach the gRPC endpoint on Cyoda Cloud. My REST endpoint is https://client-abc123-prod.eu.cyoda.net",
-      "expected_output": "Explains that the cloud gRPC endpoint is on a different hostname — grpc-client-abc123-prod.eu.cyoda.net:443 — not the REST hostname, and guides the user to update their compute node endpoint configuration",
-      "files": {},
+      "prompt": "Do I need a compute node to approve invoices automatically when the amount is under 1000?",
+      "expected_output": "No: an inline simple criterion ($.amount LESS_THAN 1000) on an automated transition does it (workflows CRITERIA / search CONDITION DSL). A compute node is needed only for data not on the entity, external calls, a user-visible rejection reason, or a per-entity schedule time. Adding the criterion is 'next, type /cyoda:build'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+      },
       "assertions": [
-        { "id": "identifies-hostname-difference", "text": "Identifies that cloud gRPC uses a different hostname from the REST API (grpc- prefix)", "type": "behavior" },
-        { "id": "gives-correct-endpoint", "text": "Gives the correct gRPC endpoint: grpc-client-abc123-prod.eu.cyoda.net:443", "type": "behavior" },
-        { "id": "tls-on-cloud", "text": "Notes that TLS is required for the cloud gRPC endpoint on port 443", "type": "behavior" },
-        { "id": "does-not-guess-port", "text": "Does NOT suggest guessing ports (9090, 50051) for cloud connections", "type": "behavior" }
-      ]
-    },
-    {
-      "id": 6,
-      "prompt": "What events do I need to handle for keep-alive and what do I send back? Also does the GreetEvent need a response?",
-      "expected_output": "Explains CalculationMemberKeepAliveEvent → EventAckResponse with sourceEventId, and that CalculationMemberGreetEvent also needs EventAckResponse acknowledgement",
-      "files": {},
-      "assertions": [
-        { "id": "correct-keepalive-type", "text": "Identifies the keep-alive event as CalculationMemberKeepAliveEvent (not KeepAliveRequest)", "type": "behavior" },
-        { "id": "correct-keepalive-response", "text": "Specifies EventAckResponse (not CalculationMemberKeepAliveResponse) as the correct response", "type": "behavior" },
-        { "id": "sourceeventid-field", "text": "Mentions sourceEventId field in the EventAckResponse linking it to the keep-alive event", "type": "behavior" },
-        { "id": "greet-ack", "text": "Explains that CalculationMemberGreetEvent also requires an EventAckResponse acknowledgement", "type": "behavior" },
-        { "id": "id-in-payload", "text": "Notes that all event text_data payloads must include an id field (BaseEvent requirement)", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Names `workflows --section CRITERIA` (or `search --section \"CONDITION DSL\"`) for the criterion",
+          "type": "behavior"
+        },
+        {
+          "id": "no-compute-needed",
+          "text": "Says no compute node is needed and proposes an inline simple criterion on an automated transition",
+          "type": "behavior"
+        },
+        {
+          "id": "when-needed",
+          "text": "Says when a compute node would be needed (other data, an external call, a rejection reason, or a computed schedule)",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     }
   ]

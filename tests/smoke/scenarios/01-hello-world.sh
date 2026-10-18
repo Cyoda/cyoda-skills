@@ -28,4 +28,20 @@ scenario_main() {
   loopback "$id" '{"message":"updated"}' >/dev/null
   local n; n="$(curl -s "$BASE/entity/$id/changes" | jq 'length')"
   [ "${n:-0}" -ge 2 ] && _ok || _bad "changes lists >= 2 versions" "got: $n"
+
+  # test skill's smoke-test.sh template: run from a project dir holding a
+  # cyoda-manifest.json, fire the manual `archive` transition. The token
+  # command proves the auth header survives as one argument (mock ignores it).
+  local proj out rc
+  proj="$(mktemp -d)"
+  cp "$EX_DIR/sample.json" "$proj/hello-v1-sample.json"
+  printf '{"manifestVersion":1,"entities":[{"name":"hello","modelVersion":1,"sample":"hello-v1-sample.json"}]}\n' >"$proj/cyoda-manifest.json"
+  out="$(cd "$proj" && env -u CYODA_CONFIG ENTITY_NAME=hello MODEL_VERSION=1 TRANSITION_NAME=archive \
+    EXPECTED_STATE=archived CYODA_ENDPOINT="${BASE%/api}" CYODA_TOKEN_COMMAND='echo smoke-token' \
+    bash "$_LOAD_ROOT/cyoda/skills/test/templates/smoke-test.sh" 2>"$proj/stderr")"; rc=$?
+  assert_eq "$rc" 0 "smoke-test.sh exits 0"
+  [ "$rc" -eq 0 ] || { echo "        stdout: $out" >&2; echo "        stderr: $(cat "$proj/stderr")" >&2; }
+  assert_eq "$(printf '%s\n' "$out" | tail -n1)" "=== PASS ===" "smoke-test.sh stdout ends === PASS ==="
+  assert_contains "$out" archived "smoke-test.sh reports the archived state"
+  rm -rf "$proj"
 }

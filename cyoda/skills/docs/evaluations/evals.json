@@ -3,42 +3,206 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "How do I search for entities created in the last 7 days?",
-      "expected_output": "Synthesized answer with correct endpoint and filter syntax, shown as a curl example. Assumes cyoda CLI is installed.",
-      "files": {},
+      "prompt": "How do I move an order to its next state without changing any of its data?",
+      "expected_output": "Runs cyoda-help.sh crud --section ENDPOINTS (one section, not the whole topic), answers that a named transition without a data change is PATCH /api/entity/JSON/{id}/{transition} with Content-Type application/merge-patch+json, If-Match: * (or the transactionId) and body {}, warns that a PUT with an empty body is a 400 despite the crud help wording (#684-C), and ends with the source line naming topic, section, SOURCE and VERSION.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/help.md": "cyoda-help.sh prints SOURCE=instance VERSION=0.8.4 on stderr. `crud --section ENDPOINTS` returns the ENDPOINTS body, including the PATCH /api/entity/{format}/{entityId}/{transition} entry (merge-patch, If-Match required, `{}` is a valid no-op merge 'consistent with PUT-with-empty-body')."
+      },
       "assertions": [
-        { "id": "runs-cyoda-help", "text": "Runs cyoda help to retrieve local docs", "type": "behavior" },
-        { "id": "synthesizes-answer", "text": "Synthesizes a direct answer with endpoint and filter syntax", "type": "behavior" },
-        { "id": "shows-example", "text": "Shows a concrete curl or code example", "type": "format" },
-        { "id": "no-raw-dump", "text": "Does NOT paste raw cyoda help output without explanation", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Runs `cyoda-help.sh crud --section ENDPOINTS` (or another named crud section) before answering, rather than answering from memory",
+          "type": "behavior"
+        },
+        {
+          "id": "section-level",
+          "text": "Reads one section (`--section`), not the whole crud topic",
+          "type": "behavior"
+        },
+        {
+          "id": "patch-recipe",
+          "text": "Answer is PATCH /api/entity/JSON/{id}/{transition} with `Content-Type: application/merge-patch+json`, `If-Match: *` (or a transactionId) and body `{}`",
+          "type": "behavior"
+        },
+        {
+          "id": "empty-put-erratum",
+          "text": "Says a PUT with an empty body is rejected (400) even though the crud help implies it's fine, citing #684-C or equivalent",
+          "type": "behavior"
+        },
+        {
+          "id": "cites-source",
+          "text": "Ends with the source: topic and section plus SOURCE (instance) and version 0.8.4",
+          "type": "format"
+        },
+        {
+          "id": "no-raw-dump",
+          "text": "Synthesises an answer; does not paste the raw help section",
+          "type": "format"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 2,
-      "prompt": "What's the endpoint to trigger a transition? (cyoda CLI is not installed)",
-      "expected_output": "Asks the user whether to install cyoda locally or use the online help at https://docs.cyoda.net/help/. If user chooses online: fetches /help/index.json, then fetches the relevant /help/<slug>.md page, synthesizes the answer.",
-      "files": {},
+      "prompt": "What does WORKFLOW_SCHEMA_VERSION_UNSUPPORTED mean? I don't see it in the error list.",
+      "expected_output": "Runs cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED. With no binary and no instance, the helper falls back to the web help mirror; the skill says once that cyoda isn't installed and that the answer comes from the mirror, and says 'next, type /cyoda:setup' to install it. Explains that the index lists 61 of 77 codes and the rest are only in the subtopic list, so the code exists; the workflow version must be a supported MAJOR.MINOR, read from `cyoda help workflows schema-version versions`.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{}",
+        "_simulated/machine.md": "`cyoda` is not on PATH. No profile has an endpoint. cyoda-help.sh prints SOURCE=web VERSION=0.8.4 and the whole web page for errors/WORKFLOW_SCHEMA_VERSION_UNSUPPORTED: HTTP 400, the workflow `version` is not in the supported MAJOR.MINOR range; see `cyoda help workflows schema-version versions`."
+      },
       "assertions": [
-        { "id": "detects-cli-missing", "text": "Detects that cyoda CLI is not installed", "type": "behavior" },
-        { "id": "asks-install-or-online", "text": "Asks the user whether to install via /cyoda:setup or use the online help at https://docs.cyoda.net/help/", "type": "behavior" },
-        { "id": "fetches-index-json", "text": "When user chooses online, fetches https://docs.cyoda.net/help/index.json to discover topics", "type": "behavior" },
-        { "id": "fetches-slug-md", "text": "Fetches https://docs.cyoda.net/help/<slug>.md for the relevant topic using the cyoda-help URL mapping", "type": "behavior" },
-        { "id": "synthesizes-answer", "text": "Synthesizes a direct answer with the transition endpoint", "type": "behavior" },
-        { "id": "does-not-block", "text": "Does NOT refuse to help — proceeds with online docs if user declines install", "type": "behavior" },
-        { "id": "does-not-ask-again", "text": "Does NOT ask again if the user already declined install earlier in the conversation", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Runs `cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED` (the per-code page) before answering",
+          "type": "behavior"
+        },
+        {
+          "id": "index-gap",
+          "text": "Explains that the ERROR CODE INDEX doesn't list every code (61 of 77; the rest only in the subtopic list), so a missing index entry doesn't mean the code doesn't exist",
+          "type": "behavior"
+        },
+        {
+          "id": "web-mirror-said",
+          "text": "Says the answer comes from the web help mirror because the binary isn't installed, naming the version",
+          "type": "behavior"
+        },
+        {
+          "id": "schema-version-pointer",
+          "text": "Points to `cyoda help workflows schema-version versions` for the supported version instead of stating a version from memory",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:setup`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-install",
+          "text": "Does not try to install cyoda itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 3,
-      "prompt": "How does Cyoda handle schema version migration when I lock a model and then need to add a field?",
-      "expected_output": "Checks local cyoda help first, then fetches llms.txt to find the relevant web page, fetches that page, and synthesizes a complete answer. Assumes cyoda CLI is installed.",
-      "files": {},
+      "prompt": "Can I run Trino SQL reports over my entities? And what's the easiest way to move my app to Cyoda Cloud later?",
+      "expected_output": "SQL analytics: 'not available in cyoda-go' (help analytics describes an interface cyoda-go doesn't serve), and offers grouped statistics and search, naming crud ENDPOINTS / search ENDPOINTS. Cloud migration: 'That's not covered by this plugin.' and nothing more.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/help.md": "cyoda-help.sh crud --section ENDPOINTS includes POST /api/entity/stats/{e}/{v}/query (grouped statistics). search --section ENDPOINTS includes POST /api/search/direct/{e}/{v}."
+      },
       "assertions": [
-        { "id": "checks-local-help", "text": "Runs cyoda help first", "type": "behavior" },
-        { "id": "fetches-llms-txt", "text": "Fetches https://docs.cyoda.net/llms.txt before fetching any other docs page when supplementing local help", "type": "behavior" },
-        { "id": "fetches-relevant-page", "text": "Uses llms.txt to identify and fetch the specific page relevant to schema migration rather than fetching a broad URL", "type": "behavior" },
-        { "id": "synthesizes-complete", "text": "Synthesizes a complete answer combining local help and web docs", "type": "behavior" },
-        { "id": "no-stops-at-local", "text": "Does NOT stop at 'cyoda help doesn't cover this' without checking web docs", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Names or reads the help sections for the alternative it offers (`crud` ENDPOINTS grouped statistics and/or `search` ENDPOINTS)",
+          "type": "behavior"
+        },
+        {
+          "id": "sql-not-available",
+          "text": "Says SQL/Trino analytics is not available in cyoda-go",
+          "type": "behavior"
+        },
+        {
+          "id": "offers-stats",
+          "text": "Offers grouped statistics or search as the way to report over entities",
+          "type": "behavior"
+        },
+        {
+          "id": "cloud-not-covered",
+          "text": "Answers the migration question with 'not covered by this plugin' and gives no migration steps",
+          "type": "behavior"
+        },
+        {
+          "id": "no-analytics-recipe",
+          "text": "Does not give endpoints or steps from `cyoda help analytics`",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I'm writing a criteria handler in Kotlin. Exactly which fields does the criteria response need?",
+      "expected_output": "Gets the schema with cyoda-help.sh cloudevents json piped to jq for processing/EntityCriteriaCalculationResponse.json, reports required requestId and entityId plus matches and the optional reason (2 KiB cap per grpc COMPUTE MEMBER PROTOCOL), and mentions `cyoda help grpc proto` (run with the binary) for stubs.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/help.md": "cyoda-help.sh cloudevents json prints {schemas:{...}}; schemas[\"processing/EntityCriteriaCalculationResponse.json\"] has required [requestId, entityId] and properties entityId, matches, reason, requestId. `cyoda help grpc proto` prints the .proto text."
+      },
+      "assertions": [
+        {
+          "id": "consults-help",
+          "text": "Fetches `cyoda help cloudevents json` (via cyoda-help.sh) and selects `processing/EntityCriteriaCalculationResponse.json` with jq rather than listing fields from memory",
+          "type": "behavior"
+        },
+        {
+          "id": "fields-correct",
+          "text": "Lists requestId and entityId as required, plus matches and the optional reason",
+          "type": "behavior"
+        },
+        {
+          "id": "proto-pointer",
+          "text": "Points to `cyoda help grpc proto` for generating stubs",
+          "type": "behavior"
+        },
+        {
+          "id": "no-old-link",
+          "text": "Does not point to a GitHub schemas folder or a Cyoda-platform URL",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "The workflows help says my compute node has to declare all of a processor's calculationNodesTags. Is that right?",
+      "expected_output": "Reads grpc --section \"TAG ROUTING\": routing is by overlap (one shared tag), random among matching members, empty tags match any member. Says the workflows PROCESSORS wording is wrong (Cyoda/cyoda-go#684 item B) and cites the grpc section as the source.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+      },
+      "assertions": [
+        {
+          "id": "consults-help",
+          "text": "Reads `cyoda-help.sh grpc --section \"TAG ROUTING\"` before answering",
+          "type": "behavior"
+        },
+        {
+          "id": "overlap",
+          "text": "Says one shared tag is enough (overlap / intersection), not all tags",
+          "type": "behavior"
+        },
+        {
+          "id": "erratum-cited",
+          "text": "Says the workflows PROCESSORS wording is wrong and cites #684 item B",
+          "type": "behavior"
+        },
+        {
+          "id": "random-and-empty",
+          "text": "Mentions random choice among several matching members, or that empty tags match any member",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     }
   ]
