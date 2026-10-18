@@ -85,7 +85,7 @@ For each violation, change the design and say so in one plain sentence that name
 2. An `ASYNC_NEW_TX` processor on the transition into the state, whose compute node sends the message (`workflows --section PROCESSORS`).
 3. A scheduled transition for escalation, e.g. `errored` → `escalated` after 30 minutes (`workflows --section "SCHEDULED TRANSITIONS"`).
 
-Use the same "coming soon" wording for any other feature the developer asks for that `cyoda help` doesn't document, and never describe such a feature as available.
+**Other features help doesn't document.** "Coming soon" is only for features known to be planned, which today means notifications. For anything else the developer asks for that `cyoda help` doesn't document, say: "Not available in cyoda-go <VERSION> — check `cyoda help`." `<VERSION>` is the `VERSION=` that `cyoda-help.sh` reported. Then offer the closest documented way, if there is one.
 
 **Anti-patterns:**
 
@@ -104,7 +104,7 @@ Use the same "coming soon" wording for any other feature the developer asks for 
 
 Mention a pattern from [patterns.md](resources/patterns.md) when it fits (approval, scheduled transition, cascade, error state with retry, saga, external trigger).
 
-If the developer asks about the hosted cloud service or migrating to it, say "not covered by this plugin" and nothing more.
+If the developer asks about Cloud, hosted or managed offerings, or migration, answer "not covered by this plugin" and nothing more.
 
 ## Phase 4 — Design summary
 
@@ -143,8 +143,5 @@ Then hand off:
 | Stating a Cyoda fact from memory | Read and name the help section |
 | Saying entities can be posted before the model is locked | Q6: sample data, lock, then a changeLevel |
 | A "scheduled processor" | A `schedule` on an automated transition |
-| A transition triggered by an edge message | The caller fires a manual transition |
-| Describing notifications as available | The "coming soon" wording plus today's three options |
 | Reviewing only against the anti-patterns | Every best-practice bullet, by name |
-| Generating workflow JSON | The summary; `build` writes the files |
 | Saying you'll run `build` or `setup` yourself | "Next, type `/cyoda:build`" with a one-line reason |

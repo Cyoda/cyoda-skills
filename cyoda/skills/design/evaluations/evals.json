@@ -45,8 +45,8 @@
     },
     {
       "id": 3,
-      "prompt": "Our Payment entity calls the bank through a compute node. When a payment ends up in an error state I want Cyoda to send a notification to the ops team. How should I design that?",
-      "expected_output": "Skips orientation. Loads the best practices. Says notifications are 'coming soon — check `cyoda help` for availability' and does not invent a webhook, subscription or notification API. Gives today's options: query the state (state stats or a search), an ASYNC_NEW_TX processor on the transition into the error state, and a scheduled transition for escalation. Applies 'Model error states explicitly': an explicit Errored state in the straight-through path with a criterion on its exit transition that holds the entity, plus backward transitions for retry. Points at `cyoda help workflows` PROCESSORS and SCHEDULED TRANSITIONS.",
+      "prompt": "Our Payment entity calls the bank through a compute node. When a payment ends up in an error state I want Cyoda to send a notification to the ops team. How should I design that? Also, can I run built-in cron jobs inside a processor to sweep stuck payments every 5 minutes?",
+      "expected_output": "Skips orientation. Loads the best practices. Says notifications are 'coming soon — check `cyoda help` for availability' and does not invent a webhook, subscription or notification API. Gives today's options: query the state (state stats or a search), an ASYNC_NEW_TX processor on the transition into the error state, and a scheduled transition for escalation. Applies 'Model error states explicitly': an explicit Errored state in the straight-through path with a criterion on its exit transition that holds the entity, plus backward transitions for retry. Points at `cyoda help workflows` PROCESSORS and SCHEDULED TRANSITIONS. For built-in cron jobs inside a processor (not documented in help and not planned) it says \"not available in cyoda-go 0.8.4 — check `cyoda help`\", not \"coming soon\", and offers the documented alternative (a polling scheduled transition).",
       "files": {
         "_simulated/env.md": "The cyoda binary 0.8.4 is installed. `cyoda-help.sh workflows best-practices` and `cyoda-help.sh design` both exit 2. Every other cyoda-help.sh call prints SOURCE=binary VERSION=0.8.4 and the real section text.",
         "_simulated/developer.md": "Payment states so far: created, authorised, settled, failed. The bank call is a processor on created -> authorised. Ops want to know within 30 minutes if a payment is stuck."
@@ -59,6 +59,7 @@
         { "id": "option-async-processor", "text": "Offers an ASYNC_NEW_TX processor on the transition into the error state for the side effect (e.g. calling the ops channel from a compute node)", "type": "behavior" },
         { "id": "option-scheduled", "text": "Offers a scheduled transition for escalation (e.g. after 30 minutes stuck), pointing at `cyoda help workflows` SCHEDULED TRANSITIONS", "type": "behavior" },
         { "id": "names-error-bullet", "text": "Names the best practice 'Model error states explicitly' and models the error state with an exit transition held by a criterion, plus a backward/retry path", "type": "behavior" },
+        { "id": "undocumented-not-available", "text": "For the built-in cron jobs inside a processor, says it is \"not available in cyoda-go 0.8.4 — check `cyoda help`\" (using the VERSION cyoda-help.sh reported) and does not call it \"coming soon\"; \"coming soon\" is used only for notifications", "type": "behavior" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     },
