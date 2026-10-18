@@ -94,7 +94,9 @@ test_lint_every_rule_fires() {
   lint_fires cloud "$D" 'deploy to Cyoda Cloud'
   lint_fires cloud "$D" 'host foo.cyoda.net is used'
   lint_fires invoke-flagged "$D" 'Invoke /cyoda:build next'
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   lint_fires invoke-flagged "$D" 'invoke `/cyoda:setup`'
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   lint_fires model-list-no-slash "$D" 'curl $BASE/api/model"'
   lint_fires model-list-no-slash "$D" 'GET /api/model '
 }
@@ -120,14 +122,21 @@ test_lint_excludes_evaluations() {
 
 test_lint_shellcheck_rule() {
   local d out rc
-  d="$(mktree)"; mkdir -p "$d/cyoda/scripts"; printf '#!/usr/bin/env bash\necho $1\n' > "$d/cyoda/scripts/bad.sh"
+  d="$(mktree)"; mkdir -p "$d/cyoda/scripts"
+  # shellcheck disable=SC2016 # fixture script must contain a literal $1
+  printf '#!/usr/bin/env bash\necho $1\n' > "$d/cyoda/scripts/bad.sh"
   out="$(bash "$ROOT/tests/smoke/lint.sh" --root "$d" 2>&1)"; rc=$?
   assert_eq "$rc" "1" "shellcheck rule exit 1"
-  if command -v shellcheck >/dev/null 2>&1; then
-    assert_contains "$out" "shellcheck" "bad script flagged by shellcheck"
+  if command -v shellcheck >/dev/null 2>&1 || command -v uvx >/dev/null 2>&1; then
+    assert_contains "$out" "[shellcheck]" "bad script flagged by shellcheck (local or uvx fallback)"
   else
     assert_contains "$out" "brew install shellcheck" "missing shellcheck gives install hint"
   fi
+  # LINT_SHELLCHECK_CMD selects the checker; lint passes -x -P SCRIPTDIR -f gcc and the files.
+  printf '#!/usr/bin/env bash\necho "ARGS: $*"; exit 1\n' >"$d/fakesc"; chmod +x "$d/fakesc"
+  out="$(LINT_SHELLCHECK_CMD="$d/fakesc" bash "$ROOT/tests/smoke/lint.sh" --root "$d" 2>&1)"; rc=$?
+  assert_eq "$rc" "1" "override checker failing -> lint exit 1"
+  assert_contains "$out" "ARGS: -x -P SCRIPTDIR -f gcc" "override checker invoked with -x -P SCRIPTDIR -f gcc"
 }
 
 for t in $(declare -F | awk '{print $3}' | grep '^test_'); do

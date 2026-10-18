@@ -35,8 +35,8 @@ start_server() {
       cyoda >"$SMOKE_TMP/server.log" 2>&1 &
   SMOKE_PID=$!
 
-  local i
-  for i in $(seq 1 30); do
+  local _
+  for _ in $(seq 1 30); do
     if ! kill -0 "$SMOKE_PID" 2>/dev/null; then break; fi
     if [ "$(curl -s --max-time 1 "$BASE/health" 2>/dev/null)" = '{"status":"UP"}' ]; then
       return 0
@@ -51,8 +51,8 @@ start_server() {
 stop_server() {
   if [ -n "$SMOKE_PID" ]; then
     kill "$SMOKE_PID" 2>/dev/null
-    local i
-    for i in $(seq 1 20); do
+    local _
+    for _ in $(seq 1 20); do
       kill -0 "$SMOKE_PID" 2>/dev/null || break
       sleep 0.25
     done

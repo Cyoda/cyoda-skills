@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2119 # start_server args are optional env overrides; none needed here
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
@@ -37,7 +38,7 @@ test_help_prefers_instance() {
   out="$(CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-help.sh" auth tokens 2>"$T/err")"; local rc=$?
   assert_status 0 "$rc" "instance help ok"
   assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "instance source"
-  [ -n "$out" ] && _ok || _bad "empty body"
+  if [ -n "$out" ]; then _ok; else _bad "empty body"; fi
   CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-help.sh" no such topic >/dev/null 2>&1
   assert_status 2 "$?" "unknown topic via instance"
   stop_server

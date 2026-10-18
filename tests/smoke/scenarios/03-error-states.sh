@@ -17,6 +17,7 @@ scenario_main() {
   patch_transition "$b" complete >/dev/null
   assert_eq "$(entity_state "$b")" completed "second entity completes"
   local terminals
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   terminals="$(envsubst '${SCHEMA_VERSION}' <"$EX_DIR/workflow.json" | jq '[.workflows[0].states[] | select((.transitions // []) | length == 0)] | length')"
-  [ "$terminals" -ge 2 ] && _ok || _bad "workflow has >= 2 terminal states" "got: $terminals"
+  if [ "$terminals" -ge 2 ]; then _ok; else _bad "workflow has >= 2 terminal states" "got: $terminals"; fi
 }

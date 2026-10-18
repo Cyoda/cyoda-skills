@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2119 # start_server args are optional env overrides; none needed here
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
@@ -39,6 +40,7 @@ test_status_version_mismatch() {
   start_server || return
   echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/i.json"
   mkdir -p "$T/shim"
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   printf '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "cyoda version 0.9.0 (commit x)"; fi\n' >"$T/shim/cyoda"
   chmod +x "$T/shim/cyoda"
   local out

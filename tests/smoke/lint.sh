@@ -69,7 +69,17 @@ if [ -s "$RESULTS" ]; then
 fi
 
 if [ "${LINT_SKIP_SHELLCHECK:-}" != "1" ]; then
-  if ! command -v shellcheck >/dev/null 2>&1; then
+  # Prefer a local shellcheck; else uvx's shellcheck-py; else fail with a hint.
+  # LINT_SHELLCHECK_CMD overrides the choice (used by harness tests).
+  SCBIN=()
+  if [ -n "${LINT_SHELLCHECK_CMD:-}" ]; then
+    read -r -a SCBIN <<<"$LINT_SHELLCHECK_CMD"
+  elif command -v shellcheck >/dev/null 2>&1; then
+    SCBIN=(shellcheck)
+  elif command -v uvx >/dev/null 2>&1; then
+    SCBIN=(uvx --from shellcheck-py shellcheck)
+  fi
+  if [ ${#SCBIN[@]} -eq 0 ]; then
     echo "shellcheck: not installed; run: brew install shellcheck"
     HITS=$((HITS + 1))
   else
@@ -80,7 +90,7 @@ if [ "${LINT_SKIP_SHELLCHECK:-}" != "1" ]; then
         [ -d "$ROOT/tests" ] && find "$ROOT/tests" -name '*.sh'
       } | sort -u)
     if [ ${#SC[@]} -gt 0 ]; then
-      if ! SCOUT="$(shellcheck -f gcc "${SC[@]}" 2>&1)"; then
+      if ! SCOUT="$("${SCBIN[@]}" -x -P SCRIPTDIR -f gcc "${SC[@]}" 2>&1)"; then
         printf '%s\n' "$SCOUT" | sed "s#^$ROOT/##; s#\$# [shellcheck]#"
         HITS=$((HITS + 1))
       fi

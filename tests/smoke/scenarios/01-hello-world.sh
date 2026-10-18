@@ -15,11 +15,13 @@ scenario_main() {
   curl -s -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @"$EX_DIR/sample.json" "$BASE/model/import/JSON/SAMPLE_DATA/hello/1"
   curl -s -o /dev/null -X PUT "$BASE/model/hello/1/lock"
   local out
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   out="$(SCHEMA_VERSION=1 envsubst '${SCHEMA_VERSION}' <"$EX_DIR/workflow.json" | curl -s -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- "$BASE/model/hello/1/workflow/import")"
   assert_eq "${out##*$'\n'}" 400 'workflow version "1" -> 400'
   assert_contains "$out" WORKFLOW_SCHEMA_VERSION_UNSUPPORTED 'version "1" error code'
 
   # Real import with current version, then create
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   code="$(envsubst '${SCHEMA_VERSION}' <"$EX_DIR/workflow.json" | curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- "$BASE/model/hello/1/workflow/import")"
   assert_status 200 "$code" "workflow import with current schema version"
   id="$(create_entity hello 1 "$(cat "$EX_DIR/sample.json")")"
@@ -27,7 +29,7 @@ scenario_main() {
   # Creation runs the whole cascade in one save (one version); a later update adds the second.
   loopback "$id" '{"message":"updated"}' >/dev/null
   local n; n="$(curl -s "$BASE/entity/$id/changes" | jq 'length')"
-  [ "${n:-0}" -ge 2 ] && _ok || _bad "changes lists >= 2 versions" "got: $n"
+  if [ "${n:-0}" -ge 2 ]; then _ok; else _bad "changes lists >= 2 versions" "got: $n"; fi
 
   # test skill's smoke-test.sh template: run from a project dir holding a
   # cyoda-manifest.json, fire the manual `archive` transition. The token
@@ -39,6 +41,7 @@ scenario_main() {
   # CYODA_ENDPOINT is given with an /api/ suffix; the token command must see
   # it normalised (no /api), as cyoda-call.sh passes it (Ruling R1).
   local tc
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   tc='[ "$CYODA_ENDPOINT" = "'"${BASE%/api}"'" ] && echo smoke-token'
   out="$(cd "$proj" && env -u CYODA_CONFIG ENTITY_NAME=hello MODEL_VERSION=1 TRANSITION_NAME=archive \
     EXPECTED_STATE=archived CYODA_ENDPOINT="$BASE/" CYODA_TOKEN_COMMAND="$tc" \
@@ -54,7 +57,7 @@ scenario_main() {
   local hp=18099 hpid
   ( cd "$proj/www" && exec python3 -m http.server "$hp" --bind 127.0.0.1 >/dev/null 2>&1 ) &
   hpid=$!
-  local i; for i in $(seq 1 20); do curl -s -o /dev/null "http://127.0.0.1:$hp/" && break; sleep 0.25; done
+  local _; for _ in $(seq 1 20); do curl -s -o /dev/null "http://127.0.0.1:$hp/" && break; sleep 0.25; done
   out="$(cd "$proj" && ENTITY_NAME=hello MODEL_VERSION=1 TRANSITION_NAME=archive \
     CYODA_ENDPOINT="http://127.0.0.1:$hp" bash "$_LOAD_ROOT/cyoda/skills/test/templates/smoke-test.sh" 2>"$proj/stderr")"; rc=$?
   kill "$hpid" 2>/dev/null; wait "$hpid" 2>/dev/null

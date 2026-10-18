@@ -37,6 +37,7 @@ seed_model() {
       [ "$code" = 200 ] || { echo "seed_model: changeLevel -> $code $(cat "$_LOAD_BODY")" >&2; return 1; }
     fi
   fi
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   code="$(envsubst '${SCHEMA_VERSION}' <"$d/workflow.json" | _req -X POST -H 'Content-Type: application/json' --data-binary @- "$BASE/model/$e/$v/workflow/import")"
   [ "$code" = 200 ] || { echo "seed_model: workflow import -> $code $(cat "$_LOAD_BODY")" >&2; return 1; }
 }
@@ -64,8 +65,8 @@ loopback() {
 
 # wait_state <id> <state> <timeout_s>: poll every 500 ms; echoes final state
 wait_state() {
-  local i s n=$(( $3 * 2 ))
-  for i in $(seq 1 "$n"); do
+  local s n=$(( $3 * 2 ))
+  for _ in $(seq 1 "$n"); do
     s="$(entity_state "$1")"
     [ "$s" = "$2" ] && break
     sleep 0.5

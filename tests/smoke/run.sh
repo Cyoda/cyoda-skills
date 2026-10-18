@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2119 # start_server args are optional env overrides; none needed here
 # Smoke runner. Usage: run.sh [--only NN] [--allow-version]
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -21,6 +21,6 @@ scenario_main() {
   local del_t after
   del_t="$(jq -r '[.items[]|select(.changeType=="DELETE")][0].microsTime' <<<"$audit")"
   after="$(jq --argjson t "${del_t:-0}" '[.items[]|select(.auditEventType=="StateMachine" and .microsTime > $t and (.eventType=="TRANSITION_MAKE"))]|length' <<<"$audit")"
-  [ "${del_t:-null}" != null ] && [ -n "$del_t" ] && _ok || _bad "audit lists DELETE event"
+  if [ "${del_t:-null}" != null ] && [ -n "$del_t" ]; then _ok; else _bad "audit lists DELETE event"; fi
   assert_eq "$after" 0 "no transition event after the delete"
 }

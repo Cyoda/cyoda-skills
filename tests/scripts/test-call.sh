@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2119 # start_server args are optional env overrides; none needed here
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
@@ -88,7 +89,7 @@ SH
 test_call_retries_once_on_401() {
   python3 "$HERE/stub401.py" "$T/stub.port" "$T/stub.hits" &
   local spid=$!
-  local i; for i in $(seq 1 20); do [ -s "$T/stub.port" ] && break; sleep 0.25; done
+  local _; for _ in $(seq 1 20); do [ -s "$T/stub.port" ] && break; sleep 0.25; done
   local port; port="$(cat "$T/stub.port")"
   cat >"$T/tok3.sh" <<SH
 #!/usr/bin/env bash
