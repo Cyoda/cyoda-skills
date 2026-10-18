@@ -154,7 +154,7 @@ Exit 3 means the profile has `env: production` and the call mutates. Don't add `
 ### When a call fails
 
 Exit 22 with a status other than 401/403:
-1. Read `errorCode` from the body (`.properties.errorCode`) and run `cyoda-help.sh errors <errorCode>`. For model calls, also check `models --section ERRORS`. The full index is `errors --section "ERROR CODE INDEX"`, and some codes are listed only under SEE ALSO.
+1. Read `errorCode` from the body (`.properties.errorCode`) and run `cyoda-help.sh errors <errorCode>`. For model calls, also check `models --section ERRORS`. The full index is `errors --section "ERROR CODE INDEX"`, and codes missing from the index are still reachable as subtopics: `errors <CODE>` resolves any code (`cyoda help errors --format=json` lists them all under `children`).
 2. Explain the cause using the help text and the response `detail`. Fix the **payload**. The path stays as the help section gives it: don't try alternate URLs.
 3. Common causes: `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED` (version not substituted); `BAD_REQUEST` "unknown field" (export posted verbatim: reshape, #684-I); `VALIDATION_FAILED` (the `detail` names the workflow, state or transition); `MODEL_ALREADY_LOCKED` (go back to Step 3).
 4. Show the corrected file, update the saved project file to match, and re-run from the failed step after a yes.

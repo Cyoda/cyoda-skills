@@ -27,6 +27,8 @@ Evals live in `cyoda/skills/<skill>/evaluations/evals.json`. Results go in `cyod
 
 ### Process
 
+Executors may run read-only `cyoda help …` against the installed binary; all other commands stay simulated.
+
 **1. Spawn executor subagents** (one per eval, all in parallel, background):
 - Read `SKILL.md` from the skill path
 - Simulate the skill executing the eval prompt using fixture files from `files` block

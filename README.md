@@ -39,9 +39,18 @@ Point your agent to this repository and ask it to read the skill files before bu
 | `/cyoda:build` | Incrementally build and register entity models and workflows |
 | `/cyoda:compute` | Implement compute node processors and criteria services via gRPC |
 | `/cyoda:test` | Smoke-test your running Cyoda instance |
+| `/cyoda:deploy` | Generate compose deploy artifacts with idempotent seed and verify scripts |
 | `/cyoda:debug` | Diagnose failures and browse entity history |
 | `/cyoda:docs` | Look up Cyoda documentation |
 | `/cyoda:status` | Check connection status |
+
+## Release notes — 0.4.0
+
+- Cloud support and `migrate` are removed (parked; see `docs/history/cloud-skills.md`).
+- Run `/plugin marketplace update cyoda` to pick up this release.
+-X
+- New `deploy` skill.
+- Skills with side effects now start only when you type them.
 
 ## Links
 
