@@ -1,7 +1,7 @@
 ---
 name: status
-description: Reports current Cyoda connection status. Shows "Connected to Local cyoda-go — vX.X.X", "Connected to Cyoda Cloud — vX.X.X [PRODUCTION]", or "Not connected". Use before any operation requiring an active Cyoda instance.
-when_to_use: When the user asks about their Cyoda connection, at session start when Cyoda work is mentioned, or before build/test/migrate operations.
+description: Reports current Cyoda connection status. Shows "Connected to Local cyoda-go — vX.X.X" or "Not connected". Use before any operation requiring an active Cyoda instance.
+when_to_use: When the user asks about their Cyoda connection, at session start when Cyoda work is mentioned, or before build/test operations.
 allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(jq *)
 ---
 
@@ -35,6 +35,4 @@ Report based on output:
 
 - `STATUS=not_configured` → **"Not connected to Cyoda — run `/cyoda:setup` to get started"**
 - `STATUS=unreachable` → **"Cyoda instance unreachable at {ENDPOINT} [profile: {PROFILE}] — is it running?"**
-- `STATUS=connected`, `ENV=production` → **"⚠️ Connected to Cyoda Cloud [PRODUCTION] — v{VERSION} [profile: {PROFILE}]"**
-- `STATUS=connected`, endpoint contains `localhost` → **"Connected to Local cyoda-go — v{VERSION} [profile: {PROFILE}]"**
-- `STATUS=connected`, cloud endpoint → **"Connected to Cyoda Cloud — v{VERSION} [profile: {PROFILE}]"**
+- `STATUS=connected` → **"Connected to Local cyoda-go — v{VERSION} [profile: {PROFILE}]"**

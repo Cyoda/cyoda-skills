@@ -2,6 +2,7 @@
 name: app
 description: Start here if you're new to Cyoda. Walks through the full development journey — Cyoda orientation, app design, instance setup, incremental build, and testing. Experienced users can invoke individual skills directly.
 argument-hint: [describe your app idea]
+disable-model-invocation: true
 ---
 
 ## Welcome to Cyoda Development
@@ -17,7 +18,6 @@ Cyoda is an **Entity Database Management System (EDBMS)**. Instead of tables wit
 Key ideas:
 - Nothing is ever overwritten — every transition creates a new immutable revision
 - Your entities ARE state machines
-- The same API works locally (cyoda-go) and on Cyoda Cloud — move between them with no code changes
 - Compute nodes are **optional** — many workflows need no external processors at all
 
 **Already familiar with Cyoda?** Ask: "Do you already have a domain design, or do you need to go through the design process?"
@@ -45,9 +45,7 @@ First, let me check if you already have a Cyoda instance configured.
 Invoke `/cyoda:status`.
 
 - If **already connected**: confirm with the user whether to use that environment and skip to Step 3.
-- If **not connected**: present both options as co-equal:
-  - **Local cyoda-go** (recommended for development — full control, offline-capable): Run `/cyoda:setup` → choose local
-  - **Cyoda Cloud** (coming soon — no local install needed): Run `/cyoda:setup` → choose cloud, then `/cyoda:auth`
+- If **not connected**: run `/cyoda:setup` to install and start a local cyoda-go.
 
 *(After setup is complete, run `/cyoda:status` to confirm connection.)*
 
@@ -70,14 +68,6 @@ Run `/cyoda:test` to smoke-test your running instance. Verify entity creation, t
 ### Step 5 — Iterate
 
 Repeat steps 3–4 for each new entity, state, or transition in your design.
-
----
-
-### Step 6 — Move to Cyoda Cloud (when ready)
-
-When your app is working locally and you're ready to go live:
-
-Run `/cyoda:migrate` to lift-and-shift your models and workflows to Cyoda Cloud. No code changes required.
 
 ---
 

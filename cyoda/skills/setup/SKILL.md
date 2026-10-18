@@ -1,14 +1,13 @@
 ---
 name: setup
-description: Provision a Cyoda instance. Two modes — local (install and start cyoda-go) or cloud (configure connection to Cyoda Cloud). Run this first before any other cyoda skills.
+description: Provision a Cyoda instance. Install and start a local cyoda-go. Run this first before any other cyoda skills.
 allowed-tools: Bash(brew *) Bash(cyoda *) Bash(curl *) Bash(mkdir *) Bash(tee *) Bash(grep *) Bash(cat *) Bash(jq *)
+disable-model-invocation: true
 ---
 
 ## Cyoda Instance Setup
 
-Are you setting up a **local** cyoda-go instance or connecting to **Cyoda Cloud**?
-
-Wait for the user to choose, then follow the appropriate path.
+Set up a local cyoda-go instance.
 
 ---
 
@@ -99,60 +98,6 @@ Confirm: **"Local cyoda-go is running. REST on port 8080, gRPC on port 9090. `/c
 
 ---
 
-### Cyoda Cloud
+### Existing instance
 
-**Step 1 — Check for existing endpoint:**
-
-> Cyoda Cloud managed environments are coming soon. If the Cyoda team has already provisioned an environment for you, enter the endpoint URL in Step 2 to continue. Otherwise, use local cyoda-go for now.
-
-**Step 2 — Collect endpoint URL:**
-
-Ask: *"What is your Cyoda Cloud endpoint URL? (e.g., https://client-1edf4e3da14e497baf58d3aeb621ac40-dev.eu.cyoda.net)"*
-
-**Step 2b — Verify endpoint is reachable:**
-
-```bash
-HTTP_CODE=$(curl -s --max-time 5 --output /dev/null --write-out "%{http_code}" "${USER_ENDPOINT}/readyz" 2>/dev/null || echo "000")
-if [ "$HTTP_CODE" = "000" ]; then
-  echo "ENDPOINT_UNREACHABLE"
-fi
-```
-
-If `ENDPOINT_UNREACHABLE`: *"Cannot reach that endpoint. Check the URL and your network connection, then try again."* Stop.
-
-**Step 3 — Write endpoint to config:**
-
-List existing profiles (if any):
-```bash
-jq -r '.profiles | keys[]' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "(none yet)"
-```
-
-Ask: *"Which profile name should this connection be saved under? (e.g. `default`, `cloud`, `prod`)"*
-
-```bash
-CONFIG_FILE="$HOME/.config/cyoda/cyoda-plugin-config.json"
-mkdir -p "$HOME/.config/cyoda"
-# Claude substitutes the endpoint URL the user provided
-NEW_DATA="{\"endpoint\": \"<USER_PROVIDED_ENDPOINT>\"}"
-EXISTING=$(cat "$CONFIG_FILE" 2>/dev/null || echo "{\"active\":\"${PROFILE_NAME}\",\"profiles\":{}}")
-echo "$EXISTING" | jq --arg p "$PROFILE_NAME" --argjson data "$NEW_DATA" \
-  '.profiles[$p] = $data | .active = $p' > "$CONFIG_FILE"
-```
-
-If the write fails with a permission error (`mkdir` fails or the redirect is denied): do NOT attempt `sudo`, `chmod`, `chown`, or any other fix. Show:
-
-> *"Couldn't write to `~/.config/cyoda/` — you may be running in a sandbox or restricted environment. Please grant write access to that directory and try again. Would you like help with that?"*
-
-**Step 4 — Prompt for auth:**
-
-*"Endpoint saved. Now run `/cyoda:auth` to authenticate and obtain your JWT token."*
-
-After login, verify connectivity:
-```bash
-PROFILE=$(jq -r '.active // "default"' ~/.config/cyoda/cyoda-plugin-config.json 2>/dev/null || echo "default")
-TOKEN=$(jq -r --arg p "$PROFILE" '.profiles[$p].token // ""' ~/.config/cyoda/cyoda-plugin-config.json)
-ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint' ~/.config/cyoda/cyoda-plugin-config.json)
-curl -sf --max-time 5 \
-  -H "Authorization: Bearer ${TOKEN}" \
-  "${ENDPOINT}/readyz" || echo "Check your endpoint and token"
-```
+Connect to an existing instance — see Task 9.

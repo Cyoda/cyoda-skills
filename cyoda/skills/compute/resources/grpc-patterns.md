@@ -11,19 +11,7 @@ This returns the JSON schemas for every event type (JoinEvent, GreetEvent, KeepA
 
 ## Endpoint
 
-### Local cyoda-go
 `localhost:9090` (plaintext). No TLS.
-
-### Cyoda Cloud
-The gRPC endpoint uses a **different hostname** from the REST API. If the REST endpoint is:
-```
-https://client-<id>-<env>.eu.cyoda.net
-```
-The gRPC endpoint is:
-```
-grpc-client-<id>-<env>.eu.cyoda.net:443  (TLS)
-```
-Just prepend `grpc-` to the REST hostname and use port 443 with TLS. Do not try the REST hostname directly for gRPC — it will return HTTP 405.
 
 ## Connection Lifecycle
 

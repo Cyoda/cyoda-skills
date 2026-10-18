@@ -4,7 +4,7 @@ Use the bundled Cyoda skills when building applications on Cyoda.
 
 Cyoda applications are built around entities, workflows, criteria, processors, tests and local development conventions.
 
-When the user asks to build, design, test, debug, migrate or document a Cyoda application, inspect the relevant skill in this extension’s `skills/` directory before generating code.
+When the user asks to build, design, test, debug or document a Cyoda application, inspect the relevant skill in this extension’s `skills/` directory before generating code.
 
 Start with:
 
@@ -15,6 +15,7 @@ Start with:
 - `skills/compute/SKILL.md` for processors and compute nodes
 - `skills/test/SKILL.md` for testing
 - `skills/debug/SKILL.md` for debugging
-- `skills/migrate/SKILL.md` for migration work
 - `skills/docs/SKILL.md` for documentation
 - `skills/status/SKILL.md` for checking project state
+
+Note: ```! blocks in the skills do not execute under Gemini, so run the referenced `scripts/*.sh` command yourself.

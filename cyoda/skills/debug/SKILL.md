@@ -55,8 +55,7 @@ curl -sf $AUTH "${ENDPOINT}/api/entity/${ENTITY_ID}/changes"
 #### Connectivity Issues
 
 1. Check `~/.config/cyoda/cyoda-plugin-config.json` has correct `endpoint` value
-2. For cloud: check `token` is not expired — re-run `/cyoda:auth` if needed
-3. Test endpoint directly:
+2. Test endpoint directly:
 ```!
 PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default")
 ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json")
