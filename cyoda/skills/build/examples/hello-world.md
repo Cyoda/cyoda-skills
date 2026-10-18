@@ -1,45 +1,33 @@
-# Hello World — Minimal Cyoda App
+# Hello world: the first increment
 
-The minimal first increment: one entity (`hello`) with a two-state workflow.
+A walkthrough of [hello-world/](hello-world/), the smallest entity that runs end to end on cyoda-go. Smoke scenario `01-hello-world` loads exactly these files, so they're known to work on v0.8.4.
 
-## Step 1 — Create the model (discover mode)
+## The three files
 
-Post a sample entity. Cyoda auto-creates the model in discover mode — no upfront schema definition needed.
+| File | What it holds | Saved by `build` as |
+|---|---|---|
+| [hello-world/sample.json](hello-world/sample.json) | One example entity with two string fields. The model's schema is inferred from it | `hello-v1-sample.json` |
+| [hello-world/workflow.json](hello-world/workflow.json) | One workflow: `new` → `processing` → `completed`. Both transitions are automated (`manual: false`, no criterion), so a new entity runs straight through to the terminal state | `hello-v1-workflow.json` |
+| [hello-world/config.json](hello-world/config.json) | No unique keys, `changeLevel: null` (strict schema), no per-environment overrides | `hello-v1-config.json` |
 
-```bash
-curl -X POST http://localhost:8080/api/entity/JSON/hello/1 \
-  -H 'Content-Type: application/json' \
-  -d '{"message": "Hello, Cyoda!"}'
-# returns: [{"entityIds":["<uuid>"],"transactionId":"<uuid>"}]
-```
+The workflow's `version` is the placeholder `${SCHEMA_VERSION}`. It's replaced at import time with `.current` from `cyoda help workflows schema-version versions`. A hard-coded value goes stale when the server's supported range moves.
 
-## Step 2 — Import the workflow
+## Registering it, in canonical order
 
-```bash
-curl -X POST http://localhost:8080/api/model/hello/1/workflow/import \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "workflows": [{
-      "version": "1",
-      "name": "hello-wf",
-      "initialState": "draft",
-      "active": true,
-      "states": {
-        "draft": {
-          "transitions": [
-            { "name": "submit", "next": "submitted", "manual": true }
-          ]
-        },
-        "submitted": {}
-      }
-    }]
-  }'
-```
+Each step follows the help section the `build` skill names (Step 7 of [../SKILL.md](../SKILL.md)):
 
-## Step 3 — Trigger a transition
+1. **Import the sample**: `POST /model/import/JSON/SAMPLE_DATA/hello/1` with `sample.json`. The model now exists, UNLOCKED. Read `cyoda help models` ENDPOINTS.
+2. **Unique keys**: skipped, because `uniqueKeys` is empty. They can only be set while the model is UNLOCKED.
+3. **Lock**: `PUT /model/hello/1/lock`. Entities can only be created on a LOCKED model. Read `cyoda help models` LIFECYCLE.
+4. **changeLevel**: skipped, because it's `null`.
+5. **Import the workflow**: `POST /model/hello/1/workflow/import` with `{importMode, workflows}`, version substituted. Read `cyoda help workflows` IMPORT REQUEST.
 
-```bash
-curl -X PUT http://localhost:8080/api/entity/JSON/<ENTITY_ID>/submit
-```
+Only then is an entity created. That's `/cyoda:test`'s job. The entity is created in `new`, and the cascade carries it to `completed` in the same save.
 
-> **Stay in discover mode during development.** The schema evolves automatically as you post entities. Only consider locking the schema when you are confident all fields are known and you are moving to production.
+## What to try next
+
+- Add a manual step and a criterion that's re-checked on update: [loopback/](loopback/).
+- Add validation with an `errored` state and a retry: [error-states/](error-states/).
+- Move an entity on a timer: [scheduled/](scheduled/).
+
+Changing the sample after entities exist needs a new model version (`hello` v2). Changing only the workflow doesn't.

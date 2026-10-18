@@ -3,201 +3,156 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "/cyoda:build — add an Order entity with draft and submitted states",
-      "expected_output": "Reads config, inspects existing models, generates workflow JSON, shows it for confirmation, and stops awaiting user approval — does not register without confirmation",
+      "prompt": "/cyoda:build — add an Order entity with draft and submitted states. Order has orderId, customer and amount.",
+      "expected_output": "Checks the connection with cyoda-status.sh, lists models with cyoda-call.sh GET /model/ (empty), reads cyoda help models LIFECYCLE/ENDPOINTS and workflows WORKFLOW SCHEMA, reads the schema version from cyoda-help.sh workflows schema-version versions at run time, asks for unique keys and the changeLevel, shows the three files for confirmation, writes order-v1-sample.json / order-v1-workflow.json / order-v1-config.json in the TypeScript default dirs plus cyoda-manifest.json at the project root, then registers in the canonical order (import sample, unique keys if any, lock, changeLevel if any, import workflow) through cyoda-call.sh, re-lists the models and ends with 'next, type /cyoda:test'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
+        "tsconfig.json": "{\"compilerOptions\":{\"strict\":true}}",
+        "_simulated/instance.md": "cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4. GET /model/ returns []. Every POST/PUT returns 200. The developer answers: no unique keys; changeLevel none (strict)."
       },
       "assertions": [
-        { "id": "reads-config", "text": "Reads active profile from ~/.config/cyoda/cyoda-plugin-config.json for endpoint", "type": "behavior" },
-        { "id": "inspects-models", "text": "Inspects existing entity models on the instance", "type": "behavior" },
-        { "id": "asks-clarifying", "text": "Asks minimum necessary clarifying questions before generating — may proceed directly without asking when entity name, states, and transitions are fully specified in the request", "type": "behavior" },
-        { "id": "shows-config-for-confirmation", "text": "Shows generated workflow JSON for user confirmation before registering", "type": "behavior" },
-        { "id": "no-register-without-confirm", "text": "Does NOT register without showing config for confirmation first", "type": "behavior" }
+        { "id": "consults-help", "text": "Names the help path and section it reads for the facts, at least `cyoda-help.sh models --section LIFECYCLE` (or ENDPOINTS) before registering and `cyoda-help.sh workflows --section \"WORKFLOW SCHEMA\"` (or TRANSITIONS) before generating the workflow", "type": "behavior" },
+        { "id": "schema-version-runtime", "text": "Reads the workflow schema version at run time from `workflows schema-version versions` (`.current`) and does not hard-code a version such as \"1\" or \"1.4\" from memory", "type": "behavior" },
+        { "id": "canonical-order", "text": "Registers in this order: POST /model/import/JSON/SAMPLE_DATA/order/1, then PUT /model/order/1/lock, then the workflow import POST /model/order/1/workflow/import — and creates no entity before the workflow is imported", "type": "behavior" },
+        { "id": "uses-call-script", "text": "Every API call goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh`; no raw curl with a hand-built auth header", "type": "behavior" },
+        { "id": "asks-change-level", "text": "Asks which changeLevel the developer wants and records the answer (null here) in order-v1-config.json", "type": "behavior" },
+        { "id": "writes-three-files", "text": "Writes order-v1-sample.json, order-v1-workflow.json and order-v1-config.json in the TypeScript default dirs (src/data/, src/workflows/, src/config/)", "type": "behavior" },
+        { "id": "writes-manifest", "text": "Creates cyoda-manifest.json at the project root with manifestVersion 1 and an entry {name: order, modelVersion: 1, sample, workflow, config} whose paths are relative to the project root", "type": "behavior" },
+        { "id": "confirm-before-register", "text": "Shows the generated files and waits for the developer's yes before registering", "type": "behavior" },
+        { "id": "no-discover-mode", "text": "Does not say the schema stays unlocked or in a 'discover mode'; the model is locked before the workflow import", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke or run another skill itself", "type": "behavior" }
       ]
     },
     {
       "id": 2,
-      "prompt": "/cyoda:build — add a cancel transition to the Order entity",
-      "expected_output": "Inspects existing Order entity, shows current states/transitions, asks which state 'cancel' transitions from, generates updated config, shows for confirmation, registers",
+      "prompt": "/cyoda:build — add a cancelled state to Order, reachable from draft and submitted",
+      "expected_output": "Lists models (order v1 LOCKED), reads the project's order-v1-workflow.json, consults cyoda help workflows TRANSITIONS and the best-practices file for terminal states, asks only what is missing, shows the changed workflow, edits order-v1-workflow.json in place (same version, no new model version, no sample re-import), re-imports the workflow via cyoda-call.sh, and hands off with 'next, type /cyoda:test'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"shop\"}",
+        "tsconfig.json": "{}",
+        "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"order\",\"modelVersion\":1,\"sample\":\"src/data/order-v1-sample.json\",\"workflow\":\"src/workflows/order-v1-workflow.json\",\"config\":\"src/config/order-v1-config.json\"}]}",
+        "src/workflows/order-v1-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"order\",\"initialState\":\"draft\",\"active\":true,\"states\":{\"draft\":{\"transitions\":[{\"name\":\"submit\",\"next\":\"submitted\",\"manual\":true}]},\"submitted\":{}}}]}",
+        "src/data/order-v1-sample.json": "{\"orderId\":\"ORD-1\",\"amount\":10}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\":[],\"changeLevel\":null,\"env\":{}}",
+        "_simulated/instance.md": "GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. GET /entity/stats/order/1 returns {\"count\":4}. Workflow import returns 200."
       },
       "assertions": [
-        { "id": "inspects-existing", "text": "Inspects existing Order entity models", "type": "behavior" },
-        { "id": "shows-current-state", "text": "Shows current states and transitions before proposing changes", "type": "behavior" },
-        { "id": "asks-source-state", "text": "Asks which state 'cancel' transitions from", "type": "behavior" },
-        { "id": "shows-diff-for-confirm", "text": "Shows updated config for confirmation before registering", "type": "behavior" },
-        { "id": "no-new-entity", "text": "Does NOT create a brand new entity instead of modifying existing", "type": "behavior" }
+        { "id": "consults-help", "text": "Names `cyoda-help.sh workflows --section TRANSITIONS` (or WORKFLOW SCHEMA / IMPORT REQUEST) as the source for the transition shape or import mode", "type": "behavior" },
+        { "id": "reads-existing-workflow", "text": "Starts from the existing order-v1-workflow.json (or an export reshaped to {importMode, workflows}) and shows the current states before proposing the change", "type": "behavior" },
+        { "id": "best-practices", "text": "Points at design/resources/best-practices.md (or the help topic once #684-L ships) for terminal states", "type": "behavior" },
+        { "id": "same-version", "text": "Keeps model version 1: a workflow-only change needs no new model version, no unlock and no sample re-import, even though entities exist", "type": "behavior" },
+        { "id": "edits-file-in-place", "text": "Updates src/workflows/order-v1-workflow.json and leaves the manifest entry for order v1 unchanged", "type": "behavior" },
+        { "id": "reimports-workflow", "text": "Re-imports the workflow with cyoda-call.sh POST /model/order/1/workflow/import after confirmation, with the schema version substituted from `workflows schema-version versions`", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke another skill", "type": "behavior" }
       ]
     },
     {
       "id": 3,
-      "prompt": "/cyoda:build — add approval state to RiskAssessment",
-      "expected_output": "Shows PRODUCTION warning at start, generates config normally, requires explicit 'confirm' before registering — does not block the full build loop",
+      "prompt": "/cyoda:build — Order now needs a discountCode field",
+      "expected_output": "Sees order v1 LOCKED, checks the entity count with GET /entity/stats/order/1 (12 entities), reads cyoda help models LIFECYCLE, explains that a locked model with entities cannot be unlocked (MODEL_HAS_ENTITIES), proposes model version 2, writes order-v2-* files alongside the untouched v1 files, adds an order v2 manifest entry next to v1, and registers v2 in the canonical order.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"env\":\"production\",\"token\":\"eyJfake...\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"shop\"}",
+        "tsconfig.json": "{}",
+        "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"order\",\"modelVersion\":1,\"sample\":\"src/data/order-v1-sample.json\",\"workflow\":\"src/workflows/order-v1-workflow.json\",\"config\":\"src/config/order-v1-config.json\"}]}",
+        "src/workflows/order-v1-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"order\",\"initialState\":\"draft\",\"active\":true,\"states\":{\"draft\":{\"transitions\":[{\"name\":\"submit\",\"next\":\"submitted\",\"manual\":true}]},\"submitted\":{}}}]}",
+        "src/data/order-v1-sample.json": "{\"orderId\":\"ORD-1\",\"amount\":10}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\":[],\"changeLevel\":null,\"env\":{}}",
+        "_simulated/instance.md": "GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. GET /entity/stats/order/1 returns {\"modelName\":\"order\",\"modelVersion\":1,\"count\":12}. If PUT /model/order/1/unlock is called it returns 409 MODEL_HAS_ENTITIES. All v2 calls return 200."
       },
       "assertions": [
-        { "id": "shows-production-warning", "text": "Shows PRODUCTION warning at the start of the skill", "type": "behavior" },
-        { "id": "generates-config-normally", "text": "Generates config and shows for confirmation as normal", "type": "behavior" },
-        { "id": "requires-confirm-keyword", "text": "Requires user to type 'confirm' before registering to production", "type": "behavior" },
-        { "id": "no-register-without-confirm", "text": "Does NOT register to production without explicit 'confirm'", "type": "behavior" },
-        { "id": "no-full-block", "text": "Does NOT block the entire build loop — only adds the confirmation step", "type": "behavior" }
-      ]
-    }
-    ,{
-      "id": 4,
-      "prompt": "/cyoda:build — register a new ChatRoom entity with a simple workflow",
-      "expected_output": "Invokes cyoda:docs for any endpoint not listed in the skill, executes the correct sample-entity-then-workflow-import sequence, and does not guess or retry alternate URLs",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
-      },
-      "assertions": [
-        { "id": "invokes-docs-for-unlisted-endpoints", "text": "Invokes cyoda:docs before calling any endpoint not explicitly listed in the skill", "type": "behavior" },
-        { "id": "no-url-guessing", "text": "Does NOT construct or guess API URLs — uses only endpoints listed in the skill or confirmed via cyoda:docs", "type": "behavior" },
-        { "id": "correct-sequence", "text": "Executes registration in the correct sequence: POST sample entity to /api/entity/JSON/{entity}/{version} first, then POST workflow to /api/model/{entity}/{version}/workflow/import", "type": "behavior" },
-        { "id": "no-404-retry-loop", "text": "Does NOT retry failed endpoints with guessed variants — invokes cyoda:docs on 4xx before retrying", "type": "behavior" }
-      ]
-    }
-    ,{
-      "id": 5,
-      "prompt": "/cyoda:build — register a new Order entity with draft and submitted states on a fresh instance",
-      "expected_output": "Posts a sample entity to create the model in discover mode before importing the workflow — does not call workflow/import as the first API call",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
-      },
-      "assertions": [
-        { "id": "entity-post-before-workflow", "text": "POSTs a sample entity to /api/entity/JSON/{entity}/1 before calling /api/model/{entity}/1/workflow/import", "type": "behavior" },
-        { "id": "no-workflow-first", "text": "Does NOT call /api/model/{entity}/1/workflow/import as the first API call on a fresh instance", "type": "behavior" },
-        { "id": "discover-mode-default", "text": "Does NOT lock the schema — stays in discover mode after workflow import", "type": "behavior" }
-      ]
-    }
-    ,{
-      "id": 6,
-      "prompt": "/cyoda:build — I want to add a ChatRoom entity and a Message entity",
-      "expected_output": "Builds both entities in discover mode without suggesting or performing schema locking — mentions discover mode stays active during development",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
-      },
-      "assertions": [
-        { "id": "no-lock-suggestion", "text": "Does NOT suggest locking the schema during a normal development build session", "type": "behavior" },
-        { "id": "no-lock-execution", "text": "Does NOT execute a schema lock operation", "type": "behavior" },
-        { "id": "mentions-discover-mode", "text": "Mentions that schema stays in discover mode during development", "type": "behavior" }
-      ]
-    }
-    ,{
-      "id": 7,
-      "prompt": "/cyoda:build — export the ChatRoom model schema so I can inspect it",
-      "expected_output": "Invokes cyoda:docs to look up the export endpoint before making any curl call — does not guess the URL",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
-      },
-      "assertions": [
-        { "id": "invokes-docs-for-export", "text": "Invokes cyoda:docs to look up the correct export endpoint path", "type": "behavior" },
-        { "id": "no-url-guessing", "text": "Does NOT attempt curl calls with guessed URL variants (e.g. /api/model/export/JSON/SIMPLE_VIEW/... or /api/model/export/JSON/...)", "type": "behavior" }
-      ]
-    }
-    ,{
-      "id": 8,
-      "prompt": "/cyoda:build — add a Message entity with a sent state",
-      "expected_output": "When a registration call returns 4xx, invokes cyoda:docs rather than retrying with guessed alternate paths",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
-      },
-      "assertions": [
-        { "id": "invokes-docs-on-4xx", "text": "On a 4xx response, invokes cyoda:docs to look up the correct endpoint before retrying", "type": "behavior" },
-        { "id": "no-guess-retry", "text": "Does NOT retry the call with guessed alternate URL variants after a 4xx", "type": "behavior" },
-        { "id": "no-binary-search", "text": "Does NOT search the filesystem for the cyoda binary when cyoda is not in PATH", "type": "behavior" }
-      ]
-    }
-    ,{
-      "id": 9,
-      "prompt": "/cyoda:build — add an archived state to the ChatRoom entity",
-      "expected_output": "Detects ChatRoom already exists at version 1 and asks whether to update the existing version or create version 2 before generating any config",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
-      },
-      "assertions": [
-        { "id": "reads-existing-version", "text": "Reads the current model version from the GET /api/model response", "type": "behavior" },
-        { "id": "surfaces-version-decision", "text": "Asks user whether to update existing version 1 or create a new version 2", "type": "behavior" },
-        { "id": "no-version-assumption", "text": "Does NOT silently assume version 1 and proceed without surfacing the decision", "type": "behavior" },
-        { "id": "uses-resolved-version", "text": "Uses the version chosen by the user in all subsequent API calls", "type": "behavior" }
-      ]
-    }
-    ,{
-      "id": 10,
-      "prompt": "/cyoda:build — yes, the Order entity config looks right, please register it",
-      "expected_output": "Executes the registration POST calls (sample entity then workflow import), shows the API response, re-inspects the model state, reports completion, and suggests running /cyoda:test",
-      "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
-      },
-      "assertions": [
-        { "id": "posts-sample-entity", "text": "Attempts POST to /api/entity/JSON/Order/{version} with a sample payload before the workflow import", "type": "behavior" },
-        { "id": "posts-workflow-import", "text": "Attempts POST to /api/model/Order/{version}/workflow/import with the workflow config", "type": "behavior" },
-        { "id": "shows-api-response", "text": "Shows the API response (success or failure) to the user rather than silently continuing", "type": "behavior" },
-        { "id": "re-inspects-after-registration", "text": "Re-inspects the running instance (GET /api/model) after registration to show what changed", "type": "behavior" },
-        { "id": "suggests-test", "text": "Offers to run /cyoda:test or suggests it as the next step", "type": "behavior" }
+        { "id": "consults-help", "text": "Names `cyoda-help.sh models --section LIFECYCLE` (or `errors MODEL_HAS_ENTITIES`) as the source for why the locked model cannot change in place", "type": "behavior" },
+        { "id": "checks-entities", "text": "Checks whether order v1 has entities (GET /entity/stats/order/1, or a MODEL_HAS_ENTITIES response) before deciding", "type": "behavior" },
+        { "id": "proposes-new-version", "text": "Proposes model version 2 because v1 has entities, and does not re-import the sample into the locked v1", "type": "behavior" },
+        { "id": "v1-untouched", "text": "Writes order-v2-sample.json, order-v2-workflow.json and order-v2-config.json and leaves the v1 files unchanged", "type": "behavior" },
+        { "id": "manifest-adds-v2", "text": "Adds an {name: order, modelVersion: 2, ...} entry to cyoda-manifest.json and keeps the v1 entry", "type": "behavior" },
+        { "id": "canonical-order-v2", "text": "Registers v2 as import sample, lock, (changeLevel), workflow import, all on /model/.../order/2", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke another skill", "type": "behavior" }
       ]
     },
     {
-      "id": 12,
-      "prompt": "/cyoda:build — add an Order entity with draft and submitted states",
-      "expected_output": "Detects pom.xml, saves workflow JSON to src/main/resources/workflow/order-v1-workflow.json and sample data to src/main/resources/data/order-v1-sample.json before registering via API",
+      "id": 4,
+      "prompt": "/cyoda:build — add an Invoice entity with pending, paid and cancelled states",
+      "expected_output": "Detects pom.xml, resolves the Java package com/example/demo, writes invoice-v1-workflow.json to src/main/resources/workflow/, invoice-v1-sample.json to src/main/resources/data/, invoice-v1-config.json to src/main/resources/config/, tells the developer each path, and updates the existing cyoda-manifest.json by appending an invoice v1 entry while keeping the customer entry.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
         "pom.xml": "<project><groupId>com.example</groupId><artifactId>demo</artifactId></project>",
-        "src/main/java/com/example/demo/App.java": "package com.example.demo;\npublic class App {}"
+        "src/main/java/com/example/demo/App.java": "package com.example.demo;\n\npublic class App {}\n",
+        "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"customer\",\"modelVersion\":1,\"sample\":\"src/main/resources/data/customer-v1-sample.json\",\"workflow\":\"src/main/resources/workflow/customer-v1-workflow.json\",\"config\":\"src/main/resources/config/customer-v1-config.json\"}]}",
+        "_simulated/instance.md": "GET /model/ returns [{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. All calls return 200. Developer: no unique keys, changeLevel none."
       },
       "assertions": [
-        { "id": "detects-java", "text": "Detects Java project by presence of pom.xml", "type": "behavior" },
-        { "id": "workflow-to-resources", "text": "Saves workflow JSON to src/main/resources/workflow/order-v1-workflow.json", "type": "behavior" },
-        { "id": "sample-to-data", "text": "Saves sample entity JSON to src/main/resources/data/order-v1-sample.json", "type": "behavior" },
-        { "id": "versioned-filename", "text": "File names follow the {entity}-v{version}-{type} pattern", "type": "behavior" },
-        { "id": "tells-user-path", "text": "Tells the user the saved file path(s) before proceeding to register", "type": "behavior" }
+        { "id": "consults-help", "text": "Names at least one help path and section it reads for the facts (e.g. `models --section LIFECYCLE`, `workflows --section TRANSITIONS`)", "type": "behavior" },
+        { "id": "detects-java", "text": "Detects the Java layout from pom.xml and uses the placement table", "type": "behavior" },
+        { "id": "java-paths", "text": "Writes src/main/resources/workflow/invoice-v1-workflow.json, src/main/resources/data/invoice-v1-sample.json and src/main/resources/config/invoice-v1-config.json", "type": "behavior" },
+        { "id": "tells-paths", "text": "Tells the developer the relative path of each file it saved", "type": "behavior" },
+        { "id": "manifest-updated", "text": "Appends {name: invoice, modelVersion: 1, ...} with project-relative paths to the existing cyoda-manifest.json and keeps the customer entry", "type": "behavior" },
+        { "id": "terminal-states", "text": "Treats paid and cancelled as terminal states and points at the best-practices file for terminal states", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke another skill", "type": "behavior" }
       ]
     },
     {
-      "id": 13,
-      "prompt": "/cyoda:build — add an Invoice entity with a pending state",
-      "expected_output": "Finds no build file but discovers an existing workflow/ directory, mirrors that layout for the new entity, uses versioned naming",
+      "id": 5,
+      "prompt": "/cyoda:build — register this workflow for Ticket v1; I exported it from my other instance (file: ticket-export.json). Sample and lock are already done.",
+      "expected_output": "Imports the workflow; the call exits 22 with HTTP_STATUS=400 and errorCode BAD_REQUEST 'invalid JSON: json: unknown field \"entityName\"'. The skill reads cyoda-help.sh errors BAD_REQUEST (and workflows IMPORT REQUEST), explains that the import is strictly decoded and an export cannot be re-posted verbatim (#684-I), reshapes the body to {importMode, workflows}, shows it, and re-imports to the same path after confirmation. It does not try other URLs.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
-        "workflow/order-v1-workflow.json": "{}"
+        "ticket-export.json": "{\"entityName\":\"ticket\",\"modelVersion\":1,\"workflows\":[{\"version\":\"1.4\",\"name\":\"ticket\",\"initialState\":\"open\",\"active\":true,\"states\":{\"open\":{\"transitions\":[{\"name\":\"close\",\"next\":\"closed\",\"manual\":true}]},\"closed\":{}}}]}",
+        "_simulated/instance.md": "GET /model/ returns [{\"modelName\":\"ticket\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. The first POST /model/ticket/1/workflow/import exits 22, stderr HTTP_STATUS=400, body {\"status\":400,\"detail\":\"invalid JSON: json: unknown field \\\"entityName\\\"\",\"properties\":{\"errorCode\":\"BAD_REQUEST\"}}. A body of only {importMode, workflows} returns 200."
       },
       "assertions": [
-        { "id": "no-build-file-found", "text": "Finds no pom.xml, package.json, or Python build file in the project root", "type": "behavior" },
-        { "id": "discovers-existing-workflow-dir", "text": "Scans and finds the existing workflow/ directory", "type": "behavior" },
-        { "id": "mirrors-layout", "text": "Saves the new invoice workflow to the same workflow/ directory rather than creating a new path", "type": "behavior" },
-        { "id": "versioned-naming", "text": "Writes the file as workflow/invoice-v1-workflow.json", "type": "behavior" }
+        { "id": "consults-help", "text": "On the 400, reads `cyoda-help.sh errors BAD_REQUEST` (or `workflows --section \"IMPORT REQUEST\"`) and names it, instead of explaining from memory", "type": "behavior" },
+        { "id": "no-path-guessing", "text": "Does not retry with a different or guessed URL; the retry goes to the same /model/ticket/1/workflow/import path", "type": "behavior" },
+        { "id": "explains-strict-import", "text": "Explains that the export shape {entityName, modelVersion, workflows} is rejected by the strict import and cites #684-I", "type": "behavior" },
+        { "id": "reshapes", "text": "Reshapes to {importMode, workflows} (e.g. with jq) and shows the corrected body for confirmation before re-importing", "type": "behavior" },
+        { "id": "saves-project-file", "text": "Saves the corrected workflow as a project file ticket-v1-workflow.json (with the other files and the manifest entry, or offers to)", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke another skill", "type": "behavior" }
       ]
     },
     {
-      "id": 14,
-      "prompt": "/cyoda:build — add a Product entity and a Category entity both with active and archived states",
-      "expected_output": "Generates and saves separate versioned files for each entity in the same typed folders; does not mix entity content into a single file",
+      "id": 6,
+      "prompt": "/cyoda:build — add an approved state to RiskAssessment",
+      "expected_output": "Status shows ENV=production, so the skill warns up front that it targets a production instance. Read-only calls (GET /model/) run normally. The first mutating call (workflow import) exits 3; the skill then lists the exact calls, asks the developer to confirm, and only after an explicit yes re-runs them with --confirm-production. It never passes --confirm-production before asking, and does not describe the instance as Cloud.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
-        "package.json": "{\"name\":\"demo\"}",
-        "tsconfig.json": "{\"compilerOptions\":{}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"prod\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"prod\":{\"endpoint\":\"https://cyoda.internal.example.com\",\"env\":\"production\",\"tokenCommand\":\"~/.config/cyoda/get-token-prod.sh\"}}}",
+        "_simulated/instance.md": "cyoda-status.sh prints STATUS=connected PROFILE=prod ENDPOINT=https://cyoda.internal.example.com ENV=production VERSION=0.8.4. GET /model/ returns [{\"modelName\":\"riskassessment\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. Mutating calls without --confirm-production exit 3 with stderr 'PRODUCTION: ask the user to confirm, then re-run with --confirm-production'. With the flag they return 200. The developer answers 'yes' when asked."
       },
       "assertions": [
-        { "id": "separate-file-per-entity", "text": "Writes a separate workflow file for each entity: src/workflows/product-v1-workflow.json and src/workflows/category-v1-workflow.json", "type": "behavior" },
-        { "id": "no-combined-file", "text": "Does NOT combine both entities into a single workflow file", "type": "behavior" },
-        { "id": "correct-folders", "text": "Uses src/workflows/ for workflow JSON and src/data/ for sample data (TypeScript project detected via package.json + tsconfig.json)", "type": "behavior" }
+        { "id": "consults-help", "text": "Names the help section used for the change (e.g. `workflows --section TRANSITIONS` or `IMPORT REQUEST`)", "type": "behavior" },
+        { "id": "production-warning", "text": "Says up front that the active profile is a production instance (profile prod, endpoint shown)", "type": "behavior" },
+        { "id": "handles-exit-3", "text": "On exit 3, stops, lists the calls it is about to make, and asks the developer to confirm", "type": "behavior" },
+        { "id": "flag-after-yes", "text": "Re-runs with `--confirm-production` only after the developer's explicit yes, and never adds the flag before asking", "type": "behavior" },
+        { "id": "reads-unconfirmed", "text": "Runs read-only GET calls without asking for confirmation", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud or call the production instance 'cloud'", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke another skill", "type": "behavior" }
       ]
     },
     {
-      "id": 11,
-      "prompt": "/cyoda:build — add a Product entity",
-      "expected_output": "Detects 401 on GET /api/model, invokes cyoda:auth to refresh, retries the model inspection once",
+      "id": 7,
+      "prompt": "/cyoda:build — yes, the Product config looks right, register it",
+      "expected_output": "Starts the canonical order with POST /model/import/JSON/SAMPLE_DATA/product/1; cyoda-call.sh exits 22 with HTTP_STATUS=401 (it already retried once with a fresh token). The skill stops, shows the error, says the token command could not get access, and ends with 'next, type /cyoda:auth'. It does not loop, re-run the token command itself, or continue with lock/workflow.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"https://api.eu.cyoda.net\",\"token\":\"eyJexpired...\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team\",\"profiles\":{\"team\":{\"endpoint\":\"https://cyoda.team.example.com\",\"env\":\"development\",\"tokenCommand\":\"~/.config/cyoda/get-token-team.sh\"}}}",
+        "package.json": "{\"name\":\"shop\"}",
+        "src/data/product-v1-sample.json": "{\"sku\":\"P-1\",\"name\":\"Widget\"}",
+        "src/workflows/product-v1-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"product\",\"initialState\":\"active\",\"active\":true,\"states\":{\"active\":{\"transitions\":[{\"name\":\"archive\",\"next\":\"archived\",\"manual\":true}]},\"archived\":{}}}]}",
+        "src/config/product-v1-config.json": "{\"uniqueKeys\":[],\"changeLevel\":null,\"env\":{}}",
+        "_simulated/instance.md": "GET /model/ returned [] earlier in the session. The import call now exits 22 with stderr HTTP_STATUS=401 and body {\"status\":401,\"properties\":{\"errorCode\":\"UNAUTHORIZED\"}}, after cyoda-call.sh's own token-refresh retry."
       },
       "assertions": [
-        { "id": "invokes-auth-on-401", "text": "Invokes cyoda:auth when any API call returns 401 or 403", "type": "behavior" },
-        { "id": "retries-once-after-refresh", "text": "Retries the failed call exactly once after auth refresh", "type": "behavior" },
-        { "id": "no-retry-on-other-errors", "text": "Does NOT retry on 404 or 5xx — only on 401/403", "type": "behavior" }
+        { "id": "consults-help", "text": "Names the help section it follows for the registration order (`models --section LIFECYCLE` or ENDPOINTS)", "type": "behavior" },
+        { "id": "stops-on-401", "text": "Stops after the 401 and does not continue with lock or workflow import", "type": "behavior" },
+        { "id": "no-own-retry", "text": "Does not re-run the token command or retry the call itself (the script already retried once)", "type": "behavior" },
+        { "id": "no-old-auth-wording", "text": "Does not say it will invoke cyoda:auth to refresh the token", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
+        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:auth`' and does not say it will invoke another skill", "type": "behavior" }
       ]
     }
   ]
