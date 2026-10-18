@@ -183,6 +183,48 @@
           "type": "behavior"
         }
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "/cyoda:test — guided, for orders, against our prod-ci profile",
+      "expected_output": "Guided mode. Copies ${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh to smoke-test.sh at the project root (no scripts/ dir). The profile's tokenCommand contains spaces and single quotes, so the run command wraps it in single quotes with each inner ' written as '\\'': CYODA_TOKEN_COMMAND='CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='\\''security find-generic-password -s cyoda-prod -w'\\'' /home/dev/shop/scripts/get-token.sh'. The endpoint is quoted too. Pasted into bash, the command hands the script exactly the stored tokenCommand.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"prod-ci\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"prod-ci\":{\"endpoint\":\"https://cyoda-ci.internal.example.com\",\"env\":\"development\",\"tokenCommand\":\"CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-prod -w' /home/dev/shop/scripts/get-token.sh\"}}}",
+        "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=prod-ci ENDPOINT=https://cyoda-ci.internal.example.com ENV=development VERSION=0.8.4. GET /model/ lists orders v1 LOCKED (draft -submit(manual)-> submitted). cyoda-profile.sh prints the tokenCommand exactly as stored in the config. There is no scripts/ directory."
+      },
+      "assertions": [
+        {
+          "id": "consults-help",
+          "text": "Reads or names `crud --section ENDPOINTS` or `models --section ENDPOINTS` for discovery or the transition call",
+          "type": "behavior"
+        },
+        {
+          "id": "token-command-quoted",
+          "text": "The run command sets CYODA_TOKEN_COMMAND inside single quotes, with each single quote of the stored tokenCommand written as '\\'' (or other quoting that gives the exact stored string in bash)",
+          "type": "behavior"
+        },
+        {
+          "id": "token-command-verbatim",
+          "text": "The quoted value is the stored tokenCommand character for character: both env prefixes and the `security find-generic-password -s cyoda-prod -w` part are kept",
+          "type": "behavior"
+        },
+        {
+          "id": "copies-from-plugin-root",
+          "text": "Copies the template from `${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh` to `smoke-test.sh` at the project root",
+          "type": "behavior"
+        },
+        {
+          "id": "no-secret",
+          "text": "Puts no token or secret value in the command or the script",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
+      ]
     }
   ]
 }

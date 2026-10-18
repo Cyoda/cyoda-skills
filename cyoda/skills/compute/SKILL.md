@@ -28,7 +28,7 @@ If none apply, say so and stop. Wiring a processor or criterion into the workflo
 ## Step 1 — Get the contract
 
 Before writing code, fetch the authoritative definitions. Field names come from these, never from the examples here:
-- **Service and messages**: `cyoda help grpc proto` prints the `.proto` source (`cyoda-help.sh` exits 2 on proto text, so run the binary). Generate stubs from it in the developer's language. `cyoda help grpc json` gives the descriptor set.
+- **Service and messages**: `cyoda-help.sh grpc proto` prints the `.proto` source as is. Generate stubs from it in the developer's language. `cyoda-help.sh grpc json` gives the descriptor set.
 - **Message schemas**: `cyoda-help.sh cloudevents json | jq '.schemas["processing/<Name>.json"]'`, for `CalculationMemberJoinEvent`, `EntityProcessorCalculationRequest`/`Response`, `EntityCriteriaCalculationRequest`/`Response`, `EntityFunctionCalculationRequest`/`Response`, `EventAckResponse`. List them with `jq -r '.schemas | keys[]'`.
 
 ## Step 2 — Connect and join

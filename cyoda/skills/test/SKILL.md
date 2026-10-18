@@ -77,13 +77,16 @@ Then offer, one at a time:
 
 The template [templates/smoke-test.sh](templates/smoke-test.sh) reads everything from the environment, so it's copied unchanged:
 
-1. Pick one model and one manual transition from Step 2. Copy the template to `scripts/smoke-test.sh` if a `scripts/` directory exists, else to `smoke-test.sh` at the project root. If a different file is already there, ask before overwriting.
+1. Pick one model and one manual transition from Step 2. Copy `${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh` to `scripts/smoke-test.sh` if a `scripts/` directory exists, else to `smoke-test.sh` at the project root. If a different file is already there, ask before overwriting.
 2. Give the run command with the discovered values. Take the endpoint from `cyoda-status.sh` and the profile's `tokenCommand` from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-profile.sh` (omit `CYODA_TOKEN_COMMAND` when there is none, as in mock mode):
    ```bash
    ENTITY_NAME=<e> MODEL_VERSION=<v> TRANSITION_NAME=<t> EXPECTED_STATE=<next> \
-   CYODA_ENDPOINT=<endpoint> CYODA_TOKEN_COMMAND=<tokenCommand> bash scripts/smoke-test.sh
+   CYODA_ENDPOINT='<endpoint>' CYODA_TOKEN_COMMAND='<tokenCommand>' bash scripts/smoke-test.sh
    ```
-3. Say what it does: checks the model is LOCKED, creates an entity from the manifest's sample (or `SAMPLE_FILE`), checks the transition is available, fires it with PATCH `{}`, and ends with `=== PASS ===` (exit 0) or `=== FAIL ===` (exit 1). It never reads or stores a token itself.
+   Always wrap the `tokenCommand` in single quotes, copied character for character: it can hold spaces and its own quotes, e.g. `CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-prod -w' /abs/path/get-token.sh`. Write each `'` inside it as `'\''`. That example becomes:
+   `CYODA_TOKEN_COMMAND='CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='\''security find-generic-password -s cyoda-prod -w'\'' /abs/path/get-token.sh'`
+   The script runs it with `CYODA_ENDPOINT` set, as the plugin does.
+3. Say what it does: checks the model is LOCKED, creates an entity from the manifest's sample (or `SAMPLE_FILE`), checks the transition is available, fires it with PATCH `{}`, and ends with `=== PASS ===` (exit 0) or `=== FAIL ===` (exit 1). It stores no token: it runs the token command each time.
 
 ## Common mistakes
 
@@ -93,6 +96,7 @@ The template [templates/smoke-test.sh](templates/smoke-test.sh) reads everything
 | Expecting the entity in `initialState` after create | Follow the automated cascade first |
 | Firing a transition with an empty PUT | PATCH `{}` with `If-Match: *` and merge-patch |
 | Inventing a payload when the project has a sample | The manifest's `sample` file |
+| An unquoted `CYODA_TOKEN_COMMAND=` in the run command | Single quotes, each inner `'` as `'\''` |
 | Handling 401 by re-running the token command | The script already did. Say "next, type `/cyoda:auth`" |
 | Saying you'll run `/cyoda:build` or `/cyoda:setup` yourself | "Next, type `/cyoda:<x>`" with a one-line reason |
 | A Cloud or migration question | "That's not covered by this plugin" |

@@ -42,10 +42,10 @@ Get field names and types from these, never from memory or examples:
 | Need | Run | Notes |
 |---|---|---|
 | CloudEvent JSON schemas (compute-node messages) | `cyoda-help.sh cloudevents json` | One JSON map; pick one: `\| jq '.schemas["processing/EntityCriteriaCalculationResponse.json"]'` |
-| gRPC service `.proto` | `cyoda help grpc proto` | Prints proto text, which `cyoda-help.sh` doesn't pass through (exit 2). Use the binary; with no binary, `GET <endpoint>/api/help/grpc/proto` on the instance. `cyoda help grpc json` gives the descriptor set |
-| REST API (OpenAPI 3.1) | `cyoda-help.sh openapi json` | About 0.5 MB; pick one path: `\| jq '.paths["/entity/{entityId}"]'`. Tags: `cyoda help openapi tags` |
+| gRPC service `.proto` | `cyoda-help.sh grpc proto` | Proto text, printed as is. `cyoda-help.sh grpc json` gives the descriptor set as JSON |
+| REST API (OpenAPI 3.1) | `cyoda-help.sh openapi json` (or `openapi yaml`) | About 0.5 MB; pick one path: `\| jq '.paths["/entity/{entityId}"]'`. Tags: `cyoda-help.sh openapi tags` |
 
-`cyoda help workflows schema-version versions` prints `{"current", "supported"}` JSON; it takes no `--section`.
+These are actions, not topics: the instance or binary output is printed verbatim (JSON or text), `--section` is rejected (exit 6), and the web mirror doesn't serve them (exit 2 with neither an instance nor a binary). `cyoda-help.sh workflows schema-version versions` is another, printing `{"current", "supported"}`.
 
 ## Known help errata (v0.8.4)
 

@@ -72,7 +72,39 @@ test_help_action_from_instance() {
   stop_server
 }
 
+# Non-JSON action output (Ruling R8): grpc proto is text, openapi yaml is YAML.
+test_help_text_action_from_binary() {
+  local out rc
+  out="$(bash "$S/cyoda-help.sh" grpc proto 2>"$T/err")"; rc=$?
+  assert_status 0 "$rc" "text action via binary"
+  assert_contains "$out" 'syntax = "proto3"' "proto text verbatim"
+  assert_contains "$out" "service CloudEventsService" "proto service"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=binary" "binary source for text action"
+  out="$(bash "$S/cyoda-help.sh" openapi yaml 2>/dev/null)"; rc=$?
+  assert_status 0 "$rc" "yaml action via binary"
+  assert_contains "$out" "openapi:" "openapi yaml verbatim"
+  bash "$S/cyoda-help.sh" grpc proto --section X >/dev/null 2>&1
+  assert_status 6 "$?" "--section rejected for text action"
+  bash "$S/cyoda-help.sh" grpc nosuchaction >/dev/null 2>&1
+  assert_status 2 "$?" "unknown action still exits 2"
+}
+
+test_help_text_action_from_instance() {
+  start_server || return
+  echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/t.json"
+  local out rc
+  out="$(CYODA_PLUGIN_CONFIG="$T/t.json" bash "$S/cyoda-help.sh" grpc proto 2>"$T/err")"; rc=$?
+  assert_status 0 "$rc" "text action via instance"
+  assert_contains "$out" 'syntax = "proto3"' "instance proto text verbatim"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "instance source for text action"
+  CYODA_PLUGIN_CONFIG="$T/t.json" bash "$S/cyoda-help.sh" grpc nosuchaction >/dev/null 2>&1
+  assert_status 2 "$?" "unknown action via instance still exits 2"
+  stop_server
+}
+
 test_help_section_from_binary
+test_help_text_action_from_binary
+test_help_text_action_from_instance
 test_help_action_from_binary
 test_help_action_from_instance
 test_help_ignores_broken_token_command

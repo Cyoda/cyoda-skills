@@ -15,7 +15,7 @@ Find out why something happened, from the instance's own records, then explain i
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | 2xx | continue |
-| 22 | HTTP ≥ 400 | 401/403: the script already retried once with a fresh token. Show the error and say "next, type `/cyoda:auth`". Otherwise the error is evidence: read it (Path A) |
+| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error and say "next, type `/cyoda:auth`". Otherwise the error is evidence: read it (Path A) |
 | 3 | production refusal (any non-GET) | search and stats POSTs are reads: say so, ask "Run this read-only query on production? (yes/no)", and only on yes re-run with `--confirm-production` |
 | 4 | the profile's tokenCommand failed | show stderr and say "next, type `/cyoda:auth`" |
 | 5 | no endpoint configured | "next, type `/cyoda:setup`" |
@@ -85,7 +85,7 @@ Read `models --section LIFECYCLE` and `models --section ERRORS`.
 
 ### Path E — entities in an Errored state
 
-Count them per state, then list them and read each one's reason: [examples/queries.md](examples/queries.md) walks through [examples/queries/](examples/queries/) (grouped stats by state, a lifecycle-state search, point-in-time). Best practice *Model error states explicitly*: the exit transition's criterion holds the entity until its data is fixed, then a loopback (Path B, step 6) lets it leave.
+Count them per state, then list them and read each one's reason: [examples/queries.md](examples/queries.md) walks through [examples/queries/](examples/queries/) (grouped stats by state, a lifecycle-state search, point-in-time). Pass those files as `--data-binary @"${CLAUDE_PLUGIN_ROOT}/skills/debug/examples/queries/<file>"`. Best practice *Model error states explicitly*: the exit transition's criterion holds the entity until its data is fixed, then a loopback (Path B, step 6) lets it leave.
 
 ### Path F — an entity disappeared
 

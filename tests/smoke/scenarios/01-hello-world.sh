@@ -36,12 +36,30 @@ scenario_main() {
   proj="$(mktemp -d)"
   cp "$EX_DIR/sample.json" "$proj/hello-v1-sample.json"
   printf '{"manifestVersion":1,"entities":[{"name":"hello","modelVersion":1,"sample":"hello-v1-sample.json"}]}\n' >"$proj/cyoda-manifest.json"
+  # CYODA_ENDPOINT is given with an /api/ suffix; the token command must see
+  # it normalised (no /api), as cyoda-call.sh passes it (Ruling R1).
+  local tc
+  tc='[ "$CYODA_ENDPOINT" = "'"${BASE%/api}"'" ] && echo smoke-token'
   out="$(cd "$proj" && env -u CYODA_CONFIG ENTITY_NAME=hello MODEL_VERSION=1 TRANSITION_NAME=archive \
-    EXPECTED_STATE=archived CYODA_ENDPOINT="${BASE%/api}" CYODA_TOKEN_COMMAND='echo smoke-token' \
+    EXPECTED_STATE=archived CYODA_ENDPOINT="$BASE/" CYODA_TOKEN_COMMAND="$tc" \
     bash "$_LOAD_ROOT/cyoda/skills/test/templates/smoke-test.sh" 2>"$proj/stderr")"; rc=$?
   assert_eq "$rc" 0 "smoke-test.sh exits 0"
   [ "$rc" -eq 0 ] || { echo "        stdout: $out" >&2; echo "        stderr: $(cat "$proj/stderr")" >&2; }
   assert_eq "$(printf '%s\n' "$out" | tail -n1)" "=== PASS ===" "smoke-test.sh stdout ends === PASS ==="
   assert_contains "$out" archived "smoke-test.sh reports the archived state"
+
+  # A 200 with a non-JSON body (wrong endpoint, proxy page) is a clean FAIL.
+  mkdir -p "$proj/www/api/model"
+  echo '<html>not cyoda</html>' >"$proj/www/api/model/index.html"
+  local hp=18099 hpid
+  ( cd "$proj/www" && exec python3 -m http.server "$hp" --bind 127.0.0.1 >/dev/null 2>&1 ) &
+  hpid=$!
+  local i; for i in $(seq 1 20); do curl -s -o /dev/null "http://127.0.0.1:$hp/" && break; sleep 0.25; done
+  out="$(cd "$proj" && ENTITY_NAME=hello MODEL_VERSION=1 TRANSITION_NAME=archive \
+    CYODA_ENDPOINT="http://127.0.0.1:$hp" bash "$_LOAD_ROOT/cyoda/skills/test/templates/smoke-test.sh" 2>"$proj/stderr")"; rc=$?
+  kill "$hpid" 2>/dev/null; wait "$hpid" 2>/dev/null
+  assert_eq "$rc" 1 "non-JSON 200 -> exit 1"
+  assert_eq "$(printf '%s\n' "$out" | tail -n1)" "=== FAIL ===" "non-JSON 200 -> === FAIL ==="
+  assert_contains "$out" "non-JSON body" "non-JSON 200 reason"
   rm -rf "$proj"
 }

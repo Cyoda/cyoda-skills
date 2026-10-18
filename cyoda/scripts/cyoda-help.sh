@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Look up cyoda help. Usage: cyoda-help.sh <path...> [--section <NAME>]
 # Order: active instance, local binary, docs.cyoda.net mirror.
-# Topic actions (e.g. `workflows schema-version versions`) return plain JSON
-# with no .body; it is printed verbatim (instance or binary only; the web
-# mirror has no action JSON). --section is rejected for actions (exit 6).
+# Topic actions return either plain JSON with no .body (e.g. `workflows
+# schema-version versions`, `openapi json`) or non-JSON text (e.g. `grpc proto`,
+# `openapi yaml`); both are printed verbatim (instance or binary only; the web
+# mirror has no actions). --section is rejected for actions (exit 6).
 # stderr line 1: SOURCE=instance|binary|web VERSION=<v>
 # Exit: 0 ok, 2 unknown topic, 6 section not found / not applicable.
 set -uo pipefail
@@ -50,6 +51,16 @@ emit_json() { # source version json
   exit 0
 }
 
+emit_text() { # source version text  (non-JSON action output, e.g. grpc proto)
+  echo "SOURCE=$1 VERSION=$2" >&2
+  if [ -n "$SECTION" ]; then
+    echo "'${WORDS[*]}' is an action, not a topic: its output has no sections; drop --section" >&2
+    exit 6
+  fi
+  printf '%s\n' "$3"
+  exit 0
+}
+
 # 1. Active instance. /api/help is public: plain curl, never tokenCommand.
 # One fetch of /api/help gives reachability and VERSION; one fetch gets the topic.
 ep="$("$HERE/cyoda-profile.sh" 2>/dev/null | jq -r '.endpoint // empty' 2>/dev/null)" || ep=""
@@ -57,17 +68,25 @@ if [ -n "$ep" ]; then
   ep="${ep%/}"
   if idx="$(curl -fsS --max-time 5 "$ep/api/help" 2>/dev/null)"; then
     ver="$(jq -r '.version // "unknown"' <<<"$idx" 2>/dev/null)" || ver=unknown
-    if json="$(curl -fsS --max-time 10 "$ep/api/help/$URLPATH" 2>/dev/null)" && jq -e . >/dev/null 2>&1 <<<"$json"; then
-      emit_json instance "${ver:-unknown}" "$json"
+    # curl -f: an unknown topic or action is a 404 and falls through.
+    if json="$(curl -fsS --max-time 10 "$ep/api/help/$URLPATH" 2>/dev/null)" && [ -n "$json" ]; then
+      if jq -e . >/dev/null 2>&1 <<<"$json"; then
+        emit_json instance "${ver:-unknown}" "$json"
+      fi
+      emit_text instance "${ver:-unknown}" "$json"
     fi
   fi
 fi
 
 # 2. Local binary
 if command -v cyoda >/dev/null 2>&1; then
-  if json="$(cyoda help "${WORDS[@]}" --format=json 2>/dev/null)" && jq -e . >/dev/null 2>&1 <<<"$json"; then
+  # Unknown topics and actions exit non-zero (2), so only rc 0 output is used.
+  if json="$(cyoda help "${WORDS[@]}" --format=json 2>/dev/null)" && [ -n "$json" ]; then
     ver="$(cyoda --version 2>/dev/null | awk 'NR==1{print $3}')"
-    emit_json binary "${ver:-unknown}" "$json"
+    if jq -e . >/dev/null 2>&1 <<<"$json"; then
+      emit_json binary "${ver:-unknown}" "$json"
+    fi
+    emit_text binary "${ver:-unknown}" "$json"
   fi
 fi
 

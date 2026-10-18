@@ -137,7 +137,7 @@
     {
       "id": 4,
       "prompt": "I'm writing a criteria handler in Kotlin. Exactly which fields does the criteria response need?",
-      "expected_output": "Gets the schema with cyoda-help.sh cloudevents json piped to jq for processing/EntityCriteriaCalculationResponse.json, reports required requestId and entityId plus matches and the optional reason (2 KiB cap per grpc COMPUTE MEMBER PROTOCOL), and mentions `cyoda help grpc proto` (run with the binary) for stubs.",
+      "expected_output": "Gets the schema with cyoda-help.sh cloudevents json piped to jq for processing/EntityCriteriaCalculationResponse.json, reports required requestId and entityId plus matches and the optional reason (2 KiB cap per grpc COMPUTE MEMBER PROTOCOL), and mentions `cyoda-help.sh grpc proto` for stubs.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
         "_simulated/help.md": "cyoda-help.sh cloudevents json prints {schemas:{...}}; schemas[\"processing/EntityCriteriaCalculationResponse.json\"] has required [requestId, entityId] and properties entityId, matches, reason, requestId. `cyoda help grpc proto` prints the .proto text."
@@ -155,7 +155,7 @@
         },
         {
           "id": "proto-pointer",
-          "text": "Points to `cyoda help grpc proto` for generating stubs",
+          "text": "Points to `cyoda-help.sh grpc proto` (or `cyoda help grpc proto`) for generating stubs",
           "type": "behavior"
         },
         {
