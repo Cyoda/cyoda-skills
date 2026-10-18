@@ -10,7 +10,7 @@ Cyoda Cloud is paused and will look very different when it comes back. The curre
 
 This work has three steps, done in order:
 
-1. **Segregation.** Two separate packages. The **dev** package covers developing and running cyoda-go and is completely cloud-agnostic. The **cloud** package is parked and can't be installed until the service is re-established.
+1. **Segregation.** Two separate packages. The **dev** package covers developing and running cyoda-go and is completely cloud-agnostic. The **cloud** package is parked as a git tag on the last pre-split commit and removed from `main`, so it can't be installed until the service is re-established.
 2. **Update.** Bring the dev package to cyoda-go **v0.8.4**.
 3. **Refinement.** Make the skills **help-first**: a smart wrapper over `cyoda help`. Fold in the fact-checked workflow best practices, add a `deploy` skill, rewrite every eval, and add runnable smoke tests.
 
@@ -18,7 +18,7 @@ The why behind help-first: almost everything that broke between v0.6.3 and v0.8.
 
 ## Goals
 
-- Two installable identities. `cyoda` (dev) is installable from this repo's marketplace. `cyoda-cloud` is present in the repo but **not** listed in `marketplace.json`.
+- `cyoda` (dev) is the only plugin on `main` and in `marketplace.json`. The cloud skills survive unchanged at the tag `cloud-frozen-0.3.0`, which points at `d977dd9` (plugin v0.3.0, the last commit before this work). Nothing cloud is on `main`.
 - The dev package's own content never offers or recommends Cyoda Cloud: no cloud branches, no "move to Cloud later", no cloud URLs, no Cloud OAuth. (See Evals for what counts.)
 - Every concrete instruction in the dev package works against cyoda-go v0.8.4. Wherever possible the skills get there by **pointing at the right `cyoda help` topic** rather than restating facts.
 - A new `cyoda:deploy` skill takes an app developer from a working local app to a self-hosted cyoda-go: Docker Compose, then Helm. It produces artifacts a devops person can script from.
@@ -38,7 +38,7 @@ The why behind help-first: almost everything that broke between v0.6.3 and v0.8.
 
 - The dev package still leaks cloud, e.g. `app` suggesting "move to Cloud when ready", `status` printing "Cyoda Cloud", or a profile `env: production` path that talks about Cloud.
 - Skills re-grow embedded reference material (endpoint tables, env-var lists, schema JSON) that duplicates `cyoda help`. That rebuilds the drift problem this work exists to remove.
-- The cloud package is accidentally installable, e.g. by appearing in `marketplace.json` or being reachable via a `source` path.
+- Cloud content remains anywhere on `main`, where it could be loaded with `--plugin-dir` or a git-subdir marketplace source.
 - Smoke tests that test their own fixtures rather than the skills' templates and recipes.
 - Hard-coding the workflow schema version anywhere it could instead be read from `cyoda help workflows schema-version versions`.
 
@@ -47,7 +47,7 @@ The why behind help-first: almost everything that broke between v0.6.3 and v0.8.
 - Repo rules from `CLAUDE.md`:
   - `SKILL.md` stays under 500 lines.
   - Skills don't embed Cyoda docs.
-  - Skills with side effects carry `disable-model-invocation: true`.
+  - Skills with side effects carry `disable-model-invocation: true` (enforced by this work; see Side-effect skills).
   - Each skill has `evaluations/evals.json` with 3+ cases (happy path, edge case, failure).
   - `superpowers:writing-skills` is invoked before authoring or editing skills.
   - The eval process follows `CLAUDE.md` ("Running evals").
@@ -59,7 +59,8 @@ The why behind help-first: almost everything that broke between v0.6.3 and v0.8.
 ## Decisions made with the user
 
 - **Two separate installs.** Dev and cloud are distinct plugins, following the kebab-case plugin naming convention.
-- **Cloud package parked, not installable** until the service is back.
+- **Cloud package parked, not installable** until the service is back. It's parked as the tag `cloud-frozen-0.3.0` and removed from `main`, not kept as an unlisted folder.
+- **Enforce the `CLAUDE.md` side-effect rule.** Skills with side effects get `disable-model-invocation: true`, and hand-offs between them become "next, type `/cyoda:<x>`".
 - **Add a `deploy` skill.** It's for the app developer first, and its output should be a basis a dev or devops person can script from.
 - **Delegate as much as possible to `cyoda help`.** The skills are mainly a smart wrapper over the help feature. Best practices should ultimately live in `cyoda help` too.
 - **Notifications** are phrased as "coming soon — check `cyoda help` for availability". Use the same phrasing for any other unshipped feature.
@@ -89,12 +90,6 @@ cyoda/                              ← dev package (plugin name "cyoda")
   README.md  GEMINI.md  gemini-extension.json
   skills/
     app/ setup/ status/ auth/ docs/ design/ build/ compute/ test/ debug/ deploy/
-parked/
-  cyoda-cloud/                      ← parked package (plugin name "cyoda-cloud"), NOT in marketplace.json
-    .claude-plugin/plugin.json
-    README.md                       ← "PARKED — do not install; will be redesigned when Cyoda Cloud returns"
-    skills/
-      auth/ setup/ status/ migrate/ ← frozen snapshots
 tests/
   smoke/                            ← runnable reference scenarios (see Smoke tests)
 docs/superpowers/specs/…            ← this doc
@@ -102,7 +97,7 @@ docs/superpowers/specs/…            ← this doc
 
 ### Why the dev plugin keeps the name `cyoda` (builder's call, confirmed in playback)
 
-Existing installs (`cyoda@cyoda`) and skill names (`cyoda:build`, etc.) keep working. The cloud package takes the new name `cyoda-cloud`, so its skills will be `cyoda-cloud:auth` and so on.
+Existing installs (`cyoda@cyoda`) and skill names (`cyoda:build`, etc.) keep working. When Cloud returns, its redesigned package takes the new name `cyoda-cloud`.
 
 ## Step 1: Segregation
 
@@ -114,7 +109,7 @@ Cloud content removed per skill:
 - `app`: drop the Cloud option in Step 2, Step 6 ("Move to Cyoda Cloud"), and "same API works locally and on Cloud". The journey ends with an optional `deploy` step instead.
 - `setup`: local only. A second mode, **connect to an existing self-hosted cyoda-go** (e.g. one created by `deploy`), replaces the cloud mode.
 - `status`: report "Connected to cyoda-go vX.Y.Z — <endpoint> [profile: P]" for any instance. A self-hosted instance marked production shows a `[PRODUCTION]` tag. No "Cloud" wording.
-- `auth`: **rewritten** for cyoda-go's own auth (see Step 3). The current Cloud OAuth skill moves to the parked package.
+- `auth`: **rewritten** for cyoda-go's own auth (see Step 3). The current Cloud OAuth version stays only at the tag.
 - `compute`, `debug`: remove cloud mentions.
 - `README.md`, top-level `README.md`, `plugin.json` description, `GEMINI.md`: no cloud.
 
@@ -126,17 +121,13 @@ Cloud content removed per skill:
 - **Existing configs.** Current users' files may contain `token` fields and old endpoints, possibly on the active profile. `status` and `setup` detect a stored `token` and say neutrally: "profile P contains a stored token, which this plugin no longer reads; you can remove it". An unreachable active profile gets an offer to switch to `default`. The config schema belongs to the dev package.
 - The production safety guard stays, as a generic self-hosted concern: an explicit confirmation before any skill sends a mutating API call to a profile with `env: production`.
 
-### Parked cloud package (`parked/cyoda-cloud/`)
+### Parked cloud package (git tag)
 
-- Contains `auth` (current Cloud OAuth), `migrate`, and the cloud halves of `setup` and `status`, extracted as their own skills. All are **frozen snapshots** of current content with minimal edits: frontmatter `name` adjusted, plus a top-of-file note "PARKED — targets the pre-pause Cyoda Cloud; do not use".
-- Evals move with their skills, unchanged and not run.
-- `plugin.json` name is `cyoda-cloud`, with `"description": "PARKED — not installable. …"`.
-- `README.md` says:
-  - why it's parked
-  - that it is not listed in the marketplace
-  - that it expects the `cyoda` dev package for `docs`, `design` and `build`
-  - that it will be redesigned, not revived as-is, when the service returns
-- Not referenced from `marketplace.json`, the top-level README's install instructions, or anything in `cyoda/`.
+- **First task of segregation:** create the annotated tag `cloud-frozen-0.3.0` on `d977dd9`, with the message "Cyoda Cloud skills as of plugin v0.3.0, parked while Cloud is paused". Push it only with the user's go-ahead.
+  - The tag holds the complete, working pre-split plugin, cloud parts included: `auth`, `migrate`, and the cloud branches of `setup`, `status` and `app`, with their evals.
+  - Nothing is extracted or edited, so the frozen content is exactly what worked.
+- Then delete from `main`: `cyoda/skills/migrate/` and its evals, the Cloud OAuth `auth` (replaced by the rewrite), `migration-checklist.md`, and every cloud branch in the remaining skills.
+- **Pointer, the only cloud reference on `main`:** a short "History" note in `docs/` (not in the plugin) saying the Cloud skills are parked at `cloud-frozen-0.3.0` and will be redesigned, not revived, when the service returns. It isn't in `cyoda/` or the install instructions.
 
 ## Step 2: Update to v0.8.4
 
@@ -205,9 +196,29 @@ Update stale references, e.g. the schemas link becomes `cyoda help cloudevents j
 - `build` references it when generating states, transitions and criteria: error states, terminal states, loopback, validation cycles, rejection reasons. `debug` references it when diagnosing: loopback to re-evaluate, error-state queries, soft delete bypassing the workflow.
 - Notifications: "coming soon — check `cyoda help` for availability". Today's options are state queries, `ASYNC_NEW_TX` processors, and scheduled transitions for escalation.
 
+### Side-effect skills (enforcing the `CLAUDE.md` rule)
+
+With `disable-model-invocation: true`, only the user can start a skill, by typing `/cyoda:<x>`. Claude can't start it on its own or from another skill, and the skill's description isn't loaded into Claude's context. Today only `test` has the flag, which breaks the repo's own rule.
+
+| Skill | Flag | Why |
+|---|---|---|
+| `app` | yes | orchestrates side-effecting steps |
+| `setup` | yes | installs software, starts a server, writes config |
+| `build` | yes | writes project files, registers models and workflows on the instance |
+| `test` | yes (already) | creates entities, fires transitions |
+| `deploy` | yes | writes deployment files into the project |
+| `auth` | yes | writes the token script, updates the profile |
+| `status`, `docs`, `design`, `compute`, `debug` | no | read-only or advisory; Claude may use them whenever relevant |
+
+**Consequences:**
+- **Hand-offs** (`app`→`setup`/`build`/`test`/`deploy`, `docs`→`setup`, `setup`→`auth`, the 401 rule→`auth`) are written as "next, type `/cyoda:<x>`", with a one-line reason. They never say "invoke".
+- `debug` stays auto-invocable, so any fix it proposes that would change the instance is handed off to `/cyoda:build`, or done only after an explicit yes.
+- Update `CLAUDE.md`'s list to `setup`, `build`, `test`, `app`, `deploy`, `auth`. `migrate` is gone.
+- Evals for flagged skills assert that hand-offs say "type `/cyoda:<x>`" rather than invoking.
+
 ### `cyoda:deploy` (new)
 
-Frontmatter: `disable-model-invocation: true`. It writes files into the developer's project, so it should only run when invoked deliberately.
+Frontmatter: `disable-model-invocation: true` (see Side-effect skills).
 
 Audience: the app developer first. **The skill writes deployment files. It doesn't run them.** Its output is a set of files in the developer's project that the developer, or a devops person, runs and scripts from. The skill never runs `docker compose`, `helm`, `kubectl` or secret generation itself. It ends by listing the exact commands to run, in order. If the developer then asks the agent to run them, that's an ordinary request outside the skill.
 
@@ -279,7 +290,7 @@ Nothing is persisted by the plugin. Mock auth (the local default) needs no token
   4. `deploy` + `auth`
   5. `compute` + `debug`
   6. `test` + `docs` + `app`
-- Parked-package evals: moved, not rewritten, not run.
+- Cloud evals: preserved at the tag, not run.
 
 ## Smoke tests
 
