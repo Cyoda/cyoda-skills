@@ -3,57 +3,99 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "I want to build a chess app where players can create rooms and games are saved in Cyoda Cloud",
-      "expected_output": "Gives brief Cyoda orientation, identifies Room/Game/Move as entities, asks about states and transitions one question at a time, presents structured design summary without forcing compute nodes",
-      "files": {},
+      "prompt": "I want to build an app where tenants report maintenance issues for their flat and the landlord assigns a contractor to fix them.",
+      "expected_output": "Probes `cyoda-help.sh workflows best-practices` then `cyoda-help.sh design`, gets exit 2 for both and loads resources/best-practices.md, saying which source it used. Gives a short orientation (no Cyoda terms in the prompt). Asks one question at a time about entities, states, triggers, external code, unique fields and schema evolution. Proposes MaintenanceRequest (and possibly Contractor) with an explicit error or blocked state and several precise terminal states. Reviews the design against the best-practice bullets by name. Presents the summary and hands off with 'next, type `/cyoda:build`'. No workflow JSON before the design is confirmed.",
+      "files": {
+        "_simulated/env.md": "The cyoda binary 0.8.4 is installed; no instance profile is configured. `cyoda-help.sh workflows best-practices` exits 2 (unknown help topic: workflows best-practices). `cyoda-help.sh design` exits 2 (unknown help topic: design). Every other cyoda-help.sh call prints SOURCE=binary VERSION=0.8.4 on stderr and the real section text.",
+        "_simulated/developer.md": "The developer answers each question briefly. Entities: maintenance request; contractors are a list they keep. A request is reported, then the landlord assigns a contractor, the contractor schedules a visit, fixes it, and the tenant confirms. Sometimes the contractor can't fix it, or the tenant withdraws the request. Triggers: tenant, landlord and contractor actions in the UI. No external code. Each request has a reference number that must be unique. It's a prototype; they expect to add fields while building."
+      },
       "assertions": [
-        { "id": "gives-orientation", "text": "Gives brief EDBMS/entity/workflow orientation for newcomer", "type": "behavior" },
-        { "id": "one-question-at-a-time", "text": "Asks only one question at a time", "type": "behavior" },
-        { "id": "identifies-entities", "text": "Identifies Room, Game, Move as likely entities", "type": "behavior" },
-        { "id": "asks-states", "text": "Asks about states for each entity", "type": "behavior" },
-        { "id": "compute-nodes-optional", "text": "Presents compute nodes as optional, not required", "type": "behavior" },
-        { "id": "produces-design-summary", "text": "Produces a structured design summary", "type": "format" },
-        { "id": "no-workflow-json-early", "text": "Does NOT generate workflow JSON before design is confirmed", "type": "behavior" }
+        { "id": "probes-help-first", "text": "Runs `cyoda-help.sh workflows best-practices` and then `cyoda-help.sh design` before reviewing the design, and falls back to resources/best-practices.md only after both exit 2", "type": "behavior" },
+        { "id": "names-source", "text": "Tells the developer which best-practices source it used (the bundled copy, because the help topic has not shipped)", "type": "behavior" },
+        { "id": "gives-orientation", "text": "Gives a brief orientation (entities, workflows, states, transitions) because the prompt uses no Cyoda terms", "type": "behavior" },
+        { "id": "one-question-at-a-time", "text": "Asks one question at a time and waits for the answer", "type": "behavior" },
+        { "id": "explicit-error-state", "text": "The proposed workflow has an explicit error or blocked state (e.g. for 'contractor can't fix it') with a way out, rather than only the happy path", "type": "behavior" },
+        { "id": "precise-terminals", "text": "The proposed workflow has more than one named terminal state that says how the lifecycle ended (e.g. Completed and Withdrawn/Cancelled), and does not end lifecycles by deleting entities", "type": "behavior" },
+        { "id": "review-by-bullet-name", "text": "The design review names best-practice bullets by their names (e.g. 'Model error states explicitly', 'Define precise terminal states')", "type": "behavior" },
+        { "id": "unique-key-captured", "text": "Records the reference number as a unique key in the summary", "type": "behavior" },
+        { "id": "schema-evolution-not-discover", "text": "Frames the schema question as how much schema evolution to allow on a locked model (changeLevel), citing `cyoda help models` LIFECYCLE, and does not describe a 'discover mode' where entities can be posted to an unlocked model", "type": "behavior" },
+        { "id": "summary", "text": "Produces a structured design summary with entities, states (initial, terminal and error marked), transitions with their triggers, compute nodes (none), unique keys, schema evolution and a first increment", "type": "format" },
+        { "id": "no-workflow-json-early", "text": "Does not generate workflow JSON before the design is confirmed", "type": "behavior" },
+        { "id": "handoff-type", "text": "Hands off with 'next, type `/cyoda:build`' plus a one-line reason (and suggests `/cyoda:setup` first since no instance is configured); does not say it will invoke another skill", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     },
     {
       "id": 2,
-      "prompt": "I need to model a risk assessment entity with states for pending, under_review, and approved. It needs a scheduled timeout.",
-      "expected_output": "Skips orientation (user knows Cyoda), asks clarifying questions about transitions, recognises scheduled timeout pattern from patterns.md, asks about compute node needs",
-      "files": {},
+      "prompt": "I'm designing a shop on cyoda-go with Order entities. I also want a ProductSalesTotal entity per product that the order workflow increments every time an order is paid, so the dashboard can show total sales per product.",
+      "expected_output": "Loads the best practices (help probes exit 2, bundled copy). Flags the counter entity against 'Compute aggregations; don't maintain them': running totals conflict under snapshot isolation (retryable 409s) and duplicate what queries give. Proposes the stats API instead (grouped stats query grouped by a scalar product id path with sum over the amount), citing `cyoda help crud` ENDPOINTS rather than reciting the API from memory. Keeps productId/amount at scalar paths on Order (tree-shaped JSON caveat) and links by entity id. Drops ProductSalesTotal from the summary, mentioning dedicated aggregate entities only for volumes too large for indexed queries.",
+      "files": {
+        "_simulated/env.md": "The cyoda binary 0.8.4 is installed. `cyoda-help.sh workflows best-practices` and `cyoda-help.sh design` both exit 2. Every other cyoda-help.sh call prints SOURCE=binary VERSION=0.8.4 and the real section text.",
+        "_simulated/developer.md": "Order states: draft, placed, paid, shipped, cancelled. Each order has one product line: productId, quantity, amount. The developer accepts the suggested alternative when asked."
+      },
       "assertions": [
-        { "id": "skips-orientation", "text": "Does NOT give Cyoda orientation to an experienced user", "type": "behavior" },
-        { "id": "asks-clarifying", "text": "Asks clarifying questions about transitions and triggers", "type": "behavior" },
-        { "id": "recognises-timeout-pattern", "text": "Recognises the scheduled timeout pattern and references it", "type": "behavior" },
-        { "id": "asks-compute-nodes", "text": "Asks about compute node needs", "type": "behavior" }
+        { "id": "names-aggregation-bullet", "text": "Names the best practice 'Compute aggregations; don't maintain them' when rejecting the counter entity", "type": "behavior" },
+        { "id": "explains-conflict", "text": "Explains that a shared running total conflicts under concurrent writes (snapshot isolation, retryable 409s) and duplicates what a query gives", "type": "behavior" },
+        { "id": "suggests-stats", "text": "Suggests the entity stats API (grouped stats query with group-by on the product id and a sum over the amount) instead of the counter entity", "type": "behavior" },
+        { "id": "help-for-stats", "text": "Points at `cyoda help crud` (ENDPOINTS section) for the stats request shape instead of writing out the request schema from memory", "type": "behavior" },
+        { "id": "scalar-path", "text": "Keeps the values to group or aggregate on at scalar paths (not inside an array), or notes that grouped stats can't use array subscripts", "type": "behavior" },
+        { "id": "no-counter-in-summary", "text": "The final design summary does not contain a ProductSalesTotal (or other running-total) entity", "type": "format" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud (and does not suggest Cloud-only SQL analytics)", "type": "behavior" }
       ]
     },
     {
       "id": 3,
-      "prompt": "I want a simple document approval workflow — nothing fancy",
-      "expected_output": "Asks about domain objects and states, presents compute nodes as optional, accepts 'no compute nodes needed' gracefully, produces design summary without compute nodes. When asking Q5 about schema mode, explains discover vs lock with the ability to switch later.",
-      "files": {},
+      "prompt": "Our Payment entity calls the bank through a compute node. When a payment ends up in an error state I want Cyoda to send a notification to the ops team. How should I design that?",
+      "expected_output": "Skips orientation. Loads the best practices. Says notifications are 'coming soon — check `cyoda help` for availability' and does not invent a webhook, subscription or notification API. Gives today's options: query the state (state stats or a search), an ASYNC_NEW_TX processor on the transition into the error state, and a scheduled transition for escalation. Applies 'Model error states explicitly': an explicit Errored state in the straight-through path with a criterion on its exit transition that holds the entity, plus backward transitions for retry. Points at `cyoda help workflows` PROCESSORS and SCHEDULED TRANSITIONS.",
+      "files": {
+        "_simulated/env.md": "The cyoda binary 0.8.4 is installed. `cyoda-help.sh workflows best-practices` and `cyoda-help.sh design` both exit 2. Every other cyoda-help.sh call prints SOURCE=binary VERSION=0.8.4 and the real section text.",
+        "_simulated/developer.md": "Payment states so far: created, authorised, settled, failed. The bank call is a processor on created -> authorised. Ops want to know within 30 minutes if a payment is stuck."
+      },
       "assertions": [
-        { "id": "asks-domain-objects", "text": "Asks about domain objects and their states", "type": "behavior" },
-        { "id": "presents-compute-optional", "text": "Presents compute nodes as optional when asking about them", "type": "behavior" },
-        { "id": "accepts-no-compute", "text": "Accepts 'no compute nodes needed' gracefully without pushing back", "type": "behavior" },
-        { "id": "no-compute-in-summary", "text": "Does NOT include compute nodes in design summary when not needed", "type": "behavior" },
-        { "id": "q5-explains-discover", "text": "Q5 explains discover mode: schema evolves automatically, no upfront definitions", "type": "behavior" },
-        { "id": "q5-explains-lock", "text": "Q5 explains lock mode: schema fixed, mismatches rejected", "type": "behavior" },
-        { "id": "q5-can-switch", "text": "Q5 mentions you can start with discover and switch to lock later", "type": "behavior" }
+        { "id": "skips-orientation", "text": "Does not give a Cyoda orientation (the prompt uses Cyoda terms)", "type": "behavior" },
+        { "id": "coming-soon-wording", "text": "Says notifications are 'coming soon — check `cyoda help` for availability' (this wording)", "type": "behavior" },
+        { "id": "no-invented-api", "text": "Does not describe a webhook, subscription or notification feature as available today", "type": "behavior" },
+        { "id": "option-state-query", "text": "Offers querying entities in the error state (state stats or a search) as a way to find payments needing action", "type": "behavior" },
+        { "id": "option-async-processor", "text": "Offers an ASYNC_NEW_TX processor on the transition into the error state for the side effect (e.g. calling the ops channel from a compute node)", "type": "behavior" },
+        { "id": "option-scheduled", "text": "Offers a scheduled transition for escalation (e.g. after 30 minutes stuck), pointing at `cyoda help workflows` SCHEDULED TRANSITIONS", "type": "behavior" },
+        { "id": "names-error-bullet", "text": "Names the best practice 'Model error states explicitly' and models the error state with an exit transition held by a criterion, plus a backward/retry path", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     },
     {
       "id": 4,
-      "prompt": "I want to model an Order entity with these states: draft, submitted, processing, calling_payment_api, retry, approved, rejected",
-      "expected_output": "Removes technical states (processing, calling_payment_api, retry) during Phase 3 design review, explains each removal inline, produces corrected design summary with business states only (draft, submitted, approved, rejected), references design-guidelines.md for async processor pattern",
-      "files": {},
+      "prompt": "I haven't installed cyoda yet. Can you help me design a simple event ticketing app first? Tickets get reserved, then paid, and a reservation should expire if it isn't paid within 15 minutes.",
+      "expected_output": "Does not stop to install or require an instance. cyoda-help.sh falls back to the web help mirror (SOURCE=web; --section ignored, so it reads the named section heading in the whole page). Both best-practices probes exit 2, so it uses resources/best-practices.md. Models the expiry as a scheduled transition (schedule.delayMs on an automated transition), citing `cyoda help workflows` SCHEDULED TRANSITIONS and the patterns file, not a scheduled processor. Completes the design summary with explicit terminal states (e.g. Paid/Used, Expired, Cancelled), then hands off: 'next, type `/cyoda:setup`' to install, then `/cyoda:build`.",
+      "files": {
+        "_simulated/env.md": "`command -v cyoda` finds nothing, and no instance profile is configured. `cyoda-help.sh workflows best-practices` exits 2 and `cyoda-help.sh design` exits 2. Every other cyoda-help.sh call prints 'SOURCE=web VERSION=0.8.4' and 'note: --section is ignored for web pages; showing the whole page' on stderr, then the whole topic page from docs.cyoda.net/help.",
+        "_simulated/developer.md": "Entities: event and ticket. Ticket: reserved, paid, then scanned at the door; the buyer can cancel before paying. No external code. Ticket numbers must be unique. Prototype."
+      },
       "assertions": [
-        { "id": "removes-technical-states", "text": "Removes processing, calling_payment_api, and retry as technical states", "type": "behavior" },
-        { "id": "explains-removals-inline", "text": "Briefly explains each removal inline in plain language", "type": "behavior" },
-        { "id": "corrected-summary", "text": "Produces design summary that contains no technical states (processing, calling_payment_api, retry absent); may include a business recovery state such as payment_failed", "type": "format" },
-        { "id": "references-guidelines", "text": "References design-guidelines.md for the async processor pattern", "type": "behavior" },
-        { "id": "no-silent-correction", "text": "Does NOT silently drop states without explanation", "type": "behavior" }
+        { "id": "no-install-gate", "text": "Does not refuse or pause the design until cyoda is installed", "type": "behavior" },
+        { "id": "uses-web-mirror", "text": "Uses the cyoda-help.sh output from the web help mirror (SOURCE=web) for facts, and reads the named section within the whole page", "type": "behavior" },
+        { "id": "bundled-fallback", "text": "Uses resources/best-practices.md because both best-practices help probes exit 2", "type": "behavior" },
+        { "id": "scheduled-transition", "text": "Models the 15-minute expiry as a scheduled transition (a `schedule` with delayMs on an automated transition out of reserved), pointing at `cyoda help workflows` SCHEDULED TRANSITIONS, and does not describe a 'scheduled processor'", "type": "behavior" },
+        { "id": "terminal-states", "text": "Names several precise terminal states (e.g. expired, cancelled, used) instead of deleting tickets", "type": "behavior" },
+        { "id": "design-completes", "text": "Produces the full design summary in this session", "type": "format" },
+        { "id": "handoff-setup-then-build", "text": "Hands off with 'next, type `/cyoda:setup`' (to install and start cyoda-go), then `/cyoda:build`; does not say it will invoke them", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I want to model an Order entity with these states: draft, submitted, processing, calling_payment_api, retry, approved, rejected",
+      "expected_output": "Skips orientation. Loads the best practices. In the design review, removes the technical states processing, calling_payment_api and retry with a one-sentence reason each (a processor on a transition is not a state; retries are a backward transition or a loopback), adds an explicit error state for a failed payment if the developer wants one, keeps approved and rejected as terminal states, and names the bullets and guidelines sections it applied. Produces the corrected summary.",
+      "files": {
+        "_simulated/env.md": "The cyoda binary 0.8.4 is installed. `cyoda-help.sh workflows best-practices` and `cyoda-help.sh design` both exit 2. Every other cyoda-help.sh call prints SOURCE=binary VERSION=0.8.4 and the real section text.",
+        "_simulated/developer.md": "The payment call happens after submit. A failed payment should be visible to staff, who can retry it. Approval is a manual staff action."
+      },
+      "assertions": [
+        { "id": "removes-technical-states", "text": "Removes processing, calling_payment_api and retry as technical states", "type": "behavior" },
+        { "id": "explains-removals-inline", "text": "Explains each removal inline in one plain sentence", "type": "behavior" },
+        { "id": "retry-as-transition", "text": "Models retry as a backward transition or a loopback re-evaluation, not as a state", "type": "behavior" },
+        { "id": "corrected-summary", "text": "The summary contains no technical states; it may contain a business error state such as payment_failed", "type": "format" },
+        { "id": "references-guidelines", "text": "References resources/design-guidelines.md (async processing section) or the best-practice bullets by name for the reasoning", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     }
   ]

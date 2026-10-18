@@ -1,12 +1,14 @@
 # Entity Lifecycle & State Machine Design Guidelines
 
-Use this document when reviewing a proposed entity design, or share it with users who want to understand the reasoning behind design decisions.
+General lifecycle-modelling judgment for reviewing a proposed entity design, or to share with developers who want the reasoning behind a design decision.
+
+Read it together with the shared best practices (`cyoda help workflows best-practices` or `cyoda help design` once Cyoda/cyoda-go#684 item L ships; until then [best-practices.md](best-practices.md)). Those bullets are the Cyoda-specific, fact-checked rules. Where a topic is covered there, this file points at the bullet by name instead of repeating it.
 
 ## Core Summary Principles
 
 - States represent **business meaning**, not process steps.
 - Guards represent **decision logic**, not lifecycle changes.
-- Async processors represent **deferred computation and continuation**, not states.
+- Processors represent **computation attached to a transition**, not states.
 - Entities must remain **simple, decomposed, and responsibility-focused**.
 - Lifecycle design must avoid **state explosion and technical leakage**.
 - Business clarity is more important than process completeness.
@@ -21,15 +23,15 @@ Use this document when reviewing a proposed entity design, or share it with user
 
 - **Single Responsibility Entities** — Design entities around a single business responsibility. Avoid "super entities" that aggregate multiple unrelated business activities.
 
-- **Responsibility-Oriented Modeling** — If different activities have independent business rules, ownership, reporting requirements, or lifecycles, model them as separate entities.
+- **Responsibility-Oriented Modeling** — If different activities have independent business rules, ownership, reporting requirements, or lifecycles, model them as separate entities. Link them as in the best practice *Link entities by entity id*.
 
 - **Behavior-Altering States** — Every state must represent a distinct business condition. Entering a state should have observable business consequences, such as changing allowed actions, validation requirements, permissions, reporting interpretation, or business behavior.
 
-- **Orthogonal Lifecycles** — Use separate entities or separate lifecycle dimensions when independent business concerns exist. Avoid combining unrelated concerns into a single lifecycle.
+- **Orthogonal Lifecycles** — When independent business concerns exist, give each its own entity. An entity runs exactly one workflow at a time (see §7), so two concerns can't be two parallel state machines on one entity.
 
-- **Strict Attribute Separation** — Lifecycle state should represent progression through a business process. Do not encode independent business dimensions such as ownership, assignment, priority, visibility, categorization, payment tracking, or SLA monitoring as lifecycle states. Model these as separate attributes, supporting entities, or independent lifecycles to avoid state explosion and preserve clear lifecycle semantics.
+- **Strict Attribute Separation** — Lifecycle state should represent progression through a business process. Do not encode independent business dimensions such as ownership, assignment, priority, visibility, categorization, payment tracking, or SLA monitoring as lifecycle states. Model these as attributes, or as supporting entities with their own lifecycle, to avoid state explosion and preserve clear lifecycle semantics.
 
-- **Value-Driven States** — Prefer fewer meaningful states over many low-value intermediate states. Every state should have clear business value and purpose.
+- **Value-Driven States** — Prefer fewer meaningful states over many low-value intermediate states. Every state should have clear business value and purpose. For the limits on cascades, see the best practice *Balance the number of states*.
 
 - **State Classification Awareness** — Distinguish active, waiting, suspended, completed, cancelled, rejected, expired, and archived conditions only when they represent genuinely different business meanings.
 
@@ -37,7 +39,7 @@ Use this document when reviewing a proposed entity design, or share it with user
 
 ## 2. Structural & Graph Integrity
 
-- **Boundary States** — Every lifecycle must have exactly one initial state. Lifecycles may have one or more terminal states.
+- **Boundary States** — Every lifecycle has exactly one initial state. For end states, see the best practice *Define precise terminal states*.
 
 - **State Exclusivity** — States must be mutually exclusive and unambiguous.
 
@@ -47,7 +49,7 @@ Use this document when reviewing a proposed entity design, or share it with user
 
 - **Graph Validation** — Validate lifecycle graphs for unreachable states, accidental dead ends, invalid loops, and missing completion paths.
 
-- **Intentional Loops** — Cycles and return paths should be intentional and explicitly documented.
+- **Intentional Loops** — Cycles and return paths should be intentional and documented. For how the engine treats them, see the best practices *Build explicit validation cycles* and *Re-trigger evaluation with a loopback, not by firing an automated transition*.
 
 ---
 
@@ -59,7 +61,7 @@ Use this document when reviewing a proposed entity design, or share it with user
 
 - **Exit Criteria** — Define explicit conditions under which a state may be exited.
 
-- **Persisted vs Derived State** — Persist lifecycle state only when it represents a business decision, milestone, or historical fact. Do not persist statuses that can be deterministically derived from existing data.
+- **Persisted vs Derived State** — Persist lifecycle state only when it represents a business decision, milestone, or historical fact. Do not persist statuses that can be deterministically derived from existing data. For totals and counts, see the best practice *Compute aggregations; don't maintain them*.
 
 - **Conditional Guards** — Prefer transition guards over creating additional states for minor business variations.
 
@@ -75,9 +77,9 @@ Use this document when reviewing a proposed entity design, or share it with user
 
 - **No Generic State Changes** — Avoid generic "Change State" operations. Every transition should have explicit business meaning.
 
-- **Multiple Transitions from a Single State** — Multiple transitions may originate from the same state. Transition selection may be based on entity data or externalized condition evaluation. Conditions should ideally be mutually exclusive. If multiple transitions may match simultaneously, the first matching transition wins.
+- **Multiple Transitions from a Single State** — Several transitions may leave the same state, selected on entity data or by an externalized (function) criterion. How the engine picks among automated ones is in the best practice *Drive processing with automated transitions*; who fires the others is in *Use manual transitions for external triggers*.
 
-- **Avoid Overlapping Guards** — Guard conditions should ideally be mutually exclusive. If multiple transitions may match simultaneously, precedence rules must be clearly documented.
+- **Avoid Overlapping Guards** — Guard conditions should be mutually exclusive. If they can't be, the declaration order decides, so document why the order matters.
 
 - **Prefer Guards Over State Proliferation** — Use transition conditions when business variations do not represent distinct business states. If the business difference is about how something happens, use a transition condition (guard). If the business difference is about what the entity is, use a new state.
 
@@ -85,33 +87,31 @@ Use this document when reviewing a proposed entity design, or share it with user
 
 ---
 
-## 5. Async Processing, External Execution & State Continuation
+## 5. Processors, Async Work & Failure
 
 - **No Technical States for Processing** — Do not model execution states such as processing, calling an external system, retrying, or waiting in a queue.
 
-- **Async Processors (Core Platform Concept)** — A transition may trigger a fully asynchronous processor. The processor may complete later, return a result, or resume/restart the state machine with new input. Use it only when necessary. If an async processor fails, the entity remains in the state reached before execution — lifecycle design must account for this explicitly.
+- **A Processor Is NOT a State** — It is externalized business computation attached to a transition. It does not define lifecycle position.
 
-- **An Async Processor Is NOT a State** — It is externalized business computation. It does not define lifecycle position.
+- **Design for the Execution Mode** — What a failed processor does to the lifecycle depends on its `executionMode`: for example an `ASYNC_NEW_TX` failure still completes the transition (its returned data is discarded), while a `SYNC` failure rolls the whole write back. Pick the mode deliberately and read `cyoda help workflows` PROCESSORS for each mode's failure behaviour. Don't assume a processor succeeds.
 
-- **Failure Recovery Must Be Modeled** — Designers must define retry paths, compensation actions, alternative transitions, and manual intervention paths.
+- **Model the Failure Path** — See the best practices *Model error states explicitly* and *Add backward transitions for retries and corrections*.
 
-- **Do Not Assume Completion** — Async processors are not guaranteed to succeed.
+- **Continuing Later** — A processor does not pause the state machine and resume it. Work that finishes later continues the lifecycle by firing a transition on the entity, as in the best practice *Use manual transitions for external triggers*.
 
-- **Async Continuation Rule** — When a fully async processor completes, it may re-enter or continue the state machine as a new lifecycle event.
-
-- **Timeout Awareness** — Async processors must consider timeout behavior explicitly.
+- **Timeout Awareness** — Processor and function-criterion calls time out (30 s by default, overridable per processor). For slow external work, read the `COMMIT_BEFORE_DISPATCH` mode in `cyoda help workflows` PROCESSORS.
 
 ---
 
 ## 6. Parallel Activities & Business Progress
 
-- **Parallel Execution** — Parallel activities may be designed externally; there are no parallel transitions within the state machine.
+- **Parallel Execution** — Parallel activities are designed across entities; there are no parallel transitions within a state machine.
 
 - **Do Not Encode Parallelism in States** — Avoid combinatorial states such as: `WaitingForAAndB`, `WaitingForAOnly`, `WaitingForBOnly`.
 
-- **Track Progress Separately** — Use supporting structures or sub-entities.
+- **Track Progress Separately** — Use supporting structures or sub-entities, linked by entity id.
 
-- **Explicit Join Conditions** — If you run parallel execution using sub-entities, you can add a scheduled loop and condition that checks whether all tasks are complete — for example, by checking flags at the entity level or by calling an externalized processor.
+- **Explicit Join Conditions** — With parallel sub-entities, join on the parent by either (a) a processor on each sub-entity's final transition firing a transition on the parent, whose criterion checks that all are done, or (b) a polling scheduled transition on the parent that re-checks the condition. For (b), read `cyoda help workflows` SCHEDULED TRANSITIONS ("One-shot vs. polling").
 
 ---
 
@@ -127,4 +127,4 @@ Use this document when reviewing a proposed entity design, or share it with user
 
 - **State Explosion Prevention** — Avoid encoding unrelated dimensions as states.
 
-- **Prefer Composition** — Multiple simple lifecycles are preferred over one complex lifecycle. It is possible to define multiple conditional workflows for the same entity type.
+- **Prefer Composition** — Several simple lifecycles on separate entities beat one complex lifecycle. One entity type may have several conditional workflows, but they are alternatives: each call runs the first active workflow whose criterion matches. Selection is re-evaluated on every call, so select on fields that don't change, or an edit can re-bind the entity to another workflow and strand its state. Read `cyoda help workflows` CRITERIA (workflow-level selection).

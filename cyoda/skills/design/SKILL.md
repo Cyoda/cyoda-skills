@@ -1,89 +1,150 @@
 ---
 name: design
-description: Brainstorm and design a Cyoda application. Guides entity modeling, workflow design, and compute node decisions following Cyoda philosophy. Auto-invoked when the user describes an app idea or asks how to model their domain in Cyoda.
-when_to_use: When the user describes an application they want to build on Cyoda, asks how to model their domain, or needs help designing entities and workflows.
+description: Use when the developer describes an application idea for cyoda-go, asks how to model their domain as Cyoda entities and workflows, or wants a proposed entity or workflow design reviewed before building it.
+allowed-tools: Bash(*cyoda-help.sh *) Read
 ---
 
-## Cyoda Application Design
+# Cyoda application design
 
-### Phase 1 — Orientation (skip if user is already familiar with Cyoda)
+Turn an app idea into entities and workflows, review them against the Cyoda best practices, and hand a summary to `/cyoda:build`. This skill writes no files and calls no instance API. It only reads help, so it works without an instance and without the binary.
 
-Assess whether the user needs orientation. **Skip orientation if the user's message contains any of these Cyoda-specific terms:** `entity`, `entities`, `workflow`, `workflows`, `state`, `states`, `transition`, `transitions`, `compute node`, `discover mode`, `lock mode`. If the user already speaks Cyoda — go straight to Phase 2.
+**Facts come from `cyoda help`, not from this file or from memory.** Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> [--section "<NAME>"]`. It prints the topic or section body, and stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2 means unknown topic; exit 6 means unknown section (stderr lists the sections that exist). With no binary installed it falls back to the web help mirror by itself. The mirror ignores `--section` and prints the whole page, so find the section by its heading there. If a topic you know exists still exits 2 (offline), carry on with the design and tell the developer which facts you couldn't check.
 
-If none of those terms appear, give a brief orientation first:
+## Step 0 — Load the best practices
 
-**Orientation (2-3 sentences maximum):**
+Before Phase 1, load the list Phase 3 reviews against:
 
-Cyoda is an Entity Database Management System (EDBMS) — a database where every record is a state machine. Instead of storing rows in tables, you define **entities** — domain objects like Orders or Users — each with a **workflow**: a set of named states and the transitions between them. Nothing in Cyoda is overwritten; every transition produces a new immutable revision, giving you the full history of every entity.
+1. Run `cyoda-help.sh workflows best-practices`. Exit 0: that text is the list.
+2. Exit 2: run `cyoda-help.sh design`. Exit 0: that text is the list.
+3. Both exit 2: read [resources/best-practices.md](resources/best-practices.md), the bundled copy kept until Cyoda/cyoda-go#684 item L ships.
 
-After orientation, ask: *"Does that make sense? Ready to design your app?"*
+Tell the developer in one line which source you used, e.g. "Best practices: bundled copy (the `cyoda help` topic hasn't shipped yet)."
 
-### Phase 2 — Domain Brainstorm
+## Phase 1 — Orientation
 
-Ask one question at a time. Wait for the answer before asking the next.
+Skip it if the developer's message contains any of: `entity`, `entities`, `workflow`, `workflows`, `state`, `states`, `transition`, `transitions`, `compute node`, `changeLevel`. Go straight to Phase 2.
 
-**Q1:** *"What are the main domain objects in your application that have an independent lifecycle — things that change over time on their own clock?"*
+Otherwise, orient in 2-3 sentences:
 
-For each entity identified, continue:
+Cyoda is an Entity Database Management System (EDBMS): a database where every record is a state machine. You define **entities** (domain objects like Orders or Users), each with a **workflow**: named states and the transitions between them. Nothing is overwritten; every write produces a new immutable revision, so each entity keeps its full history.
 
-**Q2:** *"For [entity name]: what states does it move through from creation to completion? (e.g., for an Order: draft → submitted → processing → shipped → delivered)"*
+Then ask: *"Does that make sense? Ready to design your app?"*
 
-**Q3:** *"For each transition: what triggers it? Manual action by a user, an incoming event/message, a time delay, or automatically when a condition is met?"*
+## Phase 2 — Domain brainstorm
 
-**Q4:** *"Do any transitions need to call external code — to validate data, call a third-party API, or run a calculation? If yes, that's where a compute node comes in. But many apps don't need them at all."*
+Ask one question at a time and wait for the answer. Skip any question the developer has already answered.
 
-Present the compute node option neutrally — it is **optional**. Many workflows work purely with Cyoda's built-in criteria and processors.
+**Q1:** *"What are the main things in your app that have their own lifecycle, changing over time on their own clock?"*
 
-**Q5:** *"Are you building this as a prototype or targeting production? This determines the schema mode:*
-- *Discover mode (prototype): Cyoda infers and evolves the schema automatically as data is posted — no upfront field definitions needed.*
-- *Lock mode (production): The schema is fixed. Data that doesn't match is rejected. Use this when the model is stable.*
+For each entity:
 
-*You can always start with discover and switch to lock when you're ready to go live. Which fits where you are now?"*
+**Q2:** *"For [entity]: what states does it move through, from creation to every way it can end? What can go wrong along the way?"* Listen for the error path and for several distinct endings (best practices *Model error states explicitly*, *Define precise terminal states*).
 
-### Phase 3 — Design Review
+**Q3:** *"What moves it from one state to the next: a person or another system acting, a condition on its data becoming true, or time passing?"* Map the answers:
 
-Before presenting the output summary, apply this checklist to the proposed design (entities, states, transitions gathered through Q1–Q5). For each violation found, fix the design and note the change in one plain-language sentence inline — for example: *"I've removed `processing` — Cyoda models that as an async processor, not a business state."* Then produce the corrected Phase 4 summary. When a deeper explanation is useful, point the user to the guidelines: *"See [Entity Lifecycle & State Machine Design Guidelines](resources/design-guidelines.md) — § Async Processing."*
+| Developer says | Model it as | Facts |
+|---|---|---|
+| A user, a batch job, another system, a webhook arriving | Manual transition, fired through the API by that caller | `workflows --section TRANSITIONS` |
+| "When X is true" | Automated transition with a criterion | `workflows --section CRITERIA` |
+| "After N minutes", "expires", "escalate if stuck" | Scheduled transition ([patterns.md](resources/patterns.md) § Scheduled Transition) | `workflows --section "SCHEDULED TRANSITIONS"` |
+| "When the child/linked entity finishes" | A processor on that entity's transition fires a transition here | best practice *Use manual transitions for external triggers* |
 
-**Core principles to apply:**
-- States represent business meaning, not process steps
-- Guards represent decision logic, not lifecycle changes — prefer a guard over a new state when only the path differs, not the business condition
-- Async processors represent deferred computation, not states
-- Business clarity over process completeness — fewer clear states beat many low-value intermediate ones
+Edge messages (`cyoda help messages`) never fire a transition, so a "message-triggered transition" is a caller firing a manual transition.
 
-**Anti-patterns to catch and fix:**
+**Q4:** *"Do any steps need your own code: calling a third-party API, a calculation, or a check that needs data not on the entity? That's a compute node. Many apps don't need one."* Present it as optional. A compute node is also how a criterion returns a rejection reason (best practice *Give a rejection reason when a criterion fails*).
+
+**Q5:** *"Must any field, or combination of fields, be unique across all [entity]s, such as an order number or an email?"* These are unique keys, set before the model is locked (`models --section ENDPOINTS`, unique-keys).
+
+**Q6:** Read `models --section LIFECYCLE` first. Explain from it: the schema is taken from sample data, and the model is locked before any entity exists. The choice is how much the schema may still grow on writes: none (strict, only the sample's fields), or one of the changeLevel values listed there, from least to most permissive. Ask: *"Do you expect to add fields while you build, and will any processor write fields that aren't in your sample?"* Prototype: a permissive level. Production: none or a narrow one. It can be changed later.
+
+## Phase 3 — Design review
+
+Check the proposed design against two lists, then fix it:
+
+1. **Every bullet of the best-practices list from Step 0**, by its bold name. Show the result as one line per bullet: `- <bullet name>: ok | changed: <what> | n/a`.
+2. **The anti-patterns below.** List only the ones you found.
+
+For each violation, change the design and say so in one plain sentence that names the bullet or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* For the reasoning, point to [design-guidelines.md](resources/design-guidelines.md) by section, e.g. "§ 5 Processors, Async Work & Failure".
+
+**Proposals that map to a best practice:**
+
+| Developer proposes | Best practice | Propose instead (read first) |
+|---|---|---|
+| A running total, counter or summary entity updated on each write | *Compute aggregations; don't maintain them* | Entity stats or a grouped stats query on scalar fields (`crud --section ENDPOINTS`) |
+| SQL or reporting queries | *Compute aggregations; don't maintain them* | Stats or search (`search --section ENDPOINTS`). SQL analytics is not available in cyoda-go |
+| Flattening into relational tables | *Use tree-shaped JSON* | Nested objects and arrays; aggregated values at scalar paths |
+| Foreign keys, joins, cascading deletes | *Link entities by entity id* | A UUID field; no referential integrity or joins |
+| Only the happy path | *Model error states explicitly* | An `Errored` state with a criterion-held exit |
+| A `retry` state, or "re-run the check" | *Add backward transitions for retries and corrections*, *Re-trigger evaluation with a loopback, not by firing an automated transition* | A backward transition, or a loopback |
+| Deleting an entity to end it | *Prefer a ledger to deletion* | Terminal states |
+| One `done` state | *Define precise terminal states* | `Completed`, `Cancelled`, ... |
+| A check that fails with no explanation | *Give a rejection reason when a criterion fails* | A function criterion, or `criterionAnnotations.description` |
+
+**Notifications.** If the developer asks for notifications, alerts, webhooks or subscriptions when an entity enters a state, say: "Notifications are coming soon — check `cyoda help` for availability." Then offer today's options:
+1. Find entities needing action by querying the state: state stats (`crud --section ENDPOINTS`) or a search.
+2. An `ASYNC_NEW_TX` processor on the transition into the state, whose compute node sends the message (`workflows --section PROCESSORS`).
+3. A scheduled transition for escalation, e.g. `errored` → `escalated` after 30 minutes (`workflows --section "SCHEDULED TRANSITIONS"`).
+
+Use the same "coming soon" wording for any other feature the developer asks for that `cyoda help` doesn't document, and never describe such a feature as available.
+
+**Anti-patterns:**
 
 | Anti-pattern | Signal | Fix |
 |---|---|---|
-| Technical states | State named `processing`, `calling_*`, `retry`, `queued`, `waiting_for_response` | Remove; model as async processor |
-| Orthogonal dimensions as states | Priority, assignment, ownership, visibility, payment status, SLA as lifecycle states | Extract to attributes or sub-entities |
-| Orthogonal lifecycles collapsed | Independent business concerns (different rules, ownership, reporting) in one lifecycle | Split into separate entities |
-| Combinatorial wait states | `WaitingForAAndB`, `WaitingForAOnly`, etc. | Replace with progress sub-entity or join condition |
-| Super entity | Single entity spans multiple independent business activities | Split |
-| Low-value states | State with no clear business value | Remove or merge |
-| Stateless states | No observable business consequence (no change in allowed actions, validation, permissions, reporting) | Remove or merge |
-| State classification overuse | active/waiting/suspended/cancelled/rejected/expired/archived used as distinct states with identical business behavior | Consolidate |
-| Dead-end state | Non-terminal state with no valid path to a business outcome | Add a transition or flag for review |
-| Generic transitions | Named `changeState`, `update`, `modify`, `process` | Rename with a business verb |
+| Technical states | `processing`, `calling_*`, `retry`, `queued`, `waiting_for_response` | Remove; a processor on the transition does the work |
+| Orthogonal dimensions as states | Priority, assignment, ownership, visibility, payment status, SLA as lifecycle states | Attributes or sub-entities |
+| Orthogonal lifecycles collapsed | Independent concerns (different rules, ownership, reporting) in one lifecycle | Separate entities |
+| Parallel workflows on one entity | "a lifecycle workflow AND a compliance workflow" | Separate entities: each call runs one selected workflow (`workflows --section CRITERIA`, workflow-level selection) |
+| Combinatorial wait states | `WaitingForAAndB`, `WaitingForAOnly` | Progress sub-entities plus a join ([design-guidelines.md](resources/design-guidelines.md) § 6) |
+| Super entity | One entity spans several independent business activities | Split |
+| Low-value or stateless states | No change in allowed actions, validation, permissions or reporting | Remove or merge |
+| State classification overuse | active/suspended/expired/archived… with identical behaviour | Consolidate |
+| Dead-end state | Non-terminal state with no path to an outcome | Add a transition, or flag it |
+| Generic transitions | `changeState`, `update`, `modify`, `process` | Rename with a business verb |
 
-### Phase 4 — Output Design Summary
+Mention a pattern from [patterns.md](resources/patterns.md) when it fits (approval, scheduled transition, cascade, error state with retry, saga, external trigger).
 
-Present a structured summary:
+If the developer asks about the hosted cloud service or migrating to it, say "not covered by this plugin" and nothing more.
+
+## Phase 4 — Design summary
+
+Present the reviewed design in this shape. Don't write workflow JSON; `build` generates it from this summary.
 
 ```
+Best practices: <source from Step 0>
+
 Entities:
-  - [EntityName]: states=[...], key transitions=[...]
+  - <Entity>
+      states: initial=<s>; others=[...]; error=[...]; terminal=[...]
+      transitions: <name>: <from> → <to> (manual | automated, criterion: <what> | scheduled: <when>)
+      key fields: <tree-shaped fields>; links: <field> → <Entity> id
+      unique keys: [...] | none
   - ...
 
-Compute nodes needed: yes/no
-  - If yes: which transitions call external code and why
+Compute nodes: none | <entity.transition>: <processor or function criterion>, and why
 
-Schema mode: discover (prototype) / lock (production)
+Schema evolution: none (strict) | <changeLevel>, and why
 
-Suggested first increment for /cyoda:build: [EntityName] with [minimal workflow]
+Review: <each bullet changed, one line each; the rest ok or n/a>
+
+First increment: <Entity> with <minimal workflow>
 ```
 
-Reference patterns from [patterns.md](resources/patterns.md) when relevant (e.g., if the user describes an approval process, mention the Approval Flow pattern).
+Ask: *"Does this match what you want? (yes, or tell me what to change)"* Revise until yes.
 
-Offer to proceed: *"Ready to build this? Run `/cyoda:build` to start registering these models in your running Cyoda instance."*
+Then hand off:
+- If `cyoda-help.sh` reported `SOURCE=instance`: "Next, type `/cyoda:build` to turn the first increment into project files and register it on your instance."
+- Otherwise: "Next, type `/cyoda:setup` to install and start cyoda-go, then `/cyoda:build` to register the first increment." (If the developer already has an instance running, `/cyoda:build` alone.)
 
-For users who want to understand the reasoning behind design decisions, share [Entity Lifecycle & State Machine Design Guidelines](resources/design-guidelines.md).
+## Common mistakes
+
+| Mistake | Instead |
+|---|---|
+| Stating a Cyoda fact from memory | Read and name the help section |
+| Saying entities can be posted before the model is locked | Q6: sample data, lock, then a changeLevel |
+| A "scheduled processor" | A `schedule` on an automated transition |
+| A transition triggered by an edge message | The caller fires a manual transition |
+| Describing notifications as available | The "coming soon" wording plus today's three options |
+| Reviewing only against the anti-patterns | Every best-practice bullet, by name |
+| Generating workflow JSON | The summary; `build` writes the files |
+| Saying you'll run `build` or `setup` yourself | "Next, type `/cyoda:build`" with a one-line reason |
