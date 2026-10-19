@@ -1,6 +1,6 @@
 # Entity Lifecycle & State Machine Design Guidelines
 
-General lifecycle-modelling judgment for reviewing a proposed entity design, or to share with developers who want the reasoning behind a design decision.
+General lifecycle-modelling judgment for reviewing a proposed entity design and explaining the reasoning behind a design decision. Where it names a `cyoda help` section, the agent reads that section and gives the developer the result.
 
 Read it together with the shared best practices (`cyoda help workflows best-practices` or `cyoda help design` once Cyoda/cyoda-go#684 item L ships; until then [best-practices.md](best-practices.md)). Those bullets are the Cyoda-specific, fact-checked rules. Where a topic is covered there, this file points at the bullet by name instead of repeating it.
 
@@ -93,7 +93,7 @@ Read it together with the shared best practices (`cyoda help workflows best-prac
 
 - **A Processor Is NOT a State** — It is externalized business computation attached to a transition. It does not define lifecycle position.
 
-- **Design for the Execution Mode** — What a failed processor does to the lifecycle depends on its `executionMode`: for example an `ASYNC_NEW_TX` failure still completes the transition (its returned data is discarded), while a `SYNC` failure rolls the whole write back. Pick the mode deliberately and read `cyoda help workflows` PROCESSORS for each mode's failure behaviour. Don't assume a processor succeeds.
+- **Design for the Execution Mode** — What a failed processor does to the lifecycle depends on its `executionMode`: for example an `ASYNC_NEW_TX` failure still completes the transition (its returned data is discarded), while a `SYNC` failure rolls the whole write back. Pick the mode deliberately; each mode's failure behaviour is in `cyoda help workflows` PROCESSORS. Don't assume a processor succeeds.
 
 - **Model the Failure Path** — See the best practices *Model error states explicitly* and *Add backward transitions for retries and corrections*.
 
@@ -111,7 +111,7 @@ Read it together with the shared best practices (`cyoda help workflows best-prac
 
 - **Track Progress Separately** — Use supporting structures or sub-entities, linked by entity id.
 
-- **Explicit Join Conditions** — With parallel sub-entities, join on the parent by either (a) a processor on each sub-entity's final transition firing a transition on the parent, whose criterion checks that all are done, or (b) a polling scheduled transition on the parent that re-checks the condition. For (b), read `cyoda help workflows` SCHEDULED TRANSITIONS ("One-shot vs. polling").
+- **Explicit Join Conditions** — With parallel sub-entities, join on the parent by either (a) a processor on each sub-entity's final transition firing a transition on the parent, whose criterion checks that all are done, or (b) a polling scheduled transition on the parent that re-checks the condition. For (b), the facts are in `cyoda help workflows` SCHEDULED TRANSITIONS ("One-shot vs. polling").
 
 ---
 
@@ -127,4 +127,4 @@ Read it together with the shared best practices (`cyoda help workflows best-prac
 
 - **State Explosion Prevention** — Avoid encoding unrelated dimensions as states.
 
-- **Prefer Composition** — Several simple lifecycles on separate entities beat one complex lifecycle. One entity type may have several conditional workflows, but they are alternatives: each call runs the first active workflow whose criterion matches. Selection is re-evaluated on every call, so select on fields that don't change, or an edit can re-bind the entity to another workflow and strand its state. Read `cyoda help workflows` CRITERIA (workflow-level selection).
+- **Prefer Composition** — Several simple lifecycles on separate entities beat one complex lifecycle. One entity type may have several conditional workflows, but they are alternatives: each call runs the first active workflow whose criterion matches. Selection is re-evaluated on every call, so select on fields that don't change, or an edit can re-bind the entity to another workflow and strand its state. Facts: `cyoda help workflows` CRITERIA (workflow-level selection).

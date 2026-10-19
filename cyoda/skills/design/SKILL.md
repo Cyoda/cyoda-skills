@@ -10,6 +10,8 @@ Turn an app idea into entities and workflows, review them against the Cyoda best
 
 **Facts come from `cyoda help`, not from this file or from memory.** Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> [--section "<NAME>"]`. It prints the topic or section body, and stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2 means unknown topic; exit 6 means unknown section (stderr lists the sections that exist). With no binary installed it falls back to the web help mirror by itself. The mirror ignores `--section` and prints the whole page, so find the section by its heading there. If a topic you know exists still exits 2 (offline), carry on with the design and tell the developer which facts you couldn't check.
 
+**You read help; the developer gets the result.** Before you propose a query or any pattern whose shape depends on the API or the workflow schema (a stats query, a search, a schedule, a criterion), read the named section yourself. Then write the concrete example for the developer's own entity and fields in the shape that section gives, e.g. the grouped stats request for their Order data. Never copy endpoint or field text from best-practices.md or this file, and never tell the developer to go read help. You may say which section you used.
+
 ## Step 0 — Load the best practices
 
 Before Phase 1, load the list Phase 3 reviews against:
@@ -64,26 +66,28 @@ Check the proposed design against two lists, then fix it:
 1. **Every bullet of the best-practices list from Step 0**, by its bold name. Show the result as one line per bullet: `- <bullet name>: ok | changed: <what> | n/a`.
 2. **The anti-patterns below.** List only the ones you found.
 
-For each violation, change the design and say so in one plain sentence that names the bullet or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* For the reasoning, point to [design-guidelines.md](resources/design-guidelines.md) by section, e.g. "§ 5 Processors, Async Work & Failure".
+For each violation, change the design and say so in one plain sentence that names the bullet or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* Give the reasoning yourself, drawing on [design-guidelines.md](resources/design-guidelines.md) (e.g. § 5 Processors, Async Work & Failure).
+
+**Error-state exits.** An automated exit from an error state must have a criterion, or the entity leaves the state at once. Manual exits hold the entity by themselves, and a scheduled escalation is fine. Every error state also needs a retry or correction path.
 
 **Proposals that map to a best practice:**
 
-| Developer proposes | Best practice | Propose instead (read first) |
+| Developer proposes | Best practice | Produce instead (from the section you read) |
 |---|---|---|
-| A running total, counter or summary entity updated on each write | *Compute aggregations; don't maintain them* | Entity stats or a grouped stats query on scalar fields (`crud --section ENDPOINTS`) |
-| SQL or reporting queries | *Compute aggregations; don't maintain them* | Stats or search (`search --section ENDPOINTS`). SQL analytics is not available in cyoda-go |
+| A running total, counter or summary entity updated on each write | *Compute aggregations; don't maintain them* | The concrete grouped stats query for their entity, on scalar fields (`crud --section ENDPOINTS`) |
+| SQL or reporting queries | *Compute aggregations; don't maintain them* | The concrete stats query or search for their question (`crud` or `search --section ENDPOINTS`). SQL analytics is not available in cyoda-go |
 | Flattening into relational tables | *Use tree-shaped JSON* | Nested objects and arrays; aggregated values at scalar paths |
 | Foreign keys, joins, cascading deletes | *Link entities by entity id* | A UUID field; no referential integrity or joins |
-| Only the happy path | *Model error states explicitly* | An `Errored` state with a criterion-held exit |
+| Only the happy path | *Model error states explicitly* | An `Errored` state with no unguarded automated exit, plus a retry path |
 | A `retry` state, or "re-run the check" | *Add backward transitions for retries and corrections*, *Re-trigger evaluation with a loopback, not by firing an automated transition* | A backward transition, or a loopback |
 | Deleting an entity to end it | *Prefer a ledger to deletion* | Terminal states |
 | One `done` state | *Define precise terminal states* | `Completed`, `Cancelled`, ... |
 | A check that fails with no explanation | *Give a rejection reason when a criterion fails* | A function criterion, or `criterionAnnotations.description` |
 
 **Notifications.** If the developer asks for notifications, alerts, webhooks or subscriptions when an entity enters a state, say: "Notifications are coming soon — check `cyoda help` for availability." Then offer today's options:
-1. Find entities needing action by querying the state: state stats (`crud --section ENDPOINTS`) or a search.
-2. An `ASYNC_NEW_TX` processor on the transition into the state, whose compute node sends the message (`workflows --section PROCESSORS`).
-3. A scheduled transition for escalation, e.g. `errored` → `escalated` after 30 minutes (`workflows --section "SCHEDULED TRANSITIONS"`).
+1. Find entities needing action by querying the state: give the concrete state-count or search request for their entity (`crud --section ENDPOINTS`, `search --section ENDPOINTS`).
+2. An `ASYNC_NEW_TX` processor on the transition into the state, whose compute node sends the message. Show the processor entry (`workflows --section PROCESSORS`).
+3. A scheduled transition for escalation, e.g. `errored` → `escalated` after 30 minutes. Show the transition (`workflows --section "SCHEDULED TRANSITIONS"`).
 
 **Other features help doesn't document.** "Coming soon" is only for features known to be planned, which today means notifications. For anything else the developer asks for that `cyoda help` doesn't document, say: "Not available in cyoda-go <VERSION> — check `cyoda help`." `<VERSION>` is the `VERSION=` that `cyoda-help.sh` reported. Then offer the closest documented way, if there is one.
 
@@ -108,7 +112,7 @@ If the developer asks about Cloud, hosted or managed offerings, or migration, an
 
 ## Phase 4 — Design summary
 
-Present the reviewed design in this shape. Don't write workflow JSON; `build` generates it from this summary.
+Present the reviewed design in this shape. Don't write the full workflow files; `build` generates them from this summary. Short fragments that show a proposal (a query, one transition) are fine.
 
 ```
 Best practices: <source from Step 0>
@@ -141,6 +145,7 @@ Then hand off:
 | Mistake | Instead |
 |---|---|
 | Stating a Cyoda fact from memory | Read and name the help section |
+| Telling the developer to go read help, or copying endpoints from best-practices.md | Read the section yourself and write the concrete query or fragment for their entity |
 | Saying entities can be posted before the model is locked | Q6: sample data, lock, then a changeLevel |
 | A "scheduled processor" | A `schedule` on an automated transition |
 | Reviewing only against the anti-patterns | Every best-practice bullet, by name |
