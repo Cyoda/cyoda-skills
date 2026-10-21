@@ -57,8 +57,8 @@ A team, CI or any host other than the developer's own machine needs **shared** o
 - **Routing**, one of:
   - **Gateway API** (chart default): the Gateway's name and namespace (`kubectl get gateways -A` lists them), plus the API host and the gRPC host. Its listeners must admit routes from `<NAMESPACE>`.
   - **Ingress:** the IngressClass name (`kubectl get ingressclass`), the API host, the gRPC host and the TLS Secret in `<NAMESPACE>` that covers both (gRPC through an Ingress needs TLS).
-  - **Neither** (e.g. kind, minikube): no route. The API is reached through `kubectl port-forward -n <NAMESPACE> svc/cyoda 8080:8080`, and compute nodes must run in the cluster.
-- Gateway or Ingress: `<API_URL>` is `https://<API_HOST>` and `<GRPC_ENDPOINT>` is `<GRPC_HOST>:443` (TLS at the edge). Neither: `http://localhost:8080` and `cyoda.<NAMESPACE>.svc:9090`.
+  - **Neither** (e.g. kind, minikube): no route. The API is reached through `kubectl port-forward -n <NAMESPACE> svc/cyoda 18080:8080` (not local 8080: the developer's local cyoda-go holds it), and compute nodes must run in the cluster.
+- Gateway or Ingress: `<API_URL>` is `https://<API_HOST>` and `<GRPC_ENDPOINT>` is `<GRPC_HOST>:443` (TLS at the edge). Neither: `http://localhost:18080` and `cyoda.<NAMESPACE>.svc:9090`.
 
 ## Step 3 — Environment and schema settings
 
@@ -141,16 +141,22 @@ CHART_VERSION="$(helm search repo cyoda/cyoda --versions -o json | jq -r --arg a
 # 3. Install: the migration Job runs first (pre-install hook), then the StatefulSet
 helm install cyoda cyoda/cyoda --version "$CHART_VERSION" -f <DIR>/values.yaml -n <NAMESPACE>
 kubectl rollout status statefulset/cyoda -n <NAMESPACE>
-# 4. Health through the route (Neither: first kubectl port-forward -n <NAMESPACE> svc/cyoda 8080:8080 &): expect {"status":"UP"}
+# 4. Health through the route: expect {"status":"UP"}
+#    Neither: forward the API to local 18080 first, and wait until it answers:
+#    kubectl port-forward -n <NAMESPACE> svc/cyoda 18080:8080 & PF_API=$!
+#    for i in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:18080/api/health && break; sleep 1; done
 curl -fsS <API_URL>/api/health
 # 5. Seed
 CYODA_ENDPOINT=<API_URL> CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<APP>-deployer CYODA_CLIENT_SECRET_CMD='<SECRET_CMD>' \
   bash <DIR>/seed.sh --manifest cyoda-manifest.json --env <env>
-# 6. Verify: the admin port 9091 is reachable only through a port-forward (the NetworkPolicy admits the monitoring namespace only)
-kubectl port-forward -n <NAMESPACE> svc/cyoda 9091:9091 & PF=$!
-CYODA_ENDPOINT=<API_URL> CYODA_ADMIN_URL=http://localhost:9091 CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<APP>-deployer CYODA_CLIENT_SECRET_CMD='<SECRET_CMD>' \
+# 6. Verify: the admin port 9091 is reachable only through a port-forward (the NetworkPolicy admits the monitoring namespace only).
+#    Local 19091, not 9091: the local cyoda-go's admin port would answer instead of the cluster's
+kubectl port-forward -n <NAMESPACE> svc/cyoda 19091:9091 & PF_ADMIN=$!
+for i in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:19091/livez && break; sleep 1; done
+CYODA_ENDPOINT=<API_URL> CYODA_ADMIN_URL=http://localhost:19091 CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<APP>-deployer CYODA_CLIENT_SECRET_CMD='<SECRET_CMD>' \
   bash <DIR>/verify.sh --manifest cyoda-manifest.json
-kill "$PF"
+# 7. Stop the port-forwards
+kill "$PF_ADMIN" ${PF_API:+"$PF_API"}
 ```
 
 Upgrades: `helm upgrade cyoda cyoda/cyoda --version <new chart> -f <DIR>/values.yaml -n <NAMESPACE>` reruns the migration Job first (help: `helm --section "INSTALL / UPGRADE / UNINSTALL"`).
@@ -202,3 +208,4 @@ Close with one hand-off and its reason:
 | Leaving HMAC, metrics or bootstrap Secrets to the chart | Pre-create all of them: chart-generated ones fail `helm template`, `--dry-run` and GitOps renders |
 | `helm install --create-namespace` | `kubectl create namespace` first: the chart can't render into a missing namespace |
 | `/readyz` through the Gateway or Ingress | Admin port 9091 through `kubectl port-forward` |
+| Port-forwarding to local 8080 or 9091 | Local 18080 and 19091: the developer's local cyoda-go holds 8080 and 9091, and seed or verify would silently hit it |

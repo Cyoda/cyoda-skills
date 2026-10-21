@@ -41,8 +41,10 @@ readable by that user (for example `chown 65532:65532` and `chmod 0400`).
 ## Helm (values.yaml, namespace `<NAMESPACE>`)
 
 Every credential is a Kubernetes Secret in `<NAMESPACE>`, created before `helm install`
-and named in `values.yaml`. The commands pipe each value straight into the cluster: no
-secret file is written, in this dir or anywhere else.
+and named in `values.yaml`. Every command below pipes its value into `kubectl` on stdin:
+no value appears on a command line (`ps`), and no secret file is written, in this dir or
+anywhere else. `tr -d '\n'` matters: `--from-file` keeps a trailing newline, which breaks
+the hex decode of the HMAC secret.
 
 ```bash
 kubectl create namespace <NAMESPACE>
@@ -55,10 +57,10 @@ exist yet (`cyoda help helm`, SECRETS PROVISIONING).
 |---|---|---|---|---|
 | 1 | JWT signing key (RSA, PEM, ≥ 2048 bits) | `cyoda-jwt` (`signing-key.pem`) | `jwt.existingSecret` → `CYODA_JWT_SIGNING_KEY_FILE` | `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \| kubectl create secret generic cyoda-jwt -n <NAMESPACE> --from-file=signing-key.pem=/dev/stdin` |
 | 2 | Bootstrap M2M client id | none: `bootstrap.clientId: <APP>-deployer` in `values.yaml` | `CYODA_BOOTSTRAP_CLIENT_ID` (ConfigMap) | already set; not secret |
-| 3 | Bootstrap M2M client secret | `cyoda-bootstrap` (`secret`) | `bootstrap.clientSecret.existingSecret` → `CYODA_BOOTSTRAP_CLIENT_SECRET_FILE` | `kubectl create secret generic cyoda-bootstrap -n <NAMESPACE> --from-literal=secret="$(openssl rand -hex 32)"` |
-| 4 | Postgres DSN (your database; the chart runs none) | `cyoda-pg` (`dsn`) | `postgres.existingSecret` → `CYODA_POSTGRES_URL_FILE` (pods and migration Job) | `read -rs PG_DSN && printf '%s' "$PG_DSN" \| kubectl create secret generic cyoda-pg -n <NAMESPACE> --from-file=dsn=/dev/stdin && unset PG_DSN`, typing `postgres://user:pass@host:5432/db?sslmode=require` |
-| 5 | HMAC secret (cluster mode is always on) | `cyoda-hmac` (`secret`) | `cluster.hmacSecret.existingSecret` → `CYODA_HMAC_SECRET_FILE` | `kubectl create secret generic cyoda-hmac -n <NAMESPACE> --from-literal=secret="$(openssl rand -hex 32)"` |
-| 6 | Metrics bearer token (admin port 9091) | `cyoda-metrics-bearer` (`bearer`) | `monitoring.metricsBearer.existingSecret` → `CYODA_METRICS_BEARER_FILE` | `kubectl create secret generic cyoda-metrics-bearer -n <NAMESPACE> --from-literal=bearer="$(openssl rand -hex 24)"` |
+| 3 | Bootstrap M2M client secret | `cyoda-bootstrap` (`secret`) | `bootstrap.clientSecret.existingSecret` → `CYODA_BOOTSTRAP_CLIENT_SECRET_FILE` | `openssl rand -hex 32 \| tr -d '\n' \| kubectl create secret generic cyoda-bootstrap -n <NAMESPACE> --from-file=secret=/dev/stdin` |
+| 4 | Postgres DSN (your database; the chart runs none) | `cyoda-pg` (`dsn`) | `postgres.existingSecret` → `CYODA_POSTGRES_URL_FILE` (pods and migration Job) | `printf 'DSN: '; read -rs PG_DSN; echo; printf '%s' "$PG_DSN" \| kubectl create secret generic cyoda-pg -n <NAMESPACE> --from-file=dsn=/dev/stdin; unset PG_DSN`, typing `postgres://user:pass@host:5432/db?sslmode=require` |
+| 5 | HMAC secret (cluster mode is always on) | `cyoda-hmac` (`secret`) | `cluster.hmacSecret.existingSecret` → `CYODA_HMAC_SECRET_FILE` | `openssl rand -hex 32 \| tr -d '\n' \| kubectl create secret generic cyoda-hmac -n <NAMESPACE> --from-file=secret=/dev/stdin` |
+| 6 | Metrics bearer token (admin port 9091) | `cyoda-metrics-bearer` (`bearer`) | `monitoring.metricsBearer.existingSecret` → `CYODA_METRICS_BEARER_FILE` | `openssl rand -hex 24 \| tr -d '\n' \| kubectl create secret generic cyoda-metrics-bearer -n <NAMESPACE> --from-file=bearer=/dev/stdin` |
 
 - [ ] 1–6 created: `kubectl get secret -n <NAMESPACE>` lists `cyoda-jwt`, `cyoda-bootstrap`,
       `cyoda-pg`, `cyoda-hmac` and `cyoda-metrics-bearer`.

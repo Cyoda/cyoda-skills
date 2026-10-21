@@ -241,7 +241,7 @@
     {
       "id": 5,
       "prompt": "/cyoda:deploy — put it on our Kubernetes cluster with Helm",
-      "expected_output": "Reads `cyoda help helm` (VALUES, SECRETS PROVISIONING, INSTALL / UPGRADE / UNINSTALL) and asks namespace, Postgres and routing. Installs from the published repo (helm repo add cyoda https://cyoda.github.io/cyoda-go), not ./deploy/helm/cyoda, noting help's 'unpublished, 0.1.0' is outdated (cyoda-go#684 item A). Writes deploy/cyoda/values.yaml from the template: postgres/jwt/hmac/metrics/bootstrap existingSecrets, bootstrap.clientId shop-deployer (#684 item D), gateway.parentRefs prod-gateway in gateway-system with hostnames api.shop.example.com and grpc.shop.example.com (#684 item G), ingress block removed, replicas/HPA/migrate at chart defaults, no placeholders left. Writes seed.sh, verify.sh and a Helm secrets checklist (cyoda-jwt, cyoda-bootstrap, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer in namespace shop, no values, CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443). Ends with the ordered commands: namespace + secrets, helm repo add/update and the chart whose appVersion is 0.8.4 via helm search | jq, helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n shop, health on https://api.shop.example.com/api/health, seed, kubectl port-forward to 9091 + verify. Runs none of them; hands off to /cyoda:auth for the token script.",
+      "expected_output": "Reads `cyoda help helm` (VALUES, SECRETS PROVISIONING, INSTALL / UPGRADE / UNINSTALL) and asks namespace, Postgres and routing. Installs from the published repo (helm repo add cyoda https://cyoda.github.io/cyoda-go), not ./deploy/helm/cyoda, noting help's 'unpublished, 0.1.0' is outdated (cyoda-go#684 item A). Writes deploy/cyoda/values.yaml from the template: postgres/jwt/hmac/metrics/bootstrap existingSecrets, bootstrap.clientId shop-deployer (#684 item D), gateway.parentRefs prod-gateway in gateway-system with hostnames api.shop.example.com and grpc.shop.example.com (#684 item G), ingress block removed, replicas/HPA/migrate at chart defaults, no placeholders left. Writes seed.sh, verify.sh and a Helm secrets checklist (cyoda-jwt, cyoda-bootstrap, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer in namespace shop, no values, CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443). Ends with the ordered commands: namespace + secrets, helm repo add/update and the chart whose appVersion is 0.8.4 via helm search | jq, helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n shop, health on https://api.shop.example.com/api/health, seed, kubectl port-forward svc/cyoda 19091:9091 (not local 9091, which the local cyoda-go holds), a bounded wait, verify, then the forward stopped. Runs none of them; hands off to /cyoda:auth for the token script.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -303,7 +303,7 @@
         },
         {
           "id": "readyz-port-forward",
-          "text": "Checks /readyz on the admin port 9091 through `kubectl port-forward` (CYODA_ADMIN_URL=http://localhost:9091), not through the Gateway",
+          "text": "Checks /readyz on the admin port 9091 through `kubectl port-forward` to a non-default local port (e.g. svc/cyoda 19091:9091, CYODA_ADMIN_URL=http://localhost:19091), not local 9091 (the local cyoda-go's admin port) and not through the Gateway; waits until the forward answers before verify.sh and stops the forward afterwards",
           "type": "behavior"
         },
         {
@@ -331,7 +331,7 @@
     {
       "id": 6,
       "prompt": "/cyoda:deploy — Helm on our k8s cluster. We run ingress-nginx there, there's no Gateway API",
-      "expected_output": "Takes the Ingress route: values.yaml has gateway.enabled false (not left on with empty parentRefs, cyoda-go#684 item G) and ingress.enabled true with className nginx, http.host cyoda.internal.example.com, grpc.host cyoda-grpc.internal.example.com and TLS Secret internal-tls for both, keeping the chart's gRPC backend-protocol annotation. Sets bootstrap.clientId and every existingSecret. The checklist's Helm section uses namespace cyoda and CYODA_COMPUTE_GRPC_ENDPOINT cyoda-grpc.internal.example.com:443. Commands use the published repo, the chart whose appVersion is 0.8.4, helm install ... -n cyoda, health on https://cyoda.internal.example.com/api/health, seed, and verify with /readyz through kubectl port-forward on 9091. Runs none of them.",
+      "expected_output": "Takes the Ingress route: values.yaml has gateway.enabled false (not left on with empty parentRefs, cyoda-go#684 item G) and ingress.enabled true with className nginx, http.host cyoda.internal.example.com, grpc.host cyoda-grpc.internal.example.com and TLS Secret internal-tls for both, keeping the chart's gRPC backend-protocol annotation. Sets bootstrap.clientId and every existingSecret. The checklist's Helm section uses namespace cyoda and CYODA_COMPUTE_GRPC_ENDPOINT cyoda-grpc.internal.example.com:443. Commands use the published repo, the chart whose appVersion is 0.8.4, helm install ... -n cyoda, health on https://cyoda.internal.example.com/api/health, seed, and verify with /readyz through kubectl port-forward from local 19091 to the admin port 9091. Runs none of them.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -379,7 +379,7 @@
         },
         {
           "id": "readyz-port-forward",
-          "text": "Checks /readyz on the admin port 9091 through `kubectl port-forward`, not through the Ingress",
+          "text": "Checks /readyz on the admin port 9091 through `kubectl port-forward` to a non-default local port (not local 9091, which the local cyoda-go holds), not through the Ingress",
           "type": "behavior"
         },
         {
