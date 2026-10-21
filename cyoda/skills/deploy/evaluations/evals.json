@@ -241,7 +241,7 @@
     {
       "id": 5,
       "prompt": "/cyoda:deploy — put it on our Kubernetes cluster with Helm",
-      "expected_output": "Says the Helm path is coming in the next release of this skill and offers Docker Compose shared meanwhile. Does not write Helm values or run helm or kubectl.",
+      "expected_output": "Reads `cyoda help helm` (VALUES, SECRETS PROVISIONING, INSTALL / UPGRADE / UNINSTALL) and asks namespace, Postgres and routing. Installs from the published repo (helm repo add cyoda https://cyoda.github.io/cyoda-go), not ./deploy/helm/cyoda, noting help's 'unpublished, 0.1.0' is outdated (cyoda-go#684 item A). Writes deploy/cyoda/values.yaml from the template: postgres/jwt/hmac/metrics/bootstrap existingSecrets, bootstrap.clientId shop-deployer (#684 item D), gateway.parentRefs prod-gateway in gateway-system with hostnames api.shop.example.com and grpc.shop.example.com (#684 item G), ingress block removed, replicas/HPA/migrate at chart defaults, no placeholders left. Writes seed.sh, verify.sh and a Helm secrets checklist (cyoda-jwt, cyoda-bootstrap, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer in namespace shop, no values, CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443). Ends with the ordered commands: namespace + secrets, helm repo add/update and the chart whose appVersion is 0.8.4 via helm search | jq, helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n shop, health on https://api.shop.example.com/api/health, seed, kubectl port-forward to 9091 + verify. Runs none of them; hands off to /cyoda:auth for the token script.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -253,22 +253,143 @@
         "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
         "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
         "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer asks for Helm, then says they'll wait for Helm support."
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Helm on Kubernetes, namespace shop, and says it is staging, not production. They have a managed Postgres the cluster can reach. The cluster runs Gateway API: Gateway prod-gateway in namespace gateway-system, which admits routes from all namespaces. API host api.shop.example.com, gRPC host grpc.shop.example.com. The project has no token script. They decline a profile."
       },
       "assertions": [
         {
-          "id": "helm-next-release",
-          "text": "Says the Helm path is coming in the next release of this skill",
+          "id": "helm-help-first",
+          "text": "Reads `cyoda help helm` sections (e.g. VALUES, SECRETS PROVISIONING, INSTALL / UPGRADE / UNINSTALL) and names the ones it used",
           "type": "behavior"
         },
         {
-          "id": "offers-compose",
-          "text": "Offers Docker Compose shared as the option available now",
+          "id": "published-repo",
+          "text": "Uses the published chart: `helm repo add cyoda https://cyoda.github.io/cyoda-go` and `cyoda/cyoda`, not `./deploy/helm/cyoda` or a packaged 0.1.0 tgz, and does not repeat help's claim that the chart is unpublished",
           "type": "behavior"
         },
         {
-          "id": "no-helm-files",
-          "text": "Does not write a Helm values file and does not run helm or kubectl",
+          "id": "chart-by-appversion",
+          "text": "Picks the chart version as the one whose appVersion is 0.8.4 (helm search repo cyoda/cyoda --versions with jq), and the install is `helm install cyoda cyoda/cyoda --version <that version> -f deploy/cyoda/values.yaml -n shop`",
+          "type": "behavior"
+        },
+        {
+          "id": "values-secrets",
+          "text": "deploy/cyoda/values.yaml sets postgres.existingSecret and jwt.existingSecret, plus existingSecret for the HMAC, metrics bearer and bootstrap client secrets, and contains no secret value",
+          "type": "behavior"
+        },
+        {
+          "id": "bootstrap-set",
+          "text": "values.yaml sets bootstrap.clientId (e.g. shop-deployer), and the seed command uses that client id",
+          "type": "behavior"
+        },
+        {
+          "id": "gateway-explicit",
+          "text": "values.yaml enables the gateway with parentRefs naming prod-gateway in gateway-system and hostnames api.shop.example.com (http) and grpc.shop.example.com (grpc); ingress is not enabled; no `<PLACEHOLDER>` is left",
+          "type": "behavior"
+        },
+        {
+          "id": "defaults-kept",
+          "text": "replicas and autoscaling stay at chart defaults (1, disabled) and the migration Job is left on",
+          "type": "behavior"
+        },
+        {
+          "id": "checklist-helm",
+          "text": "secrets-checklist.md keeps only the Helm section, naming each Kubernetes Secret (cyoda-jwt, cyoda-bootstrap, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer) in namespace shop and what reads it, with no values, and CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443",
+          "type": "behavior"
+        },
+        {
+          "id": "command-order",
+          "text": "Ends with commands in this order: create namespace and secrets, helm repo add/update and chart lookup, helm install, health on https://api.shop.example.com/api/health, seed.sh with --env development, verify.sh",
+          "type": "format"
+        },
+        {
+          "id": "readyz-port-forward",
+          "text": "Checks /readyz on the admin port 9091 through `kubectl port-forward` (CYODA_ADMIN_URL=http://localhost:9091), not through the Gateway",
+          "type": "behavior"
+        },
+        {
+          "id": "agent-produced",
+          "text": "The agent itself produces the filled values.yaml, the secrets checklist and the ordered command list with the real namespace, hosts and secret names; it never tells the developer to read `cyoda help`, the chart README or values.yaml to work any of them out",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "writes-only",
+          "text": "Does not run docker, docker compose, helm, kubectl or openssl, and does not run seed.sh or verify.sh; it only writes files and lists the commands",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "/cyoda:deploy — Helm on our k8s cluster. We run ingress-nginx there, there's no Gateway API",
+      "expected_output": "Takes the Ingress route: values.yaml has gateway.enabled false (not left on with empty parentRefs, cyoda-go#684 item G) and ingress.enabled true with className nginx, http.host cyoda.internal.example.com, grpc.host cyoda-grpc.internal.example.com and TLS Secret internal-tls for both, keeping the chart's gRPC backend-protocol annotation. Sets bootstrap.clientId and every existingSecret. The checklist's Helm section uses namespace cyoda and CYODA_COMPUTE_GRPC_ENDPOINT cyoda-grpc.internal.example.com:443. Commands use the published repo, the chart whose appVersion is 0.8.4, helm install ... -n cyoda, health on https://cyoda.internal.example.com/api/health, seed, and verify with /readyz through kubectl port-forward on 9091. Runs none of them.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
+        "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
+        "tsconfig.json": "{}",
+        "cyoda-manifest.json": "{\n  \"manifestVersion\": 1,\n  \"entities\": [\n    {\n      \"name\": \"order\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/order-v1-sample.json\",\n      \"workflow\": \"src/workflows/order-v1-workflow.json\",\n      \"config\": \"src/config/order-v1-config.json\"\n    },\n    {\n      \"name\": \"customer\",\n      \"modelVersion\": 1,\n      \"sample\": \"src/data/customer-v1-sample.json\",\n      \"workflow\": \"src/workflows/customer-v1-workflow.json\",\n      \"config\": \"src/config/customer-v1-config.json\"\n    }\n  ]\n}",
+        "src/data/order-v1-sample.json": "{\"orderId\": \"ORD-1001\", \"customerId\": \"CUST-1\", \"amount\": 42.5}",
+        "src/data/customer-v1-sample.json": "{\"customerId\": \"CUST-1\", \"name\": \"Ada\", \"email\": \"ada@example.com\"}",
+        "src/workflows/order-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"order-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
+        "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
+        "get-token.sh": "#!/usr/bin/env bash\n# token script written by /cyoda:auth\n",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is a deploy/ dir with the developer's own manifests. docker, helm and kubectl are installed. The developer picks Helm, accepts namespace cyoda, says it is not production, and has a Postgres the cluster can reach. The cluster has ingress-nginx with IngressClass nginx and no Gateway API CRDs. API host cyoda.internal.example.com, gRPC host cyoda-grpc.internal.example.com, TLS Secret internal-tls in namespace cyoda covers both. The project has get-token.sh at the root. They decline a profile."
+      },
+      "assertions": [
+        {
+          "id": "ingress-chosen",
+          "text": "values.yaml sets gateway.enabled: false and ingress.enabled: true with className nginx, http.host cyoda.internal.example.com and grpc.host cyoda-grpc.internal.example.com, each with TLS secretName internal-tls",
+          "type": "behavior"
+        },
+        {
+          "id": "no-empty-gateway",
+          "text": "values.yaml does not leave the gateway enabled with an empty parentRefs, and does not enable both gateway and ingress",
+          "type": "behavior"
+        },
+        {
+          "id": "output-dir-existing",
+          "text": "Writes the files under deploy/cyoda/ because a deploy/ dir already exists",
+          "type": "behavior"
+        },
+        {
+          "id": "bootstrap-set",
+          "text": "values.yaml sets bootstrap.clientId and the bootstrap client secret comes from a pre-created Secret (bootstrap.clientSecret.existingSecret)",
+          "type": "behavior"
+        },
+        {
+          "id": "grpc-endpoint",
+          "text": "The checklist records CYODA_COMPUTE_GRPC_ENDPOINT as cyoda-grpc.internal.example.com:443",
+          "type": "behavior"
+        },
+        {
+          "id": "published-chart",
+          "text": "The command list uses `helm repo add cyoda https://cyoda.github.io/cyoda-go`, selects the chart whose appVersion is 0.8.4, and installs with `helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n cyoda`",
+          "type": "behavior"
+        },
+        {
+          "id": "readyz-port-forward",
+          "text": "Checks /readyz on the admin port 9091 through `kubectl port-forward`, not through the Ingress",
+          "type": "behavior"
+        },
+        {
+          "id": "token-script",
+          "text": "Seed and verify use CYODA_TOKEN_COMMAND pointing at get-token.sh with the bootstrap client id, and there is no /cyoda:auth hand-off",
+          "type": "behavior"
+        },
+        {
+          "id": "agent-produced",
+          "text": "The agent itself produces the filled values.yaml, the secrets checklist and the ordered command list with the real namespace, hosts and secret names; it never tells the developer to read `cyoda help`, the chart README or values.yaml to work any of them out",
           "type": "behavior"
         },
         {

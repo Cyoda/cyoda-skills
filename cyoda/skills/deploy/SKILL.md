@@ -1,7 +1,7 @@
 ---
 name: deploy
 description: Use when the developer types /cyoda:deploy to move a working local cyoda-go app to a self-hosted cyoda-go instance (Docker Compose, Helm on Kubernetes, Terraform), or needs a seed script, verify script, compose file or secrets checklist for one.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-call.sh GET *) Bash(jq *) Bash(find *) Bash(ls *) Bash(mkdir *) Bash(cp *) Bash(cmp *) Bash(cat *) Bash(mv *)
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-call.sh GET *) Bash(jq *) Bash(find *) Bash(ls *) Bash(mkdir *) Bash(cp *) Bash(cmp *) Bash(cat *) Bash(mv *) Bash(grep *)
 disable-model-invocation: true
 ---
 
@@ -46,10 +46,19 @@ Ask which target, one line each:
 |---|---|---|
 | Docker Compose, **single-user** | `run --section "RUN MODES"` (Docker Compose), `run --section "PORT LAYOUT"` | `compose.single-user.yaml`: SQLite, **mock auth**, ports on `127.0.0.1`. Anyone who can reach the ports is admin: one developer, one machine |
 | Docker Compose, **shared** | the above, plus `config auth --section OPTIONS` and `quickstart --section "PRODUCTION CHECKLIST"` | `compose.shared.yaml`: Postgres, JWT mode, signing key mounted `:ro` via `CYODA_JWT_SIGNING_KEY_FILE`, bootstrap M2M client |
-| Helm on Kubernetes | — | "The Helm path is coming in the next release of this skill." Offer Compose shared meanwhile |
+| Helm on Kubernetes | `helm --section VALUES`, `helm --section "SECRETS PROVISIONING"`, `helm --section "INSTALL / UPGRADE / UNINSTALL"`, `config database --section OPTIONS` | `values.yaml` for chart `cyoda/cyoda` from `https://cyoda.github.io/cyoda-go`: the developer's Postgres, JWT mode, bootstrap M2M client, Gateway API or Ingress. Every credential is a Secret the developer creates first |
 | Terraform | — | Point to `https://github.com/Cyoda/cyoda-go-terraform`: early and AWS-first; this skill doesn't guide it |
 
-A team, CI or any host other than the developer's own machine needs **shared**. Don't offer single-user for those.
+A team, CI or any host other than the developer's own machine needs **shared** or **Helm**. Don't offer single-user for those.
+
+**Helm only**, ask and record (the agent can't see the cluster, so these are the developer's answers):
+- **Namespace** (default `cyoda`).
+- **Postgres:** the chart runs none. Confirm a database the cluster can reach exists (managed service or operator). Its DSN goes only into Secret `cyoda-pg` (checklist row 4), never into chat or a file.
+- **Routing**, one of:
+  - **Gateway API** (chart default): the Gateway's name and namespace (`kubectl get gateways -A` lists them), plus the API host and the gRPC host. Its listeners must admit routes from `<NAMESPACE>`.
+  - **Ingress:** the IngressClass name (`kubectl get ingressclass`), the API host, the gRPC host and the TLS Secret in `<NAMESPACE>` that covers both (gRPC through an Ingress needs TLS).
+  - **Neither** (e.g. kind, minikube): no route. The API is reached through `kubectl port-forward -n <NAMESPACE> svc/cyoda 8080:8080`, and compute nodes must run in the cluster.
+- Gateway or Ingress: `<API_URL>` is `https://<API_HOST>` and `<GRPC_ENDPOINT>` is `<GRPC_HOST>:443` (TLS at the edge). Neither: `http://localhost:8080` and `cyoda.<NAMESPACE>.svc:9090`.
 
 ## Step 3 — Environment and schema settings
 
@@ -75,25 +84,37 @@ Copy from `${CLAUDE_PLUGIN_ROOT}/skills/deploy/templates/` into `<DIR>`:
 
 | File | From | Purpose |
 |---|---|---|
-| `compose.yaml` | `compose.single-user.yaml` or `compose.shared.yaml` | the instance. If `VERSION` from Step 0 isn't `0.8.4`, change the default in `${CYODA_VERSION:-0.8.4}` to it |
+| `compose.yaml` (Compose) | `compose.single-user.yaml` or `compose.shared.yaml` | the instance. If `VERSION` from Step 0 isn't `0.8.4`, change the default in `${CYODA_VERSION:-0.8.4}` to it |
+| `values.yaml` (Helm) | `values.yaml` | the chart values. The image follows the chart's appVersion, which Step 6 matches to `VERSION` |
 | `seed.sh` | `seed.sh` | loads models and workflows in the canonical order; safe to re-run (run `bash seed.sh` without arguments for usage) |
 | `verify.sh` | `verify.sh` | checks health, readiness and that every manifest model is LOCKED |
 | `secrets-checklist.md` | `secrets-checklist.md` | every secret to create and where it's read from |
-| `.gitignore` (shared only) | write `secrets/` and `.env`, one per line | keeps secrets out of git |
+| `.gitignore` (Compose shared only) | write `secrets/` and `.env`, one per line | keeps secrets out of git |
+
+Fill `values.yaml` (Helm), keeping its comments:
+- `<APP>`: the project name (the bootstrap client id becomes `<APP>-deployer`).
+- Gateway: fill `<GATEWAY_NAME>`, `<GATEWAY_NAMESPACE>`, `<API_HOST>` and `<GRPC_HOST>`, and delete the `ingress:` block with its comment lines.
+- Ingress: replace the `gateway:` block with `gateway:` / `  enabled: false`, set `ingress.enabled: true`, and fill `<INGRESS_CLASS>`, `<API_HOST>`, `<GRPC_HOST>` and `<TLS_SECRET>`.
+- Neither: replace the `gateway:` block with `gateway:` / `  enabled: false`, and delete the `ingress:` block with its comment lines.
+- Leave `replicas`, `autoscaling` and `migrate` at the chart defaults written there unless the developer asks: the migration Job stays on, and the comments say how to scale.
+- Check: `grep -n '<[A-Z_]*>' <DIR>/values.yaml` prints nothing.
 
 Fill the checklist placeholders:
-- `<MODE>`: single-user or shared. Keep that mode's section and delete the other one with its comment line.
+- `<MODE>`: single-user, shared or helm. Keep that mode's section and delete the others with their comment lines.
+- `<NAMESPACE>` (Helm): the namespace.
 - `<DEPLOY_DIR>`: the output dir.
 - `<APP>`: the project name.
-- `<API_URL>`: `http://localhost:8080` for single-user. For shared, ask for the host the team will use.
-- `<GRPC_ENDPOINT>`: the same host with port `9090`, as `host:9090`.
+- `<API_URL>`: `http://localhost:8080` for single-user. For shared, ask for the host the team will use. For Helm, from Step 2.
+- `<GRPC_ENDPOINT>`: the same host with port `9090`, as `host:9090`. For Helm, from Step 2.
 - `<TOKEN_COMMAND>`: the project's token script if one exists (e.g. `get-token.sh`), else `<path to your token script>`.
 
 Don't create `secrets/` or any file in it, and don't put a value for a secret anywhere.
 
 ## Step 6 — Hand over
 
-List what was written, one line per file, then the commands in this order, with the real paths (from the project root; for single-user, skip 1 and leave out every `CYODA_TOKEN_COMMAND` and `CYODA_CLIENT_*`):
+List what was written, one line per file, then the commands in this order, with the real paths, namespace, hosts and `VERSION` filled in (from the project root).
+
+**Compose** (for single-user, skip 1 and leave out every `CYODA_TOKEN_COMMAND` and `CYODA_CLIENT_*`):
 
 ```bash
 # 1. Secrets (shared): create every item in <DIR>/secrets-checklist.md, and export CYODA_BOOTSTRAP_CLIENT_ID
@@ -109,13 +130,38 @@ CYODA_ENDPOINT=<API_URL> CYODA_ADMIN_URL=http://localhost:9091 CYODA_TOKEN_COMMA
   bash <DIR>/verify.sh --manifest cyoda-manifest.json
 ```
 
+**Helm** (`<SECRET_CMD>` is `kubectl get secret cyoda-bootstrap -n <NAMESPACE> -o jsonpath={.data.secret} | base64 -d`):
+
+```bash
+# 1. Namespace and secrets: kubectl create namespace <NAMESPACE>, then every item in <DIR>/secrets-checklist.md
+# 2. Chart: the release whose appVersion is <VERSION>. Expect a chart version; if it prints nothing, stop: no chart for <VERSION> is published
+helm repo add cyoda https://cyoda.github.io/cyoda-go
+helm repo update cyoda
+CHART_VERSION="$(helm search repo cyoda/cyoda --versions -o json | jq -r --arg app <VERSION> '[.[] | select(.app_version == $app)][0].version // empty')"; echo "$CHART_VERSION"
+# 3. Install: the migration Job runs first (pre-install hook), then the StatefulSet
+helm install cyoda cyoda/cyoda --version "$CHART_VERSION" -f <DIR>/values.yaml -n <NAMESPACE>
+kubectl rollout status statefulset/cyoda -n <NAMESPACE>
+# 4. Health through the route (Neither: first kubectl port-forward -n <NAMESPACE> svc/cyoda 8080:8080 &): expect {"status":"UP"}
+curl -fsS <API_URL>/api/health
+# 5. Seed
+CYODA_ENDPOINT=<API_URL> CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<APP>-deployer CYODA_CLIENT_SECRET_CMD='<SECRET_CMD>' \
+  bash <DIR>/seed.sh --manifest cyoda-manifest.json --env <env>
+# 6. Verify: the admin port 9091 is reachable only through a port-forward (the NetworkPolicy admits the monitoring namespace only)
+kubectl port-forward -n <NAMESPACE> svc/cyoda 9091:9091 & PF=$!
+CYODA_ENDPOINT=<API_URL> CYODA_ADMIN_URL=http://localhost:9091 CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<APP>-deployer CYODA_CLIENT_SECRET_CMD='<SECRET_CMD>' \
+  bash <DIR>/verify.sh --manifest cyoda-manifest.json
+kill "$PF"
+```
+
+Upgrades: `helm upgrade cyoda cyoda/cyoda --version <new chart> -f <DIR>/values.yaml -n <NAMESPACE>` reruns the migration Job first (help: `helm --section "INSTALL / UPGRADE / UNINSTALL"`).
+
 Then, briefly:
 - seed and verify are plain bash + curl + jq, so a pipeline can call them as they are. Seeding again after a workflow change re-imports the workflows. A sample or unique-key change on a LOCKED model needs a new model version from `/cyoda:build`: the seed skips locked models.
 - Compute nodes: `CYODA_COMPUTE_GRPC_ENDPOINT` and the token source are in the checklist (help: `config grpc --section OPTIONS`). Processors are only exercised once a compute node runs against the new instance.
 
 ## Step 7 — Profile (optional)
 
-Ask: "Add a profile for the new instance, so `status`, `build` and `debug` can target it later?" On a yes, ask for a name (`default` is reserved for local) and write `endpoint` (`<API_URL>`, no `/api`), `env` and, for shared with a token script, `tokenCommand`. Never write a token or secret. Don't make it active: it doesn't answer until step 2 has run.
+Ask: "Add a profile for the new instance, so `status`, `build` and `debug` can target it later?" On a yes, ask for a name (`default` is reserved for local) and write `endpoint` (`<API_URL>`, no `/api`), `env` and, for shared or Helm with a token script, `tokenCommand`. Never write a token or secret. Don't make it active: it doesn't answer until the instance is up (Compose step 2, Helm step 3).
 
 ```bash
 CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
@@ -127,7 +173,7 @@ jq --arg p "<NAME>" --arg ep "<API_URL>" --arg env "<env>" --arg tc "<TOKEN_COMM
 ```
 
 Close with one hand-off and its reason:
-- Shared without a token script: "Once it's up, next, type `/cyoda:auth` to create the token script for this instance's bootstrap client."
+- Shared or Helm without a token script: "Once it's up, next, type `/cyoda:auth` to create the token script for this instance's bootstrap client."
 - Profile written: "Once `/api/health` answers, next, type `/cyoda:setup` to switch to profile `<NAME>`."
 - No profile: "`verify.sh` is the smoke check for the new instance. To point the other skills at it later, next, type `/cyoda:setup` and connect to `<API_URL>`."
 
@@ -135,7 +181,10 @@ Close with one hand-off and its reason:
 
 - The upstream `deploy/docker/compose.yaml` has a commented "production" block that sets `CYODA_REQUIRE_JWT=true` without `CYODA_IAM_MODE=jwt` and passes the PEM inline. Follow `run` and `config auth` instead, as `compose.shared.yaml` does.
 - Workflow import is strict and an export isn't re-importable as is (cyoda-go#684 item I): `seed.sh` posts only `{importMode, workflows}`.
-- For the Helm path (next release): `cyoda help helm` says the chart is unpublished, but it's published at `https://cyoda.github.io/cyoda-go` (#684 item A); the `run` minimal install sets no bootstrap client (#684 item D); an empty `gateway.parentRefs` doesn't fail the install (#684 item G), so set the gateway or ingress explicitly.
+- `cyoda help helm` and `run` say the chart is unpublished and at 0.1.0, and install from `./deploy/helm/cyoda`. It's published at `https://cyoda.github.io/cyoda-go` (#684 item A): install `cyoda/cyoda` from there, at the chart whose appVersion is `VERSION`.
+- Help's Helm minimal install sets no bootstrap client, which leaves no credential to seed with (#684 item D): `values.yaml` always sets `bootstrap.clientId`.
+- An empty `gateway.parentRefs` doesn't fail the chart, it leaves the routes attached to nothing (#684 item G): `values.yaml` always sets the gateway parentRefs, or ingress, explicitly.
+- `cyoda help helm` VALUES omits `migrate.postgres.existingSecret` / `existingSecretKey`, the migration Job's own DSN (#684 item H). `values.yaml` names them, empty (the Job uses the runtime DSN).
 
 ## Common mistakes
 
@@ -143,9 +192,13 @@ Close with one hand-off and its reason:
 |---|---|
 | Running `docker compose up`, `openssl` or `seed.sh` "to save a step" | Write the files; list the commands. The developer runs them |
 | Single-user compose for a team or a shared host | Shared: JWT mode and a bootstrap client |
-| A secret value in compose, `.env`, the checklist or the profile | Files under `secrets/` mounted `:ro`, created by the developer |
+| A secret value in compose, `.env`, `values.yaml`, the checklist or the profile | Compose: files under `secrets/` mounted `:ro`. Helm: Kubernetes Secrets. The developer creates them |
 | `CYODA_REQUIRE_JWT=true` alone, or `CYODA_JWT_SIGNING_KEY` inline | `CYODA_IAM_MODE=jwt` + `CYODA_JWT_SIGNING_KEY_FILE` |
 | Seeding from live exports | The manifest's versioned files |
 | Production without the processor-fields question | Step 3, recorded as `env.production.changeLevel` |
 | `/readyz` on the API port | `/api/health` on 8080; `/readyz` on the admin port 9091 (`run --section "HEALTH PROBES"`) |
 | Making the new profile active before the instance runs | Write it inactive; switch with `/cyoda:setup` |
+| `helm install ./deploy/helm/cyoda`, or a chart version guessed from help | `cyoda/cyoda` from the published repo, at the chart whose appVersion is `VERSION` |
+| Leaving HMAC, metrics or bootstrap Secrets to the chart | Pre-create all of them: chart-generated ones fail `helm template`, `--dry-run` and GitOps renders |
+| `helm install --create-namespace` | `kubectl create namespace` first: the chart can't render into a missing namespace |
+| `/readyz` through the Gateway or Ingress | Admin port 9091 through `kubectl port-forward` |
