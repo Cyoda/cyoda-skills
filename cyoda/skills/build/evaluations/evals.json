@@ -100,14 +100,14 @@
     {
       "id": 5,
       "prompt": "/cyoda:build — register this workflow for Ticket v1; I exported it from my other instance (file: ticket-export.json). Sample and lock are already done.",
-      "expected_output": "Imports the workflow; the call exits 22 with HTTP_STATUS=400 and errorCode BAD_REQUEST 'invalid JSON: json: unknown field \"entityName\"'. The skill reads cyoda-help.sh errors BAD_REQUEST (and workflows IMPORT REQUEST), explains that the import is strictly decoded and an export cannot be re-posted verbatim (#684-I), reshapes the body to {importMode, workflows}, shows it, and re-imports to the same path after confirmation. It does not try other URLs.",
+      "expected_output": "Before posting, consults `cyoda-help.sh workflows --section \"IMPORT REQUEST\"`, explains that the import is strictly decoded and an export cannot be re-posted verbatim (#684-I), reshapes the body to {importMode, workflows}, shows the exact body and calls, and imports to /model/ticket/1/workflow/import only after confirmation. If a 400 BAD_REQUEST ('unknown field \"entityName\"') does occur, it reads `cyoda-help.sh errors BAD_REQUEST` / IMPORT REQUEST and fixes the body instead of trying other URLs.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
         "ticket-export.json": "{\"entityName\":\"ticket\",\"modelVersion\":1,\"workflows\":[{\"version\":\"1.4\",\"name\":\"ticket\",\"initialState\":\"open\",\"active\":true,\"states\":{\"open\":{\"transitions\":[{\"name\":\"close\",\"next\":\"closed\",\"manual\":true}]},\"closed\":{}}}]}",
         "_simulated/instance.md": "GET /model/ returns [{\"modelName\":\"ticket\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. The first POST /model/ticket/1/workflow/import exits 22, stderr HTTP_STATUS=400, body {\"status\":400,\"detail\":\"invalid JSON: json: unknown field \\\"entityName\\\"\",\"properties\":{\"errorCode\":\"BAD_REQUEST\"}}. A body of only {importMode, workflows} returns 200."
       },
       "assertions": [
-        { "id": "consults-help", "text": "On the 400, reads `cyoda-help.sh errors BAD_REQUEST` (or `workflows --section \"IMPORT REQUEST\"`) and names it, instead of explaining from memory", "type": "behavior" },
+        { "id": "consults-help", "text": "Either before posting, consults `cyoda-help.sh workflows --section \"IMPORT REQUEST\"` and reshapes to {importMode, workflows}; or, if a 400 occurs, reads `cyoda-help.sh errors <CODE>` / IMPORT REQUEST and fixes the body instead of trying other URLs. Names the help consulted rather than explaining from memory", "type": "behavior" },
         { "id": "no-path-guessing", "text": "Does not retry with a different or guessed URL; the retry goes to the same /model/ticket/1/workflow/import path", "type": "behavior" },
         { "id": "explains-strict-import", "text": "Explains that the export shape {entityName, modelVersion, workflows} is rejected by the strict import and cites #684-I", "type": "behavior" },
         { "id": "reshapes", "text": "Reshapes to {importMode, workflows} (e.g. with jq) and shows the corrected body for confirmation before re-importing", "type": "behavior" },

@@ -95,6 +95,8 @@ Build the three files from [templates/](templates/) and the closest example:
 
 Show all three, plus the list of API calls you'll make, and ask: "Does this look right? (yes to proceed, or describe changes)". Wait for yes.
 
+Developer-supplied files (exports, hand-written workflows) go through the same show-and-confirm. Show the exact body you will send (after any reshape) and the calls, then wait for yes. "Register this" is a request to start, not the confirmation.
+
 ## Step 6 — Save the files
 
 **Detect the layout** (scan first, then fall back):
