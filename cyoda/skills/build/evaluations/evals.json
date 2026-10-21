@@ -42,7 +42,7 @@
       "assertions": [
         { "id": "consults-help", "text": "Names `cyoda-help.sh workflows --section TRANSITIONS` (or WORKFLOW SCHEMA / IMPORT REQUEST) as the source for the transition shape or import mode", "type": "behavior" },
         { "id": "reads-existing-workflow", "text": "Starts from the existing order-v1-workflow.json (or an export reshaped to {importMode, workflows}) and shows the current states before proposing the change", "type": "behavior" },
-        { "id": "best-practices", "text": "Points at design/resources/best-practices.md (or the help topic once #684-L ships) for terminal states", "type": "behavior" },
+        { "id": "best-practices", "text": "Applies the terminal-states best practice itself, having consulted design/resources/best-practices.md (or the help topic once #684-L ships)", "type": "behavior" },
         { "id": "same-version", "text": "Keeps model version 1: a workflow-only change needs no new model version, no unlock and no sample re-import, even though entities exist", "type": "behavior" },
         { "id": "edits-file-in-place", "text": "Updates src/workflows/order-v1-workflow.json and leaves the manifest entry for order v1 unchanged", "type": "behavior" },
         { "id": "reimports-workflow", "text": "Re-imports the workflow with cyoda-call.sh POST /model/order/1/workflow/import after confirmation, with the schema version substituted from `workflows schema-version versions`", "type": "behavior" },
@@ -92,7 +92,7 @@
         { "id": "java-paths", "text": "Writes src/main/resources/workflow/invoice-v1-workflow.json, src/main/resources/data/invoice-v1-sample.json and src/main/resources/config/invoice-v1-config.json", "type": "behavior" },
         { "id": "tells-paths", "text": "Tells the developer the relative path of each file it saved", "type": "behavior" },
         { "id": "manifest-updated", "text": "Appends {name: invoice, modelVersion: 1, ...} with project-relative paths to the existing cyoda-manifest.json and keeps the customer entry", "type": "behavior" },
-        { "id": "terminal-states", "text": "Treats paid and cancelled as terminal states and points at the best-practices file for terminal states", "type": "behavior" },
+        { "id": "terminal-states", "text": "Treats paid and cancelled as terminal states and applies the terminal-states best practice itself, having consulted the best-practices file", "type": "behavior" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
         { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke another skill", "type": "behavior" }
       ]

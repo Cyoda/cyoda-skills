@@ -25,7 +25,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show every `WARN=` line.
 
 `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<ENDPOINT>/api/model/"`, with no token on purpose.
 
-- `200`: **mock auth. No token needed.** Say so, write nothing, and stop. If the developer wants to try JWT mode locally, that's server config: point to `cyoda-help.sh config auth --section OPTIONS`, subsections "JWT mode" and "Bootstrap M2M client". After they restart the server with it, they type `/cyoda:auth` again.
+- `200`: **mock auth. No token needed.** Say so, write nothing, and stop. If the developer wants to try JWT mode locally, that's server config: read `cyoda-help.sh config auth --section OPTIONS` (subsections "JWT mode" and "Bootstrap M2M client") and give them the concrete settings. After they restart the server with it, they type `/cyoda:auth` again.
 - `401` / `403`: continue.
 - Anything else: show it and stop.
 

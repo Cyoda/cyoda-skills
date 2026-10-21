@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Writes the files that deploy and seed a cyoda-go instance into the developer's project, then lists the commands to run, in order. The developer, or a devops person, runs them and scripts from them.
 
-**This skill writes files only.** It never runs `docker`, `docker compose`, `helm`, `kubectl` or `openssl`, never creates secrets, and never runs `seed.sh` or `verify.sh`. It writes no secret value into any file. If the developer asks you to run the commands after the hand-over, that's an ordinary request outside this skill.
+**This skill writes files only.** It never runs `docker`, `docker compose`, `helm`, `kubectl` or `openssl`, never creates secrets, and never runs `seed.sh` or `verify.sh`. To check copied scripts, use `bash -n <file>` (syntax only); never execute `seed.sh` or `verify.sh`, not even for usage. It writes no secret value into any file. If the developer asks you to run the commands after the hand-over, that's an ordinary request outside this skill.
 
 **Scope: cyoda-go only.** The developer's own services and compute-node images aren't deployed here. The instance is made reachable for compute nodes (gRPC port, `CYODA_COMPUTE_GRPC_ENDPOINT`).
 
@@ -86,7 +86,7 @@ Copy from `${CLAUDE_PLUGIN_ROOT}/skills/deploy/templates/` into `<DIR>`:
 |---|---|---|
 | `compose.yaml` (Compose) | `compose.single-user.yaml` or `compose.shared.yaml` | the instance. If `VERSION` from Step 0 isn't `0.8.4`, change the default in `${CYODA_VERSION:-0.8.4}` to it |
 | `values.yaml` (Helm) | `values.yaml` | the chart values. The image follows the chart's appVersion, which Step 6 matches to `VERSION` |
-| `seed.sh` | `seed.sh` | loads models and workflows in the canonical order; safe to re-run (run `bash seed.sh` without arguments for usage) |
+| `seed.sh` | `seed.sh` | loads models and workflows in the canonical order; safe to re-run (it prints usage when the developer runs it without arguments) |
 | `verify.sh` | `verify.sh` | checks health, readiness and that every manifest model is LOCKED |
 | `secrets-checklist.md` | `secrets-checklist.md` | every secret to create and where it's read from |
 | `.gitignore` (Compose shared only) | write `secrets/` and `.env`, one per line | keeps secrets out of git |
@@ -107,6 +107,8 @@ Fill the checklist placeholders:
 - `<API_URL>`: `http://localhost:8080` for single-user. For shared, ask for the host the team will use. For Helm, from Step 2.
 - `<GRPC_ENDPOINT>`: the same host with port `9090`, as `host:9090`. For Helm, from Step 2.
 - `<TOKEN_COMMAND>`: the project's token script if one exists (e.g. `get-token.sh`), else `<path to your token script>`.
+
+When the project already has a token script, put its absolute path in the checklist and the profile's `tokenCommand`, and delete the `/cyoda:auth` line (the "Type `/cyoda:auth` in Claude Code…" sentence) from the generated `secrets-checklist.md`. Keep that line only when there is no token script.
 
 Don't create `secrets/` or any file in it, and don't put a value for a secret anywhere.
 
