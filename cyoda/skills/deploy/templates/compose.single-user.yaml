@@ -9,15 +9,17 @@
 #
 #   docker compose -f compose.yaml up -d
 #
-# Ports: 8080 REST API (/api), 9090 gRPC for compute nodes,
-# 9091 admin (/livez, /readyz, /metrics).
+# Ports (container -> host): 8080 REST API (/api) -> 18080, 9090 gRPC for
+# compute nodes -> 19090, 9091 admin (/livez, /readyz, /metrics) -> 19091.
+# The host ports differ from cyoda-go's defaults because the developer's local
+# cyoda-go already holds 8080/9090/9091; override with CYODA_HOST_*_PORT.
 services:
   cyoda:
     image: ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4}
     ports:
-      - "127.0.0.1:8080:8080"
-      - "127.0.0.1:9090:9090"
-      - "127.0.0.1:9091:9091"
+      - "127.0.0.1:${CYODA_HOST_HTTP_PORT:-18080}:8080"
+      - "127.0.0.1:${CYODA_HOST_GRPC_PORT:-19090}:9090"
+      - "127.0.0.1:${CYODA_HOST_ADMIN_PORT:-19091}:9091"
     environment:
       CYODA_STORAGE_BACKEND: sqlite
       CYODA_SQLITE_PATH: /var/lib/cyoda/cyoda.db

@@ -104,11 +104,13 @@ Fill the checklist placeholders:
 - `<NAMESPACE>` (Helm): the namespace.
 - `<DEPLOY_DIR>`: the output dir.
 - `<APP>`: the project name.
-- `<API_URL>`: `http://localhost:8080` for single-user. For shared, ask for the host the team will use. For Helm, from Step 2.
-- `<GRPC_ENDPOINT>`: the same host with port `9090`, as `host:9090`. For Helm, from Step 2.
+- `<API_URL>`: `http://localhost:18080` for single-user. For shared, ask for the host the team will use: `http://<host>:18080`. For Helm, from Step 2.
+- `<GRPC_ENDPOINT>`: Compose, the same host with port `19090`, as `host:19090`. For Helm, from Step 2.
+
+Both compose files publish host ports 18080 (API), 19090 (gRPC) and 19091 (admin), not 8080/9090/9091: the developer's local cyoda-go holds those, so `up` would fail or health, seed and verify would hit the local instance (`CYODA_HOST_*_PORT` overrides them).
 - `<TOKEN_COMMAND>`: the project's token script if one exists (e.g. `get-token.sh`), else `<path to your token script>`.
 
-When the project already has a token script, put its absolute path in the checklist and the profile's `tokenCommand`, and delete the `/cyoda:auth` line (the "Type `/cyoda:auth` in Claude Code…" sentence) from the generated `secrets-checklist.md`. Keep that line only when there is no token script.
+When the project already has a token script, put its absolute path in the checklist (and, with this instance's client in front, in the profile's `tokenCommand`: Step 7), and delete the `/cyoda:auth` line (the "Type `/cyoda:auth` in Claude Code…" sentence) from the generated `secrets-checklist.md`. Keep that line only when there is no token script.
 
 Don't create `secrets/` or any file in it, and don't put a value for a secret anywhere.
 
@@ -128,7 +130,7 @@ curl -fsS <API_URL>/api/health
 CYODA_ENDPOINT=<API_URL> CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<id> CYODA_CLIENT_SECRET_CMD='<command that prints the secret>' \
   bash <DIR>/seed.sh --manifest cyoda-manifest.json --env <env>
 # 5. Verify (CYODA_ADMIN_URL works only on the host itself: the admin port is loopback)
-CYODA_ENDPOINT=<API_URL> CYODA_ADMIN_URL=http://localhost:9091 CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<id> CYODA_CLIENT_SECRET_CMD='<command>' \
+CYODA_ENDPOINT=<API_URL> CYODA_ADMIN_URL=http://localhost:19091 CYODA_TOKEN_COMMAND=<TOKEN_COMMAND> CYODA_CLIENT_ID=<id> CYODA_CLIENT_SECRET_CMD='<command>' \
   bash <DIR>/verify.sh --manifest cyoda-manifest.json
 ```
 
@@ -171,11 +173,13 @@ Then, briefly:
 
 Ask: "Add a profile for the new instance, so `status`, `build` and `debug` can target it later?" On a yes, ask for a name (`default` is reserved for local) and write `endpoint` (`<API_URL>`, no `/api`), `env` and, for shared or Helm with a token script, `tokenCommand`. Never write a token or secret. Don't make it active: it doesn't answer until the instance is up (Compose step 2, Helm step 3).
 
+The `tokenCommand` names this instance's own client in front of the script, so it never picks up whatever `CYODA_CLIENT_ID`/`CYODA_CLIENT_SECRET` the shell holds for another instance (the same pattern as `/cyoda:auth` Step 6): `CYODA_CLIENT_ID=<id> CYODA_CLIENT_SECRET_CMD='<command that prints the secret>' <absolute path to the token script>`, with Helm's `<APP>-deployer` and `<SECRET_CMD>`, or the shared bootstrap id and the developer's secret command.
+
 ```bash
 CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
 mkdir -p "$(dirname "$CONFIG")"
 [ -f "$CONFIG" ] || echo '{"active":"default","profiles":{}}' > "$CONFIG"
-jq --arg p "<NAME>" --arg ep "<API_URL>" --arg env "<env>" --arg tc "<TOKEN_COMMAND or empty>" \
+jq --arg p "<NAME>" --arg ep "<API_URL>" --arg env "<env>" --arg tc "<the tokenCommand above, or empty>" \
   '.profiles[$p] = ((.profiles[$p] // {}) + {endpoint: $ep, env: $env} + (if $tc == "" then {} else {tokenCommand: $tc} end))' \
   "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
 ```
@@ -187,7 +191,7 @@ Close with one hand-off and its reason:
 
 ## Known upstream issues
 
-- The upstream `deploy/docker/compose.yaml` has a commented "production" block that sets `CYODA_REQUIRE_JWT=true` without `CYODA_IAM_MODE=jwt` and passes the PEM inline. Follow `run` and `config auth` instead, as `compose.shared.yaml` does.
+- The upstream `deploy/docker/compose.yaml` has a commented "production" block that sets `CYODA_REQUIRE_JWT=true` without `CYODA_IAM_MODE=jwt` and passes the PEM inline (cyoda-go#684 item M). Follow `run` and `config auth` instead, as `compose.shared.yaml` does.
 - Workflow import is strict and an export isn't re-importable as is (cyoda-go#684 item I): `seed.sh` posts only `{importMode, workflows}`.
 - `cyoda help helm` and `run` say the chart is unpublished and at 0.1.0, and install from `./deploy/helm/cyoda`. It's published at `https://cyoda.github.io/cyoda-go` (#684 item A): install `cyoda/cyoda` from there, at the chart whose appVersion is `VERSION`.
 - Help's Helm minimal install sets no bootstrap client, which leaves no credential to seed with (#684 item D): `values.yaml` always sets `bootstrap.clientId`.
@@ -204,10 +208,10 @@ Close with one hand-off and its reason:
 | `CYODA_REQUIRE_JWT=true` alone, or `CYODA_JWT_SIGNING_KEY` inline | `CYODA_IAM_MODE=jwt` + `CYODA_JWT_SIGNING_KEY_FILE` |
 | Seeding from live exports | The manifest's versioned files |
 | Production without the processor-fields question | Step 3, recorded as `env.production.changeLevel` |
-| `/readyz` on the API port | `/api/health` on 8080; `/readyz` on the admin port 9091 (`run --section "HEALTH PROBES"`) |
+| `/readyz` on the API port | `/api/health` on the API port; `/readyz` on the admin port (container 9091; `run --section "HEALTH PROBES"`) |
 | Making the new profile active before the instance runs | Write it inactive; switch with `/cyoda:setup` |
 | `helm install ./deploy/helm/cyoda`, or a chart version guessed from help | `cyoda/cyoda` from the published repo, at the chart whose appVersion is `VERSION` |
 | Leaving HMAC, metrics or bootstrap Secrets to the chart | Pre-create all of them: chart-generated ones fail `helm template`, `--dry-run` and GitOps renders |
 | `helm install --create-namespace` | `kubectl create namespace` first: the chart can't render into a missing namespace |
 | `/readyz` through the Gateway or Ingress | Admin port 9091 through `kubectl port-forward` |
-| Port-forwarding to local 8080 or 9091 | Local 18080 and 19091: the developer's local cyoda-go holds 8080 and 9091, and seed or verify would silently hit it |
+| Compose host ports or port-forwards on local 8080, 9090 or 9091 | Host ports 18080, 19090 and 19091: the developer's local cyoda-go holds 8080, 9090 and 9091, and seed or verify would silently hit it |

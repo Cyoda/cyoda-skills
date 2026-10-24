@@ -17,17 +17,19 @@ incl. "Generating secrets"), `cyoda help run` (RUN MODES: Docker Compose), `cyod
 <!-- shared: keep this section, delete the single-user and helm sections -->
 ## Shared (compose.shared.yaml)
 
-`<DEPLOY_DIR>/secrets/` and `<DEPLOY_DIR>/.env` are git-ignored.
+`<DEPLOY_DIR>/secrets/` and `<DEPLOY_DIR>/.env` are git-ignored. Run the commands below
+from the project root, in one shell, after `umask 077 && mkdir -p <DEPLOY_DIR>/secrets`, so
+every file lands in the git-ignored dir and only you can read it.
 The container runs as UID/GID 65532. On a Linux host, each file under `secrets/` must be
 readable by that user (for example `chown 65532:65532` and `chmod 0400`).
 
 | # | Secret | Create it as | Read by | How |
 |---|---|---|---|---|
-| 1 | JWT signing key (RSA, PEM, ≥ 2048 bits) | `secrets/signing.pem` | `CYODA_JWT_SIGNING_KEY_FILE` (mounted `:ro`) | `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out secrets/signing.pem` |
+| 1 | JWT signing key (RSA, PEM, ≥ 2048 bits) | `<DEPLOY_DIR>/secrets/signing.pem` | `CYODA_JWT_SIGNING_KEY_FILE` (mounted `:ro`) | `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out <DEPLOY_DIR>/secrets/signing.pem` |
 | 2 | Bootstrap M2M client id | `CYODA_BOOTSTRAP_CLIENT_ID` in your shell or `<DEPLOY_DIR>/.env` | `CYODA_BOOTSTRAP_CLIENT_ID` | any name, e.g. `<APP>-deployer` (not secret, but keep it with the secret) |
-| 3 | Bootstrap M2M client secret | `secrets/bootstrap-client-secret` (one line) | `CYODA_BOOTSTRAP_CLIENT_SECRET_FILE` (mounted `:ro`) | a random value, e.g. `openssl rand -hex 32` |
-| 4 | Postgres password | `secrets/postgres-password` | `POSTGRES_PASSWORD_FILE` (postgres service) | a random value, e.g. `openssl rand -hex 32` (hex keeps the URL below valid) |
-| 5 | Postgres URL | `secrets/postgres-url` | `CYODA_POSTGRES_URL_FILE` | `postgres://cyoda:<password from 4>@postgres:5432/cyoda?sslmode=disable` |
+| 3 | Bootstrap M2M client secret | `<DEPLOY_DIR>/secrets/bootstrap-client-secret` (one line) | `CYODA_BOOTSTRAP_CLIENT_SECRET_FILE` (mounted `:ro`) | a random value: `openssl rand -hex 32 > <DEPLOY_DIR>/secrets/bootstrap-client-secret` |
+| 4 | Postgres password | `<DEPLOY_DIR>/secrets/postgres-password` | `POSTGRES_PASSWORD_FILE` (postgres service) | a random value: `openssl rand -hex 32 > <DEPLOY_DIR>/secrets/postgres-password` (hex keeps the URL below valid) |
+| 5 | Postgres URL | `<DEPLOY_DIR>/secrets/postgres-url` | `CYODA_POSTGRES_URL_FILE` | `postgres://cyoda:<password from 4>@postgres:5432/cyoda?sslmode=disable`: `printf 'postgres://cyoda:%s@postgres:5432/cyoda?sslmode=disable\n' "$(cat <DEPLOY_DIR>/secrets/postgres-password)" > <DEPLOY_DIR>/secrets/postgres-url` |
 
 - [ ] 1–5 created; `git status` shows none of them.
 - [ ] Store the client id and secret (2, 3) where the people and pipelines that seed and
@@ -86,8 +88,8 @@ JWT, and send no auth header when it's unset.
 
 ## Compute nodes
 
-Compute nodes connect to the gRPC port (9090; on Helm, the gRPC route or Ingress host), not
-the REST port. Give each node:
+Compute nodes connect to the gRPC port (Compose: host port 19090; Helm: the gRPC route or
+Ingress host, or `cyoda.<NAMESPACE>.svc:9090` in the cluster), not the REST port. Give each node:
 
 | Variable | Value | Notes |
 |---|---|---|

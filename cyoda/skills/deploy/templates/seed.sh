@@ -19,7 +19,8 @@
 #      STRUCTURAL. The config's env.<name> value wins over the base value;
 #      null means none (strict schema).
 #   6. import the workflow as {"importMode":"REPLACE","workflows":[...]}, with
-#      ${SCHEMA_VERSION} set from GET /help/workflows/schema-version/versions
+#      ${SCHEMA_VERSION} set from GET /help/workflows/schema-version/versions;
+#      pass 1 rejects any version outside that endpoint's supported range
 #
 # Environment:
 #   CYODA_ENDPOINT       instance base URL, no /api (required)
@@ -97,6 +98,9 @@ file_of() { # file_of <entity-json> <key>: absolute path of a manifest file entr
 req GET /help/workflows/schema-version/versions
 SCHEMA_VERSION="$(jq -r '.current // empty' <<<"$BODY")"
 [ -n "$SCHEMA_VERSION" ] || fail "no .current in /help/workflows/schema-version/versions: $BODY"
+SUPPORTED="$(jq -c '.supported // []' <<<"$BODY")"
+[ "$SUPPORTED" != "[]" ] || fail "no .supported in /help/workflows/schema-version/versions: $BODY"
+SUPPORTED_TEXT="$(jq -r '[.[] | "\(.major).\(.minMinor)-\(.major).\(.maxMinor)"] | join(", ")' <<<"$SUPPORTED")"
 
 req GET /model/
 MODELS="$BODY"
@@ -141,6 +145,15 @@ while [ "$i" -lt "$COUNT" ]; do
       workflows: [.workflows[] | if (.version == null or .version == "${SCHEMA_VERSION}") then .version = $v else . end]}' \
     "$WORKFLOW" > "$TMP/workflow-$i.json" 2>/dev/null \
     || fail "$E v$V: cannot read workflow $WORKFLOW (expected {\"workflows\":[...]}); nothing was written"
+  # Every workflow's version (after ${SCHEMA_VERSION} substitution) must be a
+  # MAJOR.MINOR the server accepts, so a v0.3-era file (bare major "1") fails here.
+  BADV="$(jq -r --argjson sup "$SUPPORTED" '[.workflows[]
+      | (.version | tostring) as $v
+      | ($v | capture("^(?<ma>[0-9]+)\\.(?<mi>[0-9]+)$")? // null) as $c
+      | select($c == null or ([$sup[] | select(.major == ($c.ma | tonumber)
+          and ($c.mi | tonumber) >= .minMinor and ($c.mi | tonumber) <= .maxMinor)] | length) == 0)
+      | "\(.name // "?") has version \($v)"] | join("; ")' "$TMP/workflow-$i.json")"
+  [ -z "$BADV" ] || fail "$E v$V: unsupported workflow schema version in $WORKFLOW: $BADV (server accepts $SUPPORTED_TEXT; use \"\${SCHEMA_VERSION}\"); nothing was written"
   i=$((i + 1))
 done
 

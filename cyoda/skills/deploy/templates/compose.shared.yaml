@@ -12,10 +12,12 @@
 #
 #   docker compose -f compose.yaml up -d
 #
-# Ports: 8080 REST API (/api) and 9090 gRPC for compute nodes are published on
-# all interfaces; put a TLS-terminating proxy in front of them for anything
-# beyond a trusted network. 9091 admin (/livez, /readyz, /metrics) stays on
-# 127.0.0.1.
+# Ports (container -> host): 8080 REST API (/api) -> 18080 and 9090 gRPC for
+# compute nodes -> 19090 are published on all interfaces; put a TLS-terminating
+# proxy in front of them for anything beyond a trusted network. 9091 admin
+# (/livez, /readyz, /metrics) -> 19091 stays on 127.0.0.1. The host ports differ
+# from cyoda-go's defaults so the stack never collides with a local cyoda-go on
+# 8080/9090/9091; override with CYODA_HOST_*_PORT.
 services:
   postgres:
     image: postgres:17-alpine
@@ -35,9 +37,9 @@ services:
   cyoda:
     image: ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4}
     ports:
-      - "8080:8080"
-      - "9090:9090"
-      - "127.0.0.1:9091:9091"
+      - "${CYODA_HOST_HTTP_PORT:-18080}:8080"
+      - "${CYODA_HOST_GRPC_PORT:-19090}:9090"
+      - "127.0.0.1:${CYODA_HOST_ADMIN_PORT:-19091}:9091"
     environment:
       CYODA_STORAGE_BACKEND: postgres
       # postgres://cyoda:<password>@postgres:5432/cyoda?sslmode=disable

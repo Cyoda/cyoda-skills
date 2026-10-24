@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "/cyoda:deploy — I want to run my shop app's cyoda on my laptop in Docker, just for me",
-      "expected_output": "Checks status and the local models, reads cyoda-manifest.json, recommends Docker Compose single-user (mock auth, loopback, labelled 'anyone who can reach these ports is admin'), writes deploy/cyoda/{compose.yaml, seed.sh, verify.sh, secrets-checklist.md} from the templates with image ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4}, and ends with the ordered command list (up, health, seed, verify) without running any of them.",
+      "expected_output": "Checks status and the local models, reads cyoda-manifest.json, recommends Docker Compose single-user (mock auth, loopback, labelled 'anyone who can reach these ports is admin'), writes deploy/cyoda/{compose.yaml, seed.sh, verify.sh, secrets-checklist.md} from the templates with image ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4} and host ports 127.0.0.1:18080/19090/19091 (not 8080/9090/9091, which the local cyoda-go holds), and ends with the ordered command list (up, health on http://localhost:18080, seed, verify with CYODA_ADMIN_URL=http://localhost:19091) without running any of them.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -45,6 +45,11 @@
           "type": "format"
         },
         {
+          "id": "no-port-clash",
+          "text": "The compose file publishes host ports 18080, 19090 and 19091 on 127.0.0.1 (not 8080/9090/9091), and health, seed and verify use http://localhost:18080 and CYODA_ADMIN_URL=http://localhost:19091; it says why in a line (the local cyoda-go holds 8080/9090/9091)",
+          "type": "behavior"
+        },
+        {
           "id": "help-first",
           "text": "Names at least one `cyoda help` section it relied on (e.g. run RUN MODES or PORT LAYOUT) rather than asserting facts from memory",
           "type": "behavior"
@@ -69,7 +74,7 @@
     {
       "id": 2,
       "prompt": "/cyoda:deploy — we need a shared cyoda instance for the team on our staging VM, staging.shop.example.com",
-      "expected_output": "Chooses Docker Compose shared: compose.yaml from compose.shared.yaml (Postgres, CYODA_IAM_MODE=jwt, CYODA_REQUIRE_JWT, CYODA_JWT_SIGNING_KEY_FILE mounted :ro, bootstrap client id from env and secret via _FILE), a filled secrets-checklist.md naming each secret and where it is read from with no values, a .gitignore for secrets/ and .env, and the ordered commands (secrets, up, health, seed with CYODA_TOKEN_COMMAND, verify). It records CYODA_COMPUTE_GRPC_ENDPOINT=staging.shop.example.com:9090 in the checklist. It doesn't generate keys.",
+      "expected_output": "Chooses Docker Compose shared: compose.yaml from compose.shared.yaml (Postgres, CYODA_IAM_MODE=jwt, CYODA_REQUIRE_JWT, CYODA_JWT_SIGNING_KEY_FILE mounted :ro, bootstrap client id from env and secret via _FILE), a filled secrets-checklist.md naming each secret and where it is read from with no values, a .gitignore for secrets/ and .env, and the ordered commands (secrets, up, health, seed with CYODA_TOKEN_COMMAND, verify). It uses <API_URL> http://staging.shop.example.com:18080 and records CYODA_COMPUTE_GRPC_ENDPOINT=staging.shop.example.com:19090 in the checklist (the compose host ports). It doesn't generate keys.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -101,7 +106,7 @@
         },
         {
           "id": "grpc-endpoint",
-          "text": "The secrets checklist records CYODA_COMPUTE_GRPC_ENDPOINT as staging.shop.example.com:9090 for compute nodes",
+          "text": "The secrets checklist records CYODA_COMPUTE_GRPC_ENDPOINT as staging.shop.example.com:19090 (the compose gRPC host port) for compute nodes",
           "type": "behavior"
         },
         {
@@ -134,7 +139,7 @@
     {
       "id": 3,
       "prompt": "/cyoda:deploy — production deployment for shop, compose shared on prod.shop.example.com",
-      "expected_output": "Treats the target as production. Before writing, asks for each entity whether any processor writes fields not in its sample, explaining a strict schema rejects them. For order the developer says yes (a processor adds fulfilmentNotes), and after reading the changeLevel values chooses STRUCTURAL; for customer, no. Records env.production.changeLevel = \"STRUCTURAL\" in src/config/order-v1-config.json and env.production.changeLevel = null in src/config/customer-v1-config.json, keeping other keys. The seed command uses --env production. Offers a profile with env production and writes it inactive on a yes.",
+      "expected_output": "Treats the target as production. Before writing, asks for each entity whether any processor writes fields not in its sample, explaining a strict schema rejects them. For order the developer says yes (a processor adds fulfilmentNotes), and after reading the changeLevel values chooses STRUCTURAL; for customer, no. Records env.production.changeLevel = \"STRUCTURAL\" in src/config/order-v1-config.json and env.production.changeLevel = null in src/config/customer-v1-config.json, keeping other keys. The seed command uses --env production. Offers a profile with env production and writes it inactive on a yes, with a tokenCommand that names this instance's client in front of the script (CYODA_CLIENT_ID=<bootstrap id> CYODA_CLIENT_SECRET_CMD='<command>' /work/shop/get-token.sh), never the bare script path.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\", \"env\": \"development\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -171,7 +176,7 @@
         },
         {
           "id": "profile-inactive",
-          "text": "Writes profile prod with endpoint (no /api), env production and tokenCommand pointing at get-token.sh, no token or secret, and does not make it the active profile",
+          "text": "Writes profile prod with endpoint (no /api), env production and a tokenCommand of the form CYODA_CLIENT_ID=<id> CYODA_CLIENT_SECRET_CMD='<command>' /work/shop/get-token.sh (this instance's own client in front of the absolute script path, not the bare path), no token or secret, and does not make it the active profile",
           "type": "behavior"
         },
         {

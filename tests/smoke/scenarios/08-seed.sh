@@ -109,6 +109,14 @@ scenario_main() {
   assert_status 1 "$rc" "malformed workflow: seed exits 1"
   assert_eq "$(model_state badwf)" "MISSING" "malformed workflow: model not imported or locked"
 
+  # 10b. A v0.3-era workflow version ("1", no minor) fails in pass 1, before any write.
+  jq '.workflows[0].version = "1"' "$w_order" > "$tmp/old-version-workflow.json"
+  manifest "$tmp/oldver-manifest.json" "$(entry oldver "$s_order" "$tmp/old-version-workflow.json" "$c_order")"
+  out="$(CYODA_ENDPOINT="$ep" bash "$tpl/seed.sh" --manifest "$tmp/oldver-manifest.json" --env development 2>&1)"; rc=$?
+  assert_status 1 "$rc" "old workflow version: seed exits 1"
+  assert_contains "$out" "has version 1 " "old workflow version: the version is named"
+  assert_eq "$(model_state oldver)" "MISSING" "old workflow version: nothing written to the instance"
+
   # 11. A run that died after the lock (changeLevel not applied) is completed by a re-run.
   curl -s -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @"$s_order" "$BASE/model/import/JSON/SAMPLE_DATA/relock/1"
   curl -s -o /dev/null -X PUT "$BASE/model/relock/1/lock"
