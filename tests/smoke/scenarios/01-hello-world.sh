@@ -32,10 +32,24 @@ scenario_main() {
   if [ "${n:-0}" -ge 2 ]; then _ok; else _bad "changes lists >= 2 versions" "got: $n"; fi
 
   # test skill's smoke-test.sh template: run from a project dir holding a
-  # cyoda-manifest.json, fire the manual `archive` transition. The token
-  # command proves the auth header survives as one argument (mock ignores it).
-  local proj out rc
+  # cyoda-manifest.json, fire the manual `archive` transition. The mock ignores
+  # auth; a curl shim proves the token stays out of argv (R10) and still
+  # arrives intact as one header line read from a -H @file.
+  local proj out rc realcurl
   proj="$(mktemp -d)"
+  realcurl="$(command -v curl)"
+  mkdir -p "$proj/shim"
+  cat >"$proj/shim/curl" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$@" >>"$proj/curl-args"
+prev=""
+for a in "\$@"; do
+  if [ "\$prev" = "-H" ] && [ "\${a#@}" != "\$a" ]; then cat "\${a#@}" >>"$proj/curl-headers"; fi
+  prev="\$a"
+done
+exec "$realcurl" "\$@"
+SH
+  chmod +x "$proj/shim/curl"
   cp "$EX_DIR/sample.json" "$proj/hello-v1-sample.json"
   printf '{"manifestVersion":1,"entities":[{"name":"hello","modelVersion":1,"sample":"hello-v1-sample.json"}]}\n' >"$proj/cyoda-manifest.json"
   # CYODA_ENDPOINT is given with an /api/ suffix; the token command must see
@@ -44,12 +58,15 @@ scenario_main() {
   # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   tc='[ "$CYODA_ENDPOINT" = "'"${BASE%/api}"'" ] && echo smoke-token'
   out="$(cd "$proj" && env -u CYODA_CONFIG ENTITY_NAME=hello MODEL_VERSION=1 TRANSITION_NAME=archive \
-    EXPECTED_STATE=archived CYODA_ENDPOINT="$BASE/" CYODA_TOKEN_COMMAND="$tc" \
+    EXPECTED_STATE=archived CYODA_ENDPOINT="$BASE/" CYODA_TOKEN_COMMAND="$tc" PATH="$proj/shim:$PATH" \
     bash "$_LOAD_ROOT/cyoda/skills/test/templates/smoke-test.sh" 2>"$proj/stderr")"; rc=$?
   assert_eq "$rc" 0 "smoke-test.sh exits 0"
   [ "$rc" -eq 0 ] || { echo "        stdout: $out" >&2; echo "        stderr: $(cat "$proj/stderr")" >&2; }
   assert_eq "$(printf '%s\n' "$out" | tail -n1)" "=== PASS ===" "smoke-test.sh stdout ends === PASS ==="
   assert_contains "$out" archived "smoke-test.sh reports the archived state"
+  assert_eq "$(grep -c 'smoke-token' "$proj/curl-args")" 0 "smoke-test.sh: token absent from curl argv"
+  local nreq; nreq="$(grep -c '^-X$' "$proj/curl-args")"
+  assert_eq "$(grep -c '^Authorization: Bearer smoke-token$' "$proj/curl-headers")" "$nreq" "smoke-test.sh: every request carries the intact header"
 
   # A 200 with a non-JSON body (wrong endpoint, proxy page) is a clean FAIL.
   mkdir -p "$proj/www/api/model"

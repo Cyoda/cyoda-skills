@@ -11,8 +11,9 @@ load_example() {
   [ -d "$EX_DIR" ] || { echo "load_example: missing $EX_DIR" >&2; return 1; }
 }
 
-# _req <curl args...>: prints HTTP status; response body goes to $_LOAD_BODY
-_LOAD_BODY="$(mktemp)"
+# _req <curl args...>: prints HTTP status; response body goes to $_LOAD_BODY.
+# Lives in the server's temp dir, which stop_server removes after each scenario.
+_LOAD_BODY="${SMOKE_TMP:?load.sh: source after start_server}/load-body"
 _req() { curl -s -o "$_LOAD_BODY" -w '%{http_code}' "$@"; }
 
 # seed_model <entity> <version> <dir>

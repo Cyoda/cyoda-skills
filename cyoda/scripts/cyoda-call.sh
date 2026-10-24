@@ -34,22 +34,27 @@ if [ "$ENVNAME" = "production" ] && [ "$CONFIRM" -eq 0 ]; then
   esac
 fi
 
+# The token never goes into curl's argv (visible in ps): it is written to a
+# 0600 header file in a private temp dir and curl reads it with -H @file.
+HDR_DIR=""
+trap '[ -z "$HDR_DIR" ] || rm -rf "$HDR_DIR"' EXIT
+
 run_token() {
   local t
   if ! t="$(CYODA_ENDPOINT="$ENDPOINT" bash -c "$TOKEN_CMD" 2>/dev/null)" || [ -z "$t" ]; then
     echo "token command failed: $TOKEN_CMD" >&2
     exit 4
   fi
-  TOKEN="$t"
+  [ -n "$HDR_DIR" ] || HDR_DIR="$(umask 077 && mktemp -d "${TMPDIR:-/tmp}/cyoda-call.XXXXXX")"
+  (umask 077 && printf 'Authorization: Bearer %s\n' "$t" >"$HDR_DIR/auth-header")
 }
 
 URL="${ENDPOINT%/}/api/${APIPATH#/}"
-TOKEN=""
 [ -n "$TOKEN_CMD" ] && run_token
 
 do_request() {
   local args=(-sS -X "$METHOD" -w $'\n%{http_code}')
-  [ -n "$TOKEN" ] && args+=(-H "Authorization: Bearer $TOKEN")
+  [ -n "$HDR_DIR" ] && args+=(-H @"$HDR_DIR/auth-header")
   args+=("$@" "$URL")
   local out rc=0
   out="$(curl "${args[@]}")" || rc=$?

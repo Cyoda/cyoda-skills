@@ -37,7 +37,13 @@ if [ -n "${CYODA_TOKEN_COMMAND:-}" ]; then
   # Same contract as cyoda-call.sh: the token command sees CYODA_ENDPOINT.
   TOKEN="$(CYODA_ENDPOINT="$ENDPOINT" bash -c "$CYODA_TOKEN_COMMAND")" || fail "token command failed: $CYODA_TOKEN_COMMAND"
   [ -n "$TOKEN" ] || fail "token command printed nothing: $CYODA_TOKEN_COMMAND"
-  AUTH=(-H "Authorization: Bearer $TOKEN")
+  # The token goes into a 0600 header file read with -H @file, never into
+  # curl's argv (visible in ps). The private temp dir is removed on exit.
+  HDR_DIR="$(umask 077 && mktemp -d "${TMPDIR:-/tmp}/smoke-test.XXXXXX")"
+  trap 'rm -rf "$HDR_DIR"' EXIT
+  (umask 077 && printf 'Authorization: Bearer %s\n' "$TOKEN" >"$HDR_DIR/auth-header")
+  unset TOKEN
+  AUTH=(-H @"$HDR_DIR/auth-header")
 fi
 
 # req <METHOD> <URL> [curl args...]: body -> $BODY, status -> $CODE.

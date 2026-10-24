@@ -44,6 +44,9 @@ if [ -z "$ONLY" ]; then
     echo "-- $(basename "$t")"
     bash "$t" || RC=1
   done
+
+  echo "== segregation"
+  bash "$HERE/test-segregation.sh" || RC=1
 fi
 
 for s in "$HERE"/scenarios/*.sh; do

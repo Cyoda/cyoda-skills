@@ -58,10 +58,23 @@ test_call_no_endpoint() {
 }
 
 test_call_header_quoting() {
+  # R10: the token must not appear in curl's argv (ps-visible); it arrives via
+  # -H @<0600 file>. The shim records argv and the contents of any @file header.
   mkdir -p "$T/shim"
   cat >"$T/shim/curl" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"$SMOKE_TMP/curl-args"
+: >"$SMOKE_TMP/curl-headers"
+prev=""
+for a in "$@"; do
+  if [ "$prev" = "-H" ] && [ "${a#@}" != "$a" ]; then
+    f="${a#@}"
+    cat "$f" >>"$SMOKE_TMP/curl-headers"
+    stat -f '%Lp' "$f" 2>/dev/null >"$SMOKE_TMP/curl-header-mode" || stat -c '%a' "$f" >"$SMOKE_TMP/curl-header-mode"
+    printf '%s\n' "$f" >"$SMOKE_TMP/curl-header-path"
+  fi
+  prev="$a"
+done
 echo '{}'
 printf '200'
 SH
@@ -69,8 +82,12 @@ SH
   printf '#!/usr/bin/env bash\necho "a b"\n' >"$T/tok.sh"; chmod +x "$T/tok.sh"
   cfg "{\"endpoint\":\"$EP\",\"tokenCommand\":\"$T/tok.sh\"}"
   SMOKE_TMP="$T" PATH="$T/shim:$PATH" bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1
-  assert_eq "$(grep -c '^Authorization: Bearer a b$' "$T/curl-args")" 1 "single header line"
-  assert_eq "$(grep -c '^Authorization' "$T/curl-args")" 1 "only one Authorization line"
+  assert_eq "$(grep -c 'Bearer' "$T/curl-args")" 0 "token absent from curl argv"
+  assert_eq "$(grep -c 'a b' "$T/curl-args")" 0 "token value absent from curl argv"
+  assert_eq "$(grep -c '^Authorization: Bearer a b$' "$T/curl-headers")" 1 "header arrives intact via @file"
+  assert_eq "$(grep -c '^Authorization' "$T/curl-headers")" 1 "only one Authorization line"
+  assert_eq "$(cat "$T/curl-header-mode")" 600 "header file is 0600"
+  if [ -e "$(cat "$T/curl-header-path")" ]; then _bad "header file left behind"; else _ok; fi
   rm -rf "$T/shim"
 }
 
