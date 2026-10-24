@@ -87,7 +87,7 @@ if [ "${LINT_SKIP_SHELLCHECK:-}" != "1" ]; then
     while IFS= read -r f; do SC+=("$f"); done < <(
       {
         ls "$ROOT"/cyoda/scripts/*.sh "$ROOT"/cyoda/skills/*/templates/*.sh 2>/dev/null
-        [ -d "$ROOT/tests" ] && find "$ROOT/tests" -name '*.sh'
+        [ -d "$ROOT/tests" ] && find "$ROOT/tests" -name '*.sh' -not -path '*/.state/*'
       } | sort -u)
     if [ ${#SC[@]} -gt 0 ]; then
       if ! SCOUT="$("${SCBIN[@]}" -x -P SCRIPTDIR -f gcc "${SC[@]}" 2>&1)"; then

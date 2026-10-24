@@ -8,6 +8,9 @@
 # skill-creator eval pipeline; do not commit.
 cyoda/skills/*-workspace/
 cyoda-evals-workspace/
+# Eval servers' state (tests/evals/start.sh)
+tests/evals/.state/
 # Cyoda connection config — contains credentials, always local-only
 .cyoda/
 .DS_Store
+__pycache__/
