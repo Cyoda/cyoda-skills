@@ -48,4 +48,4 @@ Warning: local cyoda 0.9.0 differs from instance 0.8.4; help is read from the in
 | Reporting `BINARY_VERSION` as the version | Report `VERSION` (from the instance) |
 | Showing only the first warning | Print every `WARN=` line |
 | Running the tokenCommand or an authenticated call | Not needed: `/api/help` is public |
-| A Cloud or migration question | "That's not covered by this plugin" |
+| A Cloud or migration question | Reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it |

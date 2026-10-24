@@ -117,4 +117,4 @@ Leave `eventType=System` out: open-source cyoda-go doesn't emit those events. Pr
 | Re-firing the automated transition to retry | A loopback, after the developer's yes |
 | Changing the workflow or model from here | "Next, type `/cyoda:build`" |
 | `?level=DEBUG` on the audit API | No such parameter; filter with `severity` and `eventType` |
-| A Cloud or migration question | "That's not covered by this plugin" |
+| A Cloud or migration question | Reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it |

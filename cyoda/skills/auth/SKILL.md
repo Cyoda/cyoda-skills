@@ -13,7 +13,7 @@ Sets up a **token script** in the developer's project and points the active prof
 
 **Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` and say which one you used.
 
-A Cloud or migration question: "That's not covered by this plugin."
+A Cloud or migration question: reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it.
 
 ## Step 0 — Connection
 

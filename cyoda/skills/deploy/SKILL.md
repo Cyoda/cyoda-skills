@@ -15,7 +15,7 @@ Writes the files that deploy and seed a cyoda-go instance into the developer's p
 
 **Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` and say which one you used. Templates are under `${CLAUDE_PLUGIN_ROOT}/skills/deploy/templates/`.
 
-A Cloud or migration question: "That's not covered by this plugin."
+A Cloud or migration question: reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it.
 
 ## Step 0 — Connection
 

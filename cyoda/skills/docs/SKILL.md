@@ -70,7 +70,7 @@ Filed as Cyoda/cyoda-go#684. When an answer touches one of these, give the corre
 
 | Question | Answer |
 |---|---|
-| Cloud, hosted or managed offerings, or migrating to them | "That's not covered by this plugin." Nothing more |
+| Cloud, hosted or managed offerings, or migrating to them | Reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it |
 | SQL, Trino, analytics, reporting queries | "SQL analytics is not available in cyoda-go." (`cyoda help analytics` exists, but describes an interface cyoda-go doesn't serve: don't answer from it.) Offer search and grouped statistics: `search --section ENDPOINTS`, `crud --section ENDPOINTS` |
 | Notifications, alerts, webhooks on state entry | "Notifications are coming soon — check `cyoda help` for availability." |
 | Any other feature that help doesn't document | "Not available in cyoda-go `<VERSION>` — check `cyoda help`." |

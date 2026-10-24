@@ -26,6 +26,8 @@ Ask one question: "Is Cyoda new to you, do you already have a design, or do you 
 | Has a design (entities, states, transitions) | Step 2 |
 | Has models on a connected instance | Step 3 |
 
+Before the first step, tell the developer the journey in one line and where they are in it, e.g. "The journey is design → setup → build → test → iterate → deploy (optional); you're at design."
+
 ## Orientation (new developers only)
 
 Two or three sentences, then ask "Does that make sense? Ready to design your app?":
@@ -72,7 +74,7 @@ When the app runs locally and the developer wants it elsewhere: "next, type `/cy
 | `cyoda:debug` | A failed transition or call, an unexpected state, or an entity's history |
 | `cyoda:status` | Which instance is connected |
 
-Cloud, hosted offerings or migration: "That's not covered by this plugin."
+Cloud, hosted offerings or migration: reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it.
 
 ## Common mistakes
 

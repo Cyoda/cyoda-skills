@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Create one entity per model, walk its manual transitions on the happy path, and report each state against the workflow. Or hand the developer a script that does the same for one entity.
 
-**Facts come from `cyoda help`, not from this file.** Read the section, not the whole topic: run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` (stderr shows `SOURCE=instance|binary|web`). Exit 2 means unknown topic, exit 6 unknown section (stderr lists the sections that exist). The entity calls are in `crud --section ENDPOINTS`; read it before Step 3.
+**Facts come from `cyoda help`, not from this file.** Read the section, not the whole topic: run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` (stderr shows `SOURCE=instance|binary|web`). Exit 2 means unknown topic, exit 6 unknown section (stderr lists the sections that exist). Step 2.1 reads the sections this run depends on. State paths, fields and behaviour from what you read, and name the topic and section.
 
 **Every API call** goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh [--confirm-production] <METHOD> <PATH> [curl args...]`. PATH is relative to `<endpoint>/api` (e.g. `/model/`). The body goes to stdout and `HTTP_STATUS=<code>` to stderr. Never build a URL or auth header yourself.
 
@@ -37,11 +37,12 @@ Ask: "Run the smoke test now (**automated**), or get a script you can re-run (**
 
 ## Step 2 — Discover
 
-1. `cyoda-call.sh GET /model/` (help: `models --section ENDPOINTS`). Print "Discovered N models: `<name>` v`<version>` (`<currentState>`), ...".
-2. Only LOCKED models can hold entities (`models --section LIFECYCLE`). List any UNLOCKED one as skipped: "not locked yet; next, type `/cyoda:build` to finish registering it".
-3. More than 3 testable models: ask which to test (names or `all`).
-4. For each selected model, `cyoda-call.sh GET /model/{e}/{v}/workflow/export`. Note `initialState` and, per state, the transitions with `manual: true`, skipping any with `disabled: true` or a `schedule` (those can't be fired by name). No workflow: skip the model and say so in the summary.
-5. The payload is the project's sample: read `cyoda-manifest.json` at the project root and use the `sample` file listed for `{e}` v`{v}`. No manifest entry: write a minimal payload from `GET /model/export/SIMPLE_VIEW/{e}/{v}`, check it with `POST /model/validate/{e}/{v}` (it answers 200 either way: read `.success` and `.message`), and show it before using it.
+1. **Read help.** Run `cyoda-help.sh crud --section ENDPOINTS` (the entity calls) and `cyoda-help.sh models --section ENDPOINTS` (the model calls) before any call below.
+2. `cyoda-call.sh GET /model/`. Print "Discovered N models: `<name>` v`<version>` (`<currentState>`), ...".
+3. Only LOCKED models can hold entities. If any model is UNLOCKED, run `cyoda-help.sh models --section LIFECYCLE` and give its reason when you list the model as skipped: "not locked yet (<reason>, `models` § LIFECYCLE); next, type `/cyoda:build` to finish registering it".
+4. More than 3 testable models: ask which to test (names or `all`).
+5. For each selected model, `cyoda-call.sh GET /model/{e}/{v}/workflow/export`. Note `initialState` and, per state, the transitions with `manual: true`, skipping any with `disabled: true` or a `schedule` (those can't be fired by name). No workflow: skip the model and say so in the summary.
+6. The payload is the project's sample: read `cyoda-manifest.json` at the project root and use the `sample` file listed for `{e}` v`{v}`. No manifest entry: write a minimal payload from `GET /model/export/SIMPLE_VIEW/{e}/{v}`, check it with `POST /model/validate/{e}/{v}` (it answers 200 either way: read `.success` and `.message`), and show it before using it.
 
 Guided mode continues at [Guided mode](#guided-mode).
 
@@ -99,4 +100,4 @@ The template [templates/smoke-test.sh](templates/smoke-test.sh) reads everything
 | An unquoted `CYODA_TOKEN_COMMAND=` in the run command | Single quotes, each inner `'` as `'\''` |
 | Handling 401 by re-running the token command | The script already did. Say "next, type `/cyoda:auth`" |
 | Saying you'll run `/cyoda:build` or `/cyoda:setup` yourself | "Next, type `/cyoda:<x>`" with a one-line reason |
-| A Cloud or migration question | "That's not covered by this plugin" |
+| A Cloud or migration question | Reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it |

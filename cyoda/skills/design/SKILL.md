@@ -108,7 +108,7 @@ For each violation, change the design and say so in one plain sentence that name
 
 Mention a pattern from [patterns.md](resources/patterns.md) when it fits (approval, scheduled transition, cascade, error state with retry, saga, external trigger).
 
-If the developer asks about Cloud, hosted or managed offerings, or migration, answer "not covered by this plugin" and nothing more.
+If the developer asks about Cloud, hosted or managed offerings, or migration, reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it.
 
 ## Phase 4 — Design summary
 
