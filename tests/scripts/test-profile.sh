@@ -13,9 +13,15 @@ T="$(mktemp -d)"
 
 test_profile_default_when_no_config() {
   local out
-  out="$(CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-profile.sh")"; local rc=$?
+  out="$(unset CYODA_DEFAULT_ENDPOINT; CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-profile.sh")"; local rc=$?
   assert_status 0 "$rc" "exit 0 with no config"
-  assert_eq "$(echo "$out" | jq -c .)" '{"profile":"default","endpoint":null,"env":"development","tokenCommand":null,"warnings":[]}' "default profile"
+  assert_eq "$(echo "$out" | jq -c .)" '{"profile":"default","endpoint":"http://localhost:8080","env":"development","tokenCommand":null,"warnings":["no saved profile; using the default local instance http://localhost:8080 — type /cyoda:setup to save it"]}' "implicit default profile"
+}
+
+test_profile_existing_config_without_endpoint() {
+  echo '{"profiles":{}}' >"$T/empty.json"
+  local out; out="$(CYODA_PLUGIN_CONFIG="$T/empty.json" bash "$S/cyoda-profile.sh")"
+  assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .warnings]')" '["default",null,[]]' "existing config: no implicit endpoint"
 }
 
 test_profile_active_selected() {
@@ -50,6 +56,7 @@ test_profile_invalid_json() {
 }
 
 test_profile_default_when_no_config
+test_profile_existing_config_without_endpoint
 test_profile_active_selected
 test_profile_stale_token
 test_profile_invalid_json

@@ -32,8 +32,28 @@ test_status_unreachable() {
 }
 
 test_status_not_configured() {
-  local out; out="$(CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
+  # A config file that exists but has no endpoint for the active profile.
+  echo '{"profiles":{}}' >"$T/empty.json"
+  local out; out="$(CYODA_PLUGIN_CONFIG="$T/empty.json" bash "$S/cyoda-status.sh")"
   assert_contains "$out" "STATUS=not_configured" "not configured"
+  assert_contains "$out" "ENDPOINT=none" "no endpoint"
+}
+
+test_status_no_config_local_up() {
+  start_server || return
+  local ep="http://localhost:${SMOKE_HTTP_PORT}" out
+  out="$(CYODA_DEFAULT_ENDPOINT="$ep" CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=default ENDPOINT=$ep ENV=development VERSION=0.8.4" "implicit default connected"
+  assert_contains "$out" "WARN=no saved profile; using the default local instance $ep — type /cyoda:setup to save it" "implicit default warn"
+  stop_server
+}
+
+test_status_no_config_nothing_listening() {
+  local out
+  out="$(CYODA_DEFAULT_ENDPOINT="http://localhost:1" CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable PROFILE=default ENDPOINT=http://localhost:1" "implicit default unreachable"
+  assert_contains "$out" "WARN=no cyoda-go is answering at http://localhost:1 — type /cyoda:setup to install or start one" "implicit default unreachable warn"
+  if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for the implicit default"; else _ok; fi
 }
 
 test_status_version_mismatch() {
@@ -68,6 +88,8 @@ test_status_connected
 test_status_ignores_broken_token_command
 test_status_unreachable
 test_status_not_configured
+test_status_no_config_local_up
+test_status_no_config_nothing_listening
 test_status_version_mismatch
 test_status_stale_token_forwarded
 report

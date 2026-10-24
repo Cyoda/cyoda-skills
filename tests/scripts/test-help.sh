@@ -12,6 +12,9 @@ trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
 export CYODA_PLUGIN_CONFIG="$T/none.json"
+# No config means the implicit default endpoint; point it at a closed port so
+# the binary tests don't pick up a developer's own cyoda-go on :8080.
+export CYODA_DEFAULT_ENDPOINT="http://localhost:1"
 
 test_help_section_from_binary() {
   local out err
@@ -103,7 +106,25 @@ test_help_text_action_from_instance() {
   stop_server
 }
 
+test_help_no_config_uses_default_instance() {
+  start_server || return
+  CYODA_DEFAULT_ENDPOINT="http://localhost:${SMOKE_HTTP_PORT}" bash "$S/cyoda-help.sh" auth tokens >/dev/null 2>"$T/err"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "no config: help from the default instance"
+  stop_server
+}
+
+test_help_no_config_fallback_is_fast() {
+  local start end
+  start=$(date +%s)
+  bash "$S/cyoda-help.sh" models >/dev/null 2>"$T/err"
+  end=$(date +%s)
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=binary" "no config, nothing listening: binary"
+  if [ $((end - start)) -le 3 ]; then _ok; else _bad "fallback took $((end - start))s"; fi
+}
+
 test_help_section_from_binary
+test_help_no_config_uses_default_instance
+test_help_no_config_fallback_is_fast
 test_help_text_action_from_binary
 test_help_text_action_from_instance
 test_help_action_from_binary

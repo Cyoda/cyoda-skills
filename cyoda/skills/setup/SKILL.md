@@ -18,7 +18,8 @@ Two modes: **local** (install and run cyoda-go on this machine, profile `default
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. It prints `STATUS=… PROFILE=… ENDPOINT=… ENV=… VERSION=… BINARY_VERSION=…` and then `WARN=` lines.
 
 - Show every `WARN=` line as it is, e.g. "profile old contains a stored token, which this plugin no longer reads; you can remove it". Don't read, print or reuse a stored token. Remove it only if the developer says yes: `jq 'del(.profiles["<P>"].token)'` (write it back as in [Write the profile](#write-the-profile)).
-- `STATUS=unreachable`: offer to switch the active profile to `default`: on a yes, `jq '.active = "default"'` (written back the same way), leaving the unreachable profile in place, then go to [Finish](#finish). If `default` doesn't exist or isn't running either, continue with local mode.
+- `WARN=no saved profile; …`: there is no config file, so the scripts used the local default `http://localhost:8080`. Unless the request says connect: `STATUS=connected` means a local cyoda-go already answers, so go to local mode to save it as `default` (its checks skip what's done); `STATUS=unreachable` (`WARN=no cyoda-go is answering at …`) means nothing runs locally yet, so go to local mode.
+- `STATUS=unreachable` for a saved profile: offer to switch the active profile to `default`: on a yes, `jq '.active = "default"'` (written back the same way), leaving the unreachable profile in place, then go to [Finish](#finish). If `default` doesn't exist or isn't running either, continue with local mode.
 - Otherwise ask which mode, unless the request already says: "Run cyoda-go **locally**, or **connect** to an instance that already runs elsewhere?"
 
 A Cloud or migration question: say only "That's not covered by this plugin." and continue. Don't name or describe the product or offer alternatives for it.

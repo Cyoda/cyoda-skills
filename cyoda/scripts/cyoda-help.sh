@@ -61,12 +61,14 @@ emit_text() { # source version text  (non-JSON action output, e.g. grpc proto)
   exit 0
 }
 
-# 1. Active instance. /api/help is public: plain curl, never tokenCommand.
+# 1. Active instance (with no config, the implicit local default). /api/help is
+# public: plain curl, never tokenCommand. Short connect timeout so a closed port
+# falls through to the binary at once.
 # One fetch of /api/help gives reachability and VERSION; one fetch gets the topic.
 ep="$("$HERE/cyoda-profile.sh" 2>/dev/null | jq -r '.endpoint // empty' 2>/dev/null)" || ep=""
 if [ -n "$ep" ]; then
   ep="${ep%/}"
-  if idx="$(curl -fsS --max-time 5 "$ep/api/help" 2>/dev/null)"; then
+  if idx="$(curl -fsS --connect-timeout 2 --max-time 5 "$ep/api/help" 2>/dev/null)"; then
     ver="$(jq -r '.version // "unknown"' <<<"$idx" 2>/dev/null)" || ver=unknown
     # curl -f: an unknown topic or action is a 404 and falls through.
     if json="$(curl -fsS --max-time 10 "$ep/api/help/$URLPATH" 2>/dev/null)" && [ -n "$json" ]; then

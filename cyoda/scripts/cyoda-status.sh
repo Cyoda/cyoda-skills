@@ -4,6 +4,9 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
+IMPLICIT=0; [ -f "$CONFIG" ] || IMPLICIT=1   # no config: cyoda-profile.sh's implicit default
+
 PROFILE_JSON="$("$HERE/cyoda-profile.sh")" || exit 1
 PROFILE="$(jq -r '.profile' <<<"$PROFILE_JSON")"
 ENDPOINT="$(jq -r '.endpoint // empty' <<<"$PROFILE_JSON")"
@@ -21,12 +24,16 @@ while IFS= read -r w; do [ -n "$w" ] && WARNS+=("$w"); done < <(jq -r '.warnings
 STATUS="not_configured"; VERSION="none"
 if [ -n "$ENDPOINT" ]; then
   # /api/help is public: plain curl, never tokenCommand.
-  body="$(curl -sS --max-time 5 -w $'\n%{http_code}' "${ENDPOINT%/}/api/help" 2>/dev/null)" || body=$'\n000'
+  body="$(curl -sS --connect-timeout 2 --max-time 5 -w $'\n%{http_code}' "${ENDPOINT%/}/api/help" 2>/dev/null)" || body=$'\n000'
   code="${body##*$'\n'}"
   body="${body%$'\n'*}"
   if [ -z "$code" ] || [ "$code" = "000" ]; then
     STATUS="unreachable"
-    WARNS+=("active profile $PROFILE is unreachable; run /cyoda:setup to switch to default")
+    if [ "$IMPLICIT" -eq 1 ]; then
+      WARNS+=("no cyoda-go is answering at $ENDPOINT — type /cyoda:setup to install or start one")
+    else
+      WARNS+=("active profile $PROFILE is unreachable; run /cyoda:setup to switch to default")
+    fi
   else
     STATUS="connected"
     VERSION="$(jq -r '.version // "unknown"' <<<"$body" 2>/dev/null)" || VERSION="unknown"

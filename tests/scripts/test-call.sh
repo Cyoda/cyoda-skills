@@ -57,6 +57,13 @@ test_call_no_endpoint() {
   assert_status 5 "$rc" "no endpoint"
 }
 
+test_call_no_config_uses_default_endpoint() {
+  local rc
+  CYODA_PLUGIN_CONFIG="$T/none.json" CYODA_DEFAULT_ENDPOINT="$EP" bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>"$T/err"; rc=$?
+  assert_status 0 "$rc" "no config: GET /model/ goes to the default endpoint"
+  assert_contains "$(cat "$T/err")" "HTTP_STATUS=200" "default endpoint answered"
+}
+
 test_call_header_quoting() {
   # R10: the token must not appear in curl's argv (ps-visible); it arrives via
   # -H @<0600 file>. The shim records argv and the contents of any @file header.
@@ -127,6 +134,7 @@ test_call_get_model_list_mock
 test_call_production_guard
 test_call_token_command_failure
 test_call_no_endpoint
+test_call_no_config_uses_default_endpoint
 test_call_header_quoting
 test_call_token_command_sees_endpoint
 test_call_retries_once_on_401

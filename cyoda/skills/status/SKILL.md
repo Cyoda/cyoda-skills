@@ -24,6 +24,8 @@ Read-only. One script call, one status line, then the warnings.
    - `<V>` is the instance's version. `BINARY_VERSION` is the local `cyoda` binary; don't report it as the instance version.
 3. Print **every** `WARN=` line after the status line, as it is, one per line, prefixed `Warning: `. Don't drop, merge or reword them. The texts the script emits:
    - `active profile <P> is unreachable; run /cyoda:setup to switch to default`
+   - `no saved profile; using the default local instance <E> — type /cyoda:setup to save it` (no config file: `PROFILE=default` is implicit)
+   - `no cyoda-go is answering at <E> — type /cyoda:setup to install or start one` (the implicit default is unreachable)
    - `local cyoda <B> differs from instance <V>; help is read from the instance`
    - `profile <P> contains a stored token, which this plugin no longer reads; you can remove it`
 
@@ -33,6 +35,11 @@ Nothing else: don't switch profiles, edit the config, install or upgrade anythin
 
 ```
 Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]
+```
+
+```
+Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]
+Warning: no saved profile; using the default local instance http://localhost:8080 — type /cyoda:setup to save it
 ```
 
 ```
