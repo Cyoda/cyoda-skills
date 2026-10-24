@@ -47,7 +47,7 @@ From Step 0's status:
 - `STATUS=not_configured` or `unreachable`: "Next, type `/cyoda:setup` to install and start cyoda-go locally (or connect to an instance you already run)." Wait. When the developer is back, re-run `cyoda-status.sh` and show the line.
 - A `[PRODUCTION]` profile: suggest a development instance for building, and leave the choice to the developer.
 
-If a token is needed (the setup or status output says so): "next, type `/cyoda:auth`".
+If the instance needs a token: "next, type `/cyoda:auth`". Setup and auth detect it with an unauthenticated `GET /api/model/` that returns 401 or 403; the status line doesn't report it.
 
 ## Step 3 — Build
 

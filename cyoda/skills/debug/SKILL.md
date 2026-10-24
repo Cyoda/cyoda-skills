@@ -38,7 +38,7 @@ Ask for what's missing, one item at a time: the entity id, the model name and ve
 ### Path A — a call returned an error
 
 1. Read `.properties.errorCode` and `.detail` from the body (RFC 9457 problem JSON; `errors --section DESCRIPTION`).
-2. Run `cyoda-help.sh errors <errorCode>`. Every code has a page, even the 16 that `errors` ERROR CODE INDEX leaves out.
+2. Run `cyoda-help.sh errors <errorCode>`. Every code has its own page; `errors` ERROR CODE INDEX is incomplete (cyoda-go#684 item N), so a code missing from it isn't missing from help.
 3. Explain the cause from that page plus the `detail`, then take the matching path:
 
 | errorCode | Look at |
@@ -89,9 +89,9 @@ Count them per state, then list them and read each one's reason: [examples/queri
 
 ### Path F — an entity disappeared
 
-`GET /entity/{id}` returns 404 after a delete. Delete is soft, and it **bypasses the workflow**: no transition, criterion or processor runs, so no state records it. The evidence is a `DELETE` entry in `GET /entity/{id}/changes` and in the audit's `EntityChange` events. A point-in-time read from before the delete still returns the entity. Best practice *Prefer a ledger to deletion*: end lifecycles in terminal states. Deletes can't be undone through the API; recreating the entity is the developer's call.
+`GET /entity/{id}` returns 404 after a delete. The evidence is a `DELETE` entry in `GET /entity/{id}/changes` and in the audit's `EntityChange` events.
 
-Tell the developer: the delete is soft (history kept; `/changes` shows the DELETE; a point-in-time read from before the delete still returns the entity, so the data is recoverable by reading it there), it bypassed the workflow (no transition, criterion or processor ran), and it can't be undone through the API, so recreating is their call.
+Tell the developer: the delete is soft (history kept; `/changes` shows the DELETE; a point-in-time read from before the delete still returns the entity, so the data is recoverable by reading it there), it **bypassed the workflow** (no transition, criterion or processor ran, so no state records it), and it can't be undone through the API, so recreating is their call. Best practice *Prefer a ledger to deletion*: end lifecycles in terminal states.
 
 ## Observation
 

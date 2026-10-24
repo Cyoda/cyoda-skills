@@ -16,7 +16,7 @@ Create one entity per model, walk its manual transitions on the happy path, and 
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | 2xx | continue |
-| 22 | HTTP ≥ 400 | 401/403: the script already retried once with a fresh token. Show the error, stop, and say "next, type `/cyoda:auth`". Anything else: record ✗ for the step (Step 3) |
+| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): a call problem, not a test result. Fix the call and re-run it. 401/403: the script already retried once with a fresh token. Show the error, stop, and say "next, type `/cyoda:auth`". Anything else: record ✗ for the step (Step 3) |
 | 3 | production refusal | see Step 3, Production |
 | 4 | the profile's tokenCommand failed | show stderr, stop, and say "next, type `/cyoda:auth`" |
 | 5 | no endpoint configured | stop and say "next, type `/cyoda:setup`" |
@@ -29,7 +29,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`.
 - `STATUS=not_configured`: "No cyoda-go instance is configured. Next, type `/cyoda:setup`." Stop.
 - `STATUS=unreachable`: show the `WARN=` line and stop.
 - Show any other `WARN=` lines as they are.
-- `ENV=production`: say "Profile `<PROFILE>` (`<ENDPOINT>`) is **production**." Discovery (Step 2) is GETs only and runs as usual; the question comes before the first write (Step 3).
+- `ENV=production`: say "Profile `<PROFILE>` (`<ENDPOINT>`) is **production**." Discovery (Step 2) writes nothing and runs as usual; the question comes before the first write (Step 3). Its one POST, `POST /model/validate` (Step 2.6), is a read-only dry run that the production guard still refuses (exit 3): say so, ask "Run this read-only validation on production? (yes/no)", and only on yes re-run it with `--confirm-production`. On no, show the payload unvalidated and say so.
 
 ## Step 1 — Mode
 
@@ -70,7 +70,7 @@ Model        | Transitions fired | Result
 ```
 
 Then offer, one at a time:
-- **Clean-up**: "Delete the N test entities? (yes/no)". On yes, `DELETE /entity/{id}` for each id created in this run, nothing else. Delete is soft: the history stays, and no workflow runs (`crud --section ENDPOINTS`). Never send the model-wide `DELETE /entity/{e}/{v}`: with no condition it deletes every entity of the model.
+- **Clean-up**: "Delete the N test entities? (yes/no)". On yes, `DELETE /entity/{id}` for each id created in this run, nothing else. Delete is soft: the history stays, and no workflow runs (best practice *Prefer a ledger to deletion*). Never send the model-wide `DELETE /entity/{e}/{v}`: with no condition it deletes every entity of the model.
 - **History**: "Show the audit trail of `<id>`?" On yes, use the `cyoda:debug` skill in observation mode for that entity.
 - A failure: offer the `cyoda:debug` skill with the call, status and body. If the fix is a workflow change, "next, type `/cyoda:build`".
 

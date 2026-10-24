@@ -33,7 +33,7 @@ Topics are large (`crud` and `workflows` are about 12k tokens each). Find the to
 
 ## Error codes
 
-Run `cyoda-help.sh errors <CODE>` (e.g. `errors WORKFLOW_FAILED`). Every code has its own page. `errors --section "ERROR CODE INDEX"` lists only 61 of the 77 codes; the other 16 (such as `INVALID_CONDITION`, `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED`, `PRECONDITION_REQUIRED`, `UNIQUE_VIOLATION`) appear only in the topic's subtopic list: `cyoda help errors --format=json | jq -r '.children[]'` (or SUBTOPICS at the end of `cyoda help errors`). A code missing from the index isn't missing from help. The code is in a response's `.properties.errorCode`; key on it, not on the HTTP status.
+Run `cyoda-help.sh errors <CODE>` (e.g. `errors WORKFLOW_FAILED`): every code has its own page. `errors --section "ERROR CODE INDEX"` is incomplete (cyoda-go#684 item N), so a code missing from the index isn't missing from help; the full list is the topic's subtopics: `cyoda help errors --format=json | jq -r '.children[]'` (or SUBTOPICS at the end of `cyoda help errors`). The code is in a response's `.properties.errorCode`; key on it, not on the HTTP status.
 
 ## Schemas
 

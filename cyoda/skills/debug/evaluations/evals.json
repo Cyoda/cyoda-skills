@@ -152,7 +152,7 @@
     {
       "id": 4,
       "prompt": "Customer 5d2e... was there yesterday and now GET returns 404. Which transition removed it?",
-      "expected_output": "Reads crud ENDPOINTS: delete is soft and bypasses the workflow, so no transition removed it. Evidence: a DELETE entry in GET /entity/{id}/changes and the audit EntityChange events; no StateMachine events at that time. A point-in-time read from before the delete still returns the entity. Cites the best practice 'Prefer a ledger to deletion' and suggests terminal states. Doesn't recreate anything without a yes.",
+      "expected_output": "Delete is soft and bypasses the workflow (best practice 'Prefer a ledger to deletion'), so no transition removed it. Evidence: a DELETE entry in GET /entity/{id}/changes and the audit EntityChange events; no StateMachine events at that time. A point-in-time read from before the delete still returns the entity. Cites the best practice 'Prefer a ledger to deletion' and suggests terminal states. Doesn't recreate anything without a yes.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
         "_simulated/instance.md": "GET /entity/{id}: 404 ENTITY_NOT_FOUND. GET /entity/{id}/changes: DELETE 2026-10-17T08:12Z; UPDATE ...; CREATE .... Audit: EntityChange DELETE at 08:12; last StateMachine event 2026-10-16."

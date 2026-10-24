@@ -50,7 +50,7 @@
     {
       "id": 2,
       "prompt": "What does WORKFLOW_SCHEMA_VERSION_UNSUPPORTED mean? I don't see it in the error list.",
-      "expected_output": "Runs cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED. With no binary and no instance, the helper falls back to the web help mirror; the skill says once that cyoda isn't installed and that the answer comes from the mirror, and says 'next, type /cyoda:setup' to install it. Explains that the index lists 61 of 77 codes and the rest are only in the subtopic list, so the code exists; the workflow version must be a supported MAJOR.MINOR, read from `cyoda help workflows schema-version versions`.",
+      "expected_output": "Runs cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED. With no binary and no instance, the helper falls back to the web help mirror; the skill says once that cyoda isn't installed and that the answer comes from the mirror, and says 'next, type /cyoda:setup' to install it. Explains that the ERROR CODE INDEX is incomplete (cyoda-go#684 item N) and every code has its own page, so the code exists; the workflow version must be a supported MAJOR.MINOR, read from `cyoda help workflows schema-version versions`.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{}",
         "_simulated/machine.md": "`cyoda` is not on PATH. No profile has an endpoint. cyoda-help.sh prints SOURCE=web VERSION=0.8.4 and the whole web page for errors/WORKFLOW_SCHEMA_VERSION_UNSUPPORTED: HTTP 400, the workflow `version` is not in the supported MAJOR.MINOR range; see `cyoda help workflows schema-version versions`."
@@ -63,7 +63,7 @@
         },
         {
           "id": "index-gap",
-          "text": "Explains that the ERROR CODE INDEX doesn't list every code (61 of 77; the rest only in the subtopic list), so a missing index entry doesn't mean the code doesn't exist",
+          "text": "Explains that the ERROR CODE INDEX is incomplete (cyoda-go#684 item N) and every code has its own page via `errors <CODE>`, so a missing index entry doesn't mean the code doesn't exist",
           "type": "behavior"
         },
         {
