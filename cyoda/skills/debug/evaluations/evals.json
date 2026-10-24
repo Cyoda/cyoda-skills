@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Order 7c1e0b2a-0000-4000-8000-000000000001 has been sitting in `submitted` for an hour. I already lowered its amount to 500 so it should be approved by now.",
-      "expected_output": "Checks the connection with cyoda-status.sh, then through cyoda-call.sh reads GET /entity/{id} (submitted, amount 5000), the workflow export (approve is automated, criterion amount <= 1000), GET /entity/{id}/transitions and the StateMachine audit (TRANSITION_NOT_MATCH_CRITERION for approve). Finds that the stored amount is still 5000 (the developer's update never landed), so the approve criterion still fails. Explains that automated transitions are evaluated only on a write, and that the fix is a loopback carrying the corrected field (PATCH /entity/JSON/{id} with {\"amount\":500}, merge-patch, If-Match *), which re-runs the cascade. Points to build/examples/loopback/, shows the exact call and asks for an explicit yes before running it.",
+      "expected_output": "Checks the connection with cyoda-status.sh, then through cyoda-call.sh reads GET /entity/{id} (submitted, amount 5000), the workflow export (approve is automated, criterion amount <= 1000), GET /entity/{id}/transitions and the StateMachine audit (TRANSITION_NOT_MATCH_CRITERION for approve). Finds that the stored amount is still 5000 (the developer's update never landed), so the approve criterion still fails. Explains that automated transitions are evaluated only on a write, and that the fix is a loopback carrying the corrected field (PATCH /entity/JSON/{id} with {\"amount\":500}, merge-patch, If-Match *), which re-runs the cascade. Produces the loopback re-trigger itself, consistent with the smoke-tested loopback example, shows the exact call and asks for an explicit yes before running it, since it changes the instance.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
         "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4. GET /entity/{id}: meta.state=submitted, data {orderRef: ORD-1, amount: 5000}: the developer's earlier update went to a different entity id. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion simple $.amount LESS_OR_EQUAL 1000)-> approved. GET /entity/{id}/transitions: [\"approve\"]. Audit StateMachine (newest first): STATE_MACHINE_FINISH; TRANSITION_NOT_MATCH_CRITERION {transition: approve, reason: \"criterion did not match\"}; TRANSITION_MAKE submit."
@@ -31,8 +31,8 @@
           "type": "behavior"
         },
         {
-          "id": "example-pointer",
-          "text": "Points to the smoke-tested loopback example (build/examples/loopback/)",
+          "id": "loopback-call-produced",
+          "text": "Produces the loopback re-trigger itself: `PATCH /entity/JSON/{id}` with `{}` or the corrected fields, merge-patch, `If-Match: *`, and asks first because it changes the instance (consistent with the smoke-tested example; naming the example is not required)",
           "type": "behavior"
         },
         {
@@ -193,7 +193,7 @@
     {
       "id": 5,
       "prompt": "How many registrations are stuck in errored, which ones are they, and can you change the workflow so they retry automatically every 10 minutes?",
-      "expected_output": "Uses debug/examples/queries.md: grouped stats by state (queries/stats-group-by-state.json) or GET /entity/stats/states/{e}/{v}?states=errored for the count, then a lifecycle-state search (POST /search/direct/{e}/{v}) for the ids, and the audit TRANSITION_NOT_MATCH_CRITERION reason for each. Reads workflows SCHEDULED TRANSITIONS for the retry idea. The workflow change is handed off: 'next, type /cyoda:build' with a one-line description. Makes no workflow change itself.",
+      "expected_output": "Consults `crud --section ENDPOINTS`/`search` help or uses the skill's smoke-tested debug/examples/queries.md payloads: grouped stats by state (queries/stats-group-by-state.json) or GET /entity/stats/states/{e}/{v}?states=errored for the count, then a lifecycle-state search (POST /search/direct/{e}/{v}) for the ids, and the audit TRANSITION_NOT_MATCH_CRITERION reason for each. Reads workflows SCHEDULED TRANSITIONS for the retry idea. The workflow change is handed off: 'next, type /cyoda:build' with a one-line description. Makes no workflow change itself.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
         "_simulated/instance.md": "Model registration v1 is LOCKED. Grouped stats by state: errored 3, ready 12. Search lifecycle state=errored returns ids r1, r2, r3, each with a null email."
@@ -201,7 +201,7 @@
       "assertions": [
         {
           "id": "consults-help",
-          "text": "Reads or names `crud --section ENDPOINTS` (statistics) or `search --section \"CONDITION DSL\"`/ENDPOINTS, and `workflows --section \"SCHEDULED TRANSITIONS\"` for the retry",
+          "text": "For stats/search, either consults `crud --section ENDPOINTS` / `search` help (e.g. `search --section \"CONDITION DSL\"`) OR uses the skill's `examples/queries/` payloads; and reads `workflows --section \"SCHEDULED TRANSITIONS\"` for the retry",
           "type": "behavior"
         },
         {

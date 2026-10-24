@@ -91,6 +91,8 @@ Count them per state, then list them and read each one's reason: [examples/queri
 
 `GET /entity/{id}` returns 404 after a delete. Delete is soft, and it **bypasses the workflow**: no transition, criterion or processor runs, so no state records it. The evidence is a `DELETE` entry in `GET /entity/{id}/changes` and in the audit's `EntityChange` events. A point-in-time read from before the delete still returns the entity. Best practice *Prefer a ledger to deletion*: end lifecycles in terminal states. Deletes can't be undone through the API; recreating the entity is the developer's call.
 
+Tell the developer: the delete is soft (history kept; `/changes` shows the DELETE; a point-in-time read from before the delete still returns the entity, so the data is recoverable by reading it there), it bypassed the workflow (no transition, criterion or processor ran), and it can't be undone through the API, so recreating is their call.
+
 ## Observation
 
 Read `crud --section ENDPOINTS`, `crud --section "POINT-IN-TIME SEMANTICS"` and `audit --section ENDPOINTS`, then combine:
