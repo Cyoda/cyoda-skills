@@ -42,7 +42,18 @@ Read `cyoda-help.sh auth --section "WHICH PATH DO I NEED?"`, summarise the four 
 
 For OIDC and trusted keys, help the developer write a command that prints one JWT on stdout, then continue at Step 5 with that command as the `tokenCommand`.
 
-**No client yet (M2M)?** The operator either sets a bootstrap client in the server config (`config auth --section OPTIONS`, "Bootstrap M2M client") or creates one through `auth clients` REQUEST FLOW with an admin token. Creating one is a mutating call: send it through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh`, and on a production profile only after an explicit yes.
+**No client yet (M2M)?** Creating a client needs an admin credential the developer already holds (a `ROLE_ADMIN` token, e.g. from the bootstrap client: read `auth clients --section PREREQUISITES`). Without one, the operator sets a bootstrap client in the server config (`config auth --section OPTIONS`, "Bootstrap M2M client"), and that is the client.
+
+With one: the create response carries `client_secret`, so that response never passes through you (no `cyoda-call.sh`, no curl of your own). Read `auth clients --section "REQUEST FLOW"`, then write a command for the developer to run **in their own terminal**: the admin token goes in through `-H @<(…)` (not argv), the whole response lands in a 0600 file outside the project, and only `client_id` is printed:
+
+```bash
+( umask 077; mkdir -p ~/.secrets; R=~/.secrets/cyoda-<PROFILE>-client.json
+  curl -sS --fail-with-body -o "$R" -X POST "<ENDPOINT>/api/clients?withAdminRole=false" \
+    -H @<(printf 'Authorization: Bearer %s\n' "$(<ADMIN_TOKEN_COMMAND>)") \
+    && jq -r .client_id "$R" || cat "$R" )
+```
+
+Then `CYODA_CLIENT_ID` is the printed id and `CYODA_CLIENT_SECRET_CMD` is `jq -r .client_secret ~/.secrets/cyoda-<PROFILE>-client.json` (or they move the secret into their keychain). Continue at Step 3.
 
 ## Step 3 — Credentials stay with the developer
 
@@ -68,10 +79,10 @@ Ask whether they're already set; don't echo their values to check. If not, tell 
 Run it once without showing the token:
 
 ```bash
-CYODA_ENDPOINT="<ENDPOINT>" "<ABS_PATH>" | awk -F. '{print NF " parts, " length($0) " chars"}'
+( set -o pipefail; CYODA_ENDPOINT="<ENDPOINT>" "<ABS_PATH>" | awk -F. '{print NF " parts, " length($0) " chars"}' ); echo "exit=$?"
 ```
 
-`3 parts`: it works. On exit 1, show the `get-token:` line from stderr and explain it in a line or two. **Don't save the `tokenCommand` and don't retry in a loop.** Wait for the developer to fix it, then test again.
+`pipefail` keeps the script's exit status (a bare pipe reports `awk`'s). `exit=0` and `3 parts`: it works. On `exit=1`, show the `get-token:` line from stderr and explain it in a line or two. **Don't save the `tokenCommand` and don't retry in a loop.** Wait for the developer to fix it, then test again.
 
 | stderr says | Meaning |
 |---|---|
@@ -111,6 +122,7 @@ Report: the script's path, the profile and its `tokenCommand`, and the verify re
 | Mistake | Fix |
 |---|---|
 | Asking for the secret in chat, or writing it to a file | Env var or `CYODA_CLIENT_SECRET_CMD` in the developer's shell |
+| Creating a client through `cyoda-call.sh` (its response, with `client_secret`, lands in the conversation) | A command the developer runs in their own terminal, secret straight to a 0600 file |
 | Printing the token to check it | Count its parts with `awk` |
 | Relative `tokenCommand` | Absolute path; the scripts run from any directory |
 | Saving `tokenCommand` before the test passes | Test first (Step 5) |

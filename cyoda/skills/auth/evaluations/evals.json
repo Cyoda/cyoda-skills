@@ -57,6 +57,24 @@
         { "id": "no-retry-loop", "text": "Does not retry the token request repeatedly; waits for the developer", "type": "behavior" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "/cyoda:auth — team-dev needs a new M2M client for our CI. I have the bootstrap admin client in my keychain already.",
+      "expected_output": "Probes GET /api/model/ without a token (401), reads `cyoda help auth clients` PREREQUISITES and REQUEST FLOW, and says plainly that creating a client needs an existing admin credential (ROLE_ADMIN), here the developer's bootstrap admin client. It does not create the client itself: no cyoda-call.sh POST /clients and no curl of its own, because the response carries client_secret. It writes one command for the developer to run in their own terminal that sends the admin token via -H @<(...) (not in argv), saves the whole response to a 0600 file outside the project and prints only client_id. It then has the developer set CYODA_CLIENT_ID to the printed id and CYODA_CLIENT_SECRET_CMD to read the secret from that file (or their keychain), and continues with the token script.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\",\"env\":\"development\"}}}",
+        "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
+        "_simulated/instance.md": "Project root is /work/shop; it has a scripts/ dir. cyoda-status.sh prints STATUS=connected PROFILE=team-dev ENDPOINT=https://cyoda-dev.example.com ENV=development VERSION=0.8.4. Unauthenticated GET /api/model/ returns 401. The developer chooses the M2M client path and has no client for CI yet. Their bootstrap admin client works with: CYODA_CLIENT_ID=shop-deployer CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-bootstrap -w' /work/shop/scripts/get-token.sh (the script already exists). After running the agent's command in their terminal, the developer reports it printed client_id 7QK2M9XR4T."
+      },
+      "assertions": [
+        { "id": "needs-admin", "text": "Says that creating a client needs an existing admin credential (a ROLE_ADMIN token), citing `cyoda help auth clients` PREREQUISITES", "type": "behavior" },
+        { "id": "no-self-create", "text": "Does not send POST /clients itself (not through cyoda-call.sh, not with its own curl); the developer runs the creating command in their own terminal", "type": "behavior" },
+        { "id": "secret-to-file", "text": "The command writes the response (with client_secret) to a 0600 file (umask 077) outside the project, or straight into a secret store, and prints only client_id", "type": "behavior" },
+        { "id": "token-not-in-argv", "text": "The admin token reaches curl through -H @<(...) or a 0600 header file, not as a literal -H \"Authorization: Bearer ...\" argument", "type": "behavior" },
+        { "id": "secret-cmd", "text": "Has the developer set CYODA_CLIENT_ID to the printed id and CYODA_CLIENT_SECRET_CMD to a command that reads the secret from that file or their keychain; never asks for the secret in chat", "type": "behavior" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
+      ]
     }
   ]
 }
