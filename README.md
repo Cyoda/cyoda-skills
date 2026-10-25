@@ -46,7 +46,7 @@ Point your agent to this repository and ask it to read the skill files before bu
 
 ## Connection config
 
-The plugin keeps machine-wide profiles in `~/.config/cyoda/cyoda-plugin-config.json` (no tokens; a `tokenCommand` fetches a fresh one per call). A project can instead be linked to its own instance with `/cyoda:setup`, which writes the gitignored `<project>/.cyoda/instance.json`; inside that project it wins over the active profile, so several projects with their own cyoda-go stacks can be worked on at once. `CYODA_PROFILE=<name>` picks a machine-wide profile over both. Details: [cyoda/README.md](cyoda/README.md#connection-config).
+The plugin keeps machine-wide profiles in `~/.config/cyoda/cyoda-plugin-config.json` (no tokens; a `tokenCommand` fetches a fresh one per call). A project can instead be linked to its own instance with `/cyoda:setup`, which writes the gitignored `<project>/.cyoda/instance.json`; inside that project it wins over the active profile, so several projects with their own cyoda-go stacks can be worked on at once. A binding file that is a symlink, not yours, writable by others or tracked by git is ignored. An untracked binding file you own (for example from an unpacked archive) is trusted by design, so check a downloaded project's `.cyoda/` before running skills in it. `CYODA_PROFILE=<name>` picks a machine-wide profile over both. Details: [cyoda/README.md](cyoda/README.md#connection-config).
 
 ## Release notes — 0.4.0
 

@@ -7,9 +7,10 @@
 #      .cyoda/config, endpoint and env only) from $PWD upwards. The search stops
 #      at the git repo root or below $HOME, whichever comes first; $HOME itself
 #      and its ancestors are never searched. Outside $HOME with no git repo, only
-#      $PWD is checked. source "project", profile = basename. A binding file that
-#      isn't yours, is group/world-writable or is tracked by git is ignored
-#      entirely, with a warning, and the lookup falls through to 3./4.
+#      $PWD is checked. source "project", profile = basename. A binding that is a
+#      symlink (file or .cyoda), not yours, group/world-writable (file or .cyoda),
+#      inside a .cyoda repo/submodule, or tracked by git (any letter case) is
+#      ignored entirely, with a warning, and the lookup falls through to 3./4.
 #   3. The active profile in CYODA_PLUGIN_CONFIG (source "profile").
 #   4. No config file: an implicit `default` for the local instance (source
 #      "default"). CYODA_DEFAULT_ENDPOINT overrides its endpoint; it exists for tests only.
@@ -19,6 +20,9 @@ set -euo pipefail
 
 CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
 WANT="${CYODA_PROFILE:-}"
+
+# Every git call: never run a repo's fsmonitor hook, never take optional locks.
+g() { git --no-optional-locks -c core.fsmonitor=false "$@"; }
 
 check_json() { # file
   if ! jq -e 'type == "object"' "$1" >/dev/null 2>&1; then
@@ -38,7 +42,7 @@ find_project() {
   local dir home top=""
   dir="$(pwd -P)"
   home="$(cd "$HOME" 2>/dev/null && pwd -P)" || home="${HOME%/}"
-  top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
+  top="$(g rev-parse --show-toplevel 2>/dev/null)" || top=""
   # Outside $HOME and outside any git repo there is no safe upper bound: $PWD only.
   if [ -z "$top" ]; then
     case "$dir/" in
@@ -61,19 +65,47 @@ find_project() {
   done
 }
 
-# A project file can be planted or committed by someone else, and it chooses where
-# calls go and which command runs as the developer. It is trusted only if the
-# developer owns it, no one else can write it, and git doesn't track it (anyone
-# with commit access could change it). Echo why not, or nothing.
-untrusted_reason() { # project-dir file path-relative-to-project-dir
-  local f="$2"
-  if [ -z "$(find -H "$f" -maxdepth 0 -user "$(id -u)" 2>/dev/null)" ]; then
-    echo "not owned by you"
-  elif [ -n "$(find -H "$f" -maxdepth 0 \( -perm -020 -o -perm -002 \) 2>/dev/null)" ]; then
-    echo "group- or world-writable (run chmod 600 on it)"
-  elif git -C "$1" ls-files --error-unmatch -- "$3" >/dev/null 2>&1; then
-    echo "tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)"
+# A project file can be planted, committed or cloned in by someone else, and it
+# chooses where calls go and which command runs as the developer. Fail closed:
+# echo why it is not trusted, or nothing.
+owned()   { [ -n "$(find "$1" -maxdepth 0 -user "$(id -u)" 2>/dev/null)" ]; }
+shared_w() { [ -n "$(find "$1" -maxdepth 0 \( -perm -020 -o -perm -002 \) 2>/dev/null)" ]; }
+# in_repo <dir>: inside a git work tree. Without git, any .git above counts as one.
+in_repo() {
+  if command -v git >/dev/null 2>&1; then
+    [ "$(g -C "$1" rev-parse --is-inside-work-tree 2>/dev/null)" = true ]
+    return
   fi
+  local d="$1"
+  while :; do [ -e "$d/.git" ] && return 0; [ "$d" = / ] && return 1; d="$(dirname "$d")"; done
+}
+# tracked <dir> <pathspec>: 0 tracked, 1 not tracked, 2 could not tell
+tracked() {
+  local rc=0
+  g -C "$1" ls-files --error-unmatch -- "$2" >/dev/null 2>&1 || rc=$?
+  case "$rc" in 0) return 0 ;; 1) return 1 ;; *) return 2 ;; esac
+}
+untrusted_reason() { # project-dir binding-basename
+  local pdir="$1" base="$2" cdir="$1/.cyoda" f="$1/.cyoda/$2" real rc
+  if [ -L "$cdir" ] || [ -L "$f" ]; then echo "symlink"; return; fi
+  if ! owned "$cdir"; then echo ".cyoda directory not owned by you"; return; fi
+  if shared_w "$cdir"; then echo ".cyoda directory is group- or world-writable (run chmod 700 on it)"; return; fi
+  if ! owned "$f"; then echo "not owned by you"; return; fi
+  if shared_w "$f"; then echo "group- or world-writable (run chmod 600 on it)"; return; fi
+  real="$(cd "$cdir" && pwd -P)" || { echo "cannot resolve .cyoda"; return; }
+  in_repo "$real" || return 0
+  command -v git >/dev/null 2>&1 || { echo "git is not available to check whether it is tracked"; return; }
+  # .cyoda as its own repo or submodule root, or a gitlink in the superproject.
+  if [ "$(g -C "$real" rev-parse --show-toplevel 2>/dev/null)" = "$real" ] \
+     || g -C "$pdir" ls-files --stage -- ':(icase).cyoda' 2>/dev/null | grep -q '^160000 '; then
+    echo ".cyoda is a git repository or submodule"; return
+  fi
+  # Tracked under any letter case, seen from the file's real dir and from the project root.
+  for spec in "$real|:(icase)$base" "$pdir|:(icase).cyoda/$base"; do
+    rc=0; tracked "${spec%%|*}" "${spec#*|}" || rc=$?
+    if [ "$rc" -eq 0 ]; then echo "tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)"; return; fi
+    if [ "$rc" -eq 2 ] && in_repo "${spec%%|*}"; then echo "git could not check whether it is tracked"; return; fi
+  done
 }
 
 has_token() { jq -e 'type == "object" and has("token")' "$1" >/dev/null 2>&1; }
@@ -149,8 +181,9 @@ fi
 IGNORED='[]'
 PROJECT="$(find_project)"
 if [ -n "$PROJECT" ]; then
-  REL=".cyoda/instance.json"; [ -f "$PROJECT/$REL" ] || REL=".cyoda/config"
-  WHY="$(untrusted_reason "$PROJECT" "$PROJECT/$REL" "$REL")"
+  BASE="instance.json"; [ -f "$PROJECT/.cyoda/$BASE" ] || BASE="config"
+  REL=".cyoda/$BASE"
+  WHY="$(untrusted_reason "$PROJECT" "$BASE")"
   if [ -z "$WHY" ]; then
     project_json "$PROJECT"
     exit 0

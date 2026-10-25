@@ -207,7 +207,6 @@ test_profile_token_command_trusted() {
   assert_eq "$(echo "$out" | jq -c '[.tokenCommand, .warnings]')" '["scripts/auth.sh token",[]]' "own, 0600, untracked: tokenCommand used"
 }
 
-W_OWN="not owned by you"
 W_WRITE="group- or world-writable (run chmod 600 on it)"
 W_GIT="tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)"
 
@@ -215,16 +214,6 @@ W_GIT="tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)
 ignored() {
   assert_eq "$(echo "$1" | jq -c '[.source, .endpoint, .tokenCommand, has("projectDir")]')" '["profile","http://global",null,false]' "$4: falls through to the active profile"
   assert_eq "$(echo "$1" | jq -r '.warnings[0]')" "ignoring $2: $3" "$4: warning"
-}
-
-test_profile_untrusted_not_owned() {
-  local pd out; pd="$(trusted_proj notmine)"
-  mkdir -p "$T/idshim"
-  # shellcheck disable=SC2016 # literal script text
-  printf '#!/usr/bin/env bash\nif [ "$1" = -u ]; then echo 4242; else exec /usr/bin/id "$@"; fi\n' >"$T/idshim/id"
-  chmod +x "$T/idshim/id"
-  out="$(prof "$pd" PATH="$T/idshim:$PATH")"
-  ignored "$out" "$pd/.cyoda/instance.json" "$W_OWN" "not owned"
 }
 
 test_profile_untrusted_writable() {
@@ -268,6 +257,118 @@ test_profile_untrusted_falls_through_to_default() {
   assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "ignoring $pd/.cyoda/instance.json: $W_WRITE" "ignoring warning first"
 }
 
+# --- clone bypasses of the tracked-by-git check; all must fail closed ---
+
+gitc() { git -c user.email=t@example.com -c user.name=t -c init.defaultBranch=main -c protocol.file.allow=always "$@"; }
+plant_json() { jq -n --arg tc "touch $T/pwned; echo tok" '{endpoint: "http://attacker", tokenCommand: $tc}'; }
+# never_runs <dir> <msg>: cyoda-call.sh from <dir> must not run the planted command
+never_runs() {
+  rm -f "$T/pwned"
+  echo '{"active":"x","profiles":{"x":{"endpoint":"http://localhost:1"}}}' >"$T/dead.json"
+  (cd "$1" && CYODA_PLUGIN_CONFIG="$T/dead.json" bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1)
+  if [ -e "$T/pwned" ]; then _bad "$2: planted tokenCommand ran"; else _ok; fi
+}
+# clone_of <origin> <name>: plain clone into $HOME/work/<name>; echoes its physical path
+clone_of() { gitc clone -q --recurse-submodules "$1" "$HOME/work/$2" 2>/dev/null && (cd "$HOME/work/$2" && pwd -P); }
+
+test_bypass_symlinked_cyoda_dir() {
+  local o="$T/origin-a" c out; mkdir -p "$o/conf"
+  gitc -C "$T" init -q origin-a
+  plant_json >"$o/conf/instance.json"
+  ln -s conf "$o/.cyoda"
+  gitc -C "$o" add -A && gitc -C "$o" commit -qm plant
+  c="$(clone_of "$o" clone-a)"
+  out="$(prof "$c")"
+  ignored "$out" "$c/.cyoda/instance.json" "symlink" "(a) committed .cyoda -> conf symlink"
+  never_runs "$c" "(a)"
+}
+
+test_bypass_submodule_cyoda() {
+  local sub="$T/origin-sub" o="$T/origin-b" c out
+  gitc -C "$T" init -q origin-sub
+  plant_json >"$sub/instance.json"
+  gitc -C "$sub" add -A && gitc -C "$sub" commit -qm plant
+  gitc -C "$T" init -q origin-b
+  gitc -C "$o" submodule -q add "$sub" .cyoda 2>/dev/null
+  gitc -C "$o" commit -qm sub
+  c="$(clone_of "$o" clone-b)"
+  [ -f "$c/.cyoda/instance.json" ] || { _bad "(b) fixture: submodule not checked out"; return; }
+  out="$(prof "$c")"
+  ignored "$out" "$c/.cyoda/instance.json" ".cyoda is a git repository or submodule" "(b) submodule at .cyoda"
+  never_runs "$c" "(b)"
+}
+
+test_bypass_case_variant() {
+  local o="$T/origin-c" c out
+  gitc -C "$T" init -q origin-c
+  mkdir -p "$o/.CYODA"
+  plant_json >"$o/.CYODA/INSTANCE.JSON"
+  gitc -C "$o" add -A && gitc -C "$o" commit -qm plant
+  c="$(clone_of "$o" clone-c)"
+  if [ ! -f "$c/.cyoda/instance.json" ]; then
+    echo "  skip: (c) case-variant bypass needs a case-insensitive filesystem" >&2; return
+  fi
+  out="$(prof "$c")"
+  ignored "$out" "$c/.cyoda/instance.json" "$W_GIT" "(c) committed .CYODA/INSTANCE.JSON"
+  never_runs "$c" "(c)"
+}
+
+test_untrusted_symlinked_file() {
+  local pd out; pd="$(mkproj "$HOME/work/symfile")"
+  plant_json >"$pd/elsewhere.json"
+  ln -s ../elsewhere.json "$pd/.cyoda/instance.json"
+  out="$(prof "$pd")"
+  ignored "$out" "$pd/.cyoda/instance.json" "symlink" "symlinked binding file"
+  never_runs "$pd" "symlinked binding file"
+}
+
+test_untrusted_writable_cyoda_dir() {
+  local pd out; pd="$(mkproj "$HOME/work/opendir")"
+  plant_json >"$pd/.cyoda/instance.json"
+  chmod 600 "$pd/.cyoda/instance.json"
+  chmod 775 "$pd/.cyoda"
+  out="$(prof "$pd")"
+  ignored "$out" "$pd/.cyoda/instance.json" ".cyoda directory is group- or world-writable (run chmod 700 on it)" "group-writable .cyoda dir"
+  never_runs "$pd" "group-writable .cyoda dir"
+  chmod 755 "$pd/.cyoda"
+}
+
+test_untrusted_cyoda_dir_not_owned() {
+  local pd out; pd="$(trusted_proj dirnotmine)"
+  mkdir -p "$T/idshim2"
+  # A fake `id -u` makes both the dir and the file foreign; the dir is reported first.
+  # (The file's own owner check uses the same owned() helper; a file owned by
+  # another user can't be created without root.)
+  # shellcheck disable=SC2016 # literal script text
+  printf '#!/usr/bin/env bash\nif [ "$1" = -u ]; then echo 4242; else exec /usr/bin/id "$@"; fi\n' >"$T/idshim2/id"
+  chmod +x "$T/idshim2/id"
+  out="$(prof "$pd" PATH="$T/idshim2:$PATH")"
+  ignored "$out" "$pd/.cyoda/instance.json" ".cyoda directory not owned by you" ".cyoda dir not owned"
+}
+
+test_git_fsmonitor_hook_never_runs() {
+  local pd; pd="$(trusted_proj fsmon)"
+  gitc -C "$pd" init -q
+  printf '#!/usr/bin/env bash\ntouch "%s"\n' "$T/fsmon-ran" >"$T/fsmon.sh"; chmod +x "$T/fsmon.sh"
+  git -C "$pd" config core.fsmonitor "$T/fsmon.sh"
+  rm -f "$T/fsmon-ran"
+  prof "$pd/.cyoda" >/dev/null
+  prof "$pd" >/dev/null
+  if [ -e "$T/fsmon-ran" ]; then _bad "a repo's core.fsmonitor hook ran"; else _ok; fi
+}
+
+test_trusted_happy_path_0700() {
+  local pd out; pd="$(trusted_proj happy)"
+  chmod 700 "$pd/.cyoda"
+  gitc -C "$pd" init -q
+  echo '.cyoda/' >"$pd/.gitignore"
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .tokenCommand, .warnings]')" '["project","scripts/auth.sh token",[]]' "0700 .cyoda, 0600 untracked file you own: trusted"
+  chmod 644 "$pd/.cyoda/instance.json"; chmod 755 "$pd/.cyoda"
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | jq -r .source)" project "0755 .cyoda, 0644 file: trusted"
+}
+
 test_profile_default_when_no_config
 test_profile_existing_config_without_endpoint
 test_profile_active_selected
@@ -287,9 +388,16 @@ test_profile_symlinked_cwd
 test_profile_outside_home_no_git_no_climb
 test_profile_corrupt_legacy_next_to_instance
 test_profile_token_command_trusted
-test_profile_untrusted_not_owned
 test_profile_untrusted_writable
 test_profile_untrusted_tracked
 test_profile_untrusted_legacy
 test_profile_untrusted_falls_through_to_default
+test_bypass_symlinked_cyoda_dir
+test_bypass_submodule_cyoda
+test_bypass_case_variant
+test_untrusted_symlinked_file
+test_untrusted_writable_cyoda_dir
+test_untrusted_cyoda_dir_not_owned
+test_git_fsmonitor_hook_never_runs
+test_trusted_happy_path_0700
 report
