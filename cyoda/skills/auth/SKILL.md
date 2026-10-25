@@ -94,7 +94,7 @@ Run it once without showing the token:
 
 ## Step 6 — Point the profile at it
 
-`SOURCE=project`: set `tokenCommand` in `<PROJECT>/.cyoda/instance.json` only. A path relative to the project root (e.g. `scripts/get-token.sh`) works there: the plugin runs it from the project root. Keep the file 0600:
+`SOURCE=project`: set `tokenCommand` in `<PROJECT>/.cyoda/instance.json` only. A path relative to the project root (e.g. `scripts/get-token.sh`) works there: the plugin runs it from the project root. The plugin ignores it unless the file is the developer's own, not group- or world-writable, and not tracked by git (status then warns `tokenCommand in … ignored: …`). Keep the file 0600:
 
 ```bash
 F="<PROJECT>/.cyoda/instance.json"

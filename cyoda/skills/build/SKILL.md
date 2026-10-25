@@ -16,6 +16,7 @@ One increment per loop: inspect the instance, agree the change, write the projec
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | 2xx | continue |
+| 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr, stop, and say "next, type `/cyoda:setup`" |
 | 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error, stop, and say "next, type `/cyoda:auth`". Anything else: see [When a call fails](#when-a-call-fails) |
 | 3 | production refusal | see [Production guard](#production-guard) |
 | 4 | the profile's tokenCommand failed | show stderr, stop, and say "next, type `/cyoda:auth`" |

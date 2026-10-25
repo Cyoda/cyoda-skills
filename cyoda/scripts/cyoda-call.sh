@@ -2,7 +2,8 @@
 # Authenticated call to the bound instance's API (cyoda-profile.sh resolves it).
 # Usage: cyoda-call.sh [--confirm-production] <METHOD> <PATH> [curl args...]
 # PATH is relative to <endpoint>/api. Body to stdout, HTTP_STATUS=<code> to stderr.
-# Exit: 0 2xx, 22 >=400, 3 production refusal, 4 token command failed, 5 no endpoint.
+# Exit: 0 2xx, 22 >=400, 3 production refusal, 4 token command failed, 5 no endpoint,
+# 1 invalid config or unknown CYODA_PROFILE (from cyoda-profile.sh).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

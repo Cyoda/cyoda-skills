@@ -1,7 +1,7 @@
 ---
 name: setup
 description: Use when the developer types /cyoda:setup to install and start a local cyoda-go, to connect the plugin to an existing self-hosted cyoda-go instance, to link the current project to its own instance (e.g. its Docker Compose stack), or to switch away from an unreachable or outdated connection profile.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-docker-instances.sh*) Bash(brew *) Bash(cyoda *) Bash(command -v *) Bash(curl *) Bash(mkdir *) Bash(jq *) Bash(mv *) Bash(cat *) Bash(sleep *) Bash(git rev-parse *) Bash(git check-ignore *) Bash(chmod *)
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-docker-instances.sh*) Bash(brew *) Bash(cyoda *) Bash(command -v *) Bash(curl *) Bash(mkdir *) Bash(jq *) Bash(mv *) Bash(cat *) Bash(sleep *) Bash(git rev-parse *) Bash(git check-ignore *) Bash(git ls-files *) Bash(ls *) Bash(chmod *)
 disable-model-invocation: true
 ---
 
@@ -18,9 +18,12 @@ Three modes: **local** (install and run cyoda-go on this machine, profile `defau
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. It prints `STATUS=… PROFILE=… ENDPOINT=… ENV=… VERSION=… BINARY_VERSION=… SOURCE=… [PROJECT=…]` and then `WARN=` lines.
 
 - Show every `WARN=` line as it is, e.g. "profile old contains a stored token, which this plugin no longer reads; you can remove it". Don't read, print or reuse a stored token. Remove it only if the developer says yes: `jq 'del(.profiles["<P>"].token)'` (write it back as in [Write the profile](#write-the-profile)).
-- `SOURCE=project`: this project is already linked (`PROJECT=<dir>`). Say so; [link mode](#link-mode) replaces the binding only on a yes.
+- `SOURCE=project` (this project is linked, `PROJECT=<dir>`). Never offer the active-profile switch below for it: that changes the machine-wide config, and this project would still use its own binding.
+  - `STATUS=connected`: say so; [link mode](#link-mode) replaces the binding only on a yes.
+  - `STATUS=unreachable`: the project's own instance isn't answering. Offer two ways: (1) start it: if `<PROJECT>` has a Compose file (`ls <PROJECT>/compose.yaml <PROJECT>/compose.yml <PROJECT>/docker-compose.yml <PROJECT>/docker-compose.yaml`), give `cd <PROJECT> && docker compose up -d` for the developer to run in their own terminal (you don't run it); when they say it's up, run `cyoda-status.sh` again and go to [Finish](#finish); or (2) re-link the project to another instance in [link mode](#link-mode).
+  - `WARN=tokenCommand in <file> ignored: <reason>`: the plugin sends no token for this project until the developer applies the fix the warning names (`chmod 600` or `git rm --cached`). Give it as a command; run `chmod 600 <file>` yourself only on a yes.
 - `WARN=no saved profile; …`: there is no config file, so the scripts used the local default `http://localhost:8080`. Unless the request says connect or link: `STATUS=connected` means a local cyoda-go already answers, so go to local mode to save it as `default` (its checks skip what's done); `STATUS=unreachable` (`WARN=no cyoda-go is answering at …`) means nothing runs locally yet, so go to local mode.
-- `STATUS=unreachable` for a saved profile: offer to switch the active profile to `default`: on a yes, `jq '.active = "default"'` (written back the same way), leaving the unreachable profile in place, then go to [Finish](#finish). If `default` doesn't exist or isn't running either, continue with local mode.
+- `STATUS=unreachable` for a saved profile (`SOURCE=profile`): offer to switch the active profile to `default`: on a yes, `jq '.active = "default"'` (written back the same way), leaving the unreachable profile in place, then go to [Finish](#finish). If `default` doesn't exist or isn't running either, continue with local mode.
 - Otherwise ask which mode, unless the request already says: "Run cyoda-go **locally**, or **connect** to an instance that already runs elsewhere?" Inside a project directory (`git rev-parse --show-toplevel` succeeds, or the working directory isn't `$HOME`), add: "Or **link this project** to an instance (only this project uses it, e.g. its Docker Compose stack)?"
 
 A Cloud or migration question: say only "That's not covered by this plugin." and continue. Don't name or describe the product or offer alternatives for it.
@@ -76,7 +79,7 @@ Binds one project to one instance. Other directories keep the machine-wide profi
 4. **Environment:** ask as in connect step 3.
 5. **Tokens:** `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<ENDPOINT>/api/model/"` with no token.
    - `200`: mock auth, no `tokenCommand`.
-   - `401` / `403`: read `cyoda-help.sh auth --section "WHICH PATH DO I NEED?"` and ask: "How does this project get tokens: a **script in the project** (e.g. `scripts/auth.sh token`), or **none yet**?" A project script may be relative to `<ROOT>`: the plugin runs it from there, with `CYODA_ENDPOINT` set. Test it before saving, without showing the token:
+   - `401` / `403`: read `cyoda-help.sh auth --section "WHICH PATH DO I NEED?"` and ask: "How does this project get tokens: a **script in the project** (e.g. `scripts/auth.sh token`), or **none yet**?" A project script may be relative to `<ROOT>`: the plugin runs it from there, with `CYODA_ENDPOINT` set. A command that assigns a literal value to a `…SECRET`, `…PASSWORD` or `…TOKEN` variable (e.g. `CYODA_CLIENT_SECRET=abc scripts/auth.sh`) would store a secret: refuse it and suggest the `*_CMD` form instead, e.g. `CYODA_CLIENT_SECRET_CMD='security find-generic-password -s shop-cyoda -w' scripts/get-token.sh`. Test it before saving, without showing the token. `<CMD>` goes inside single quotes, copied character for character, with each `'` in it written as `'\''` (the same rule everywhere `<CMD>` appears below):
      ```bash
      ( set -o pipefail; cd "<ROOT>" && CYODA_ENDPOINT="<ENDPOINT>" bash -c '<CMD>' | awk -F. '{print NF " parts, " length($0) " chars"}' ); echo "exit=$?"
      ```
@@ -84,12 +87,12 @@ Binds one project to one instance. Other directories keep the machine-wide profi
 6. **Write** `<ROOT>/.cyoda/instance.json` atomically, mode 0600 (leave out `tokenCommand` when there is none):
    ```bash
    cd "<ROOT>" && mkdir -p .cyoda && ( umask 077
-     jq -n --arg ep "<ENDPOINT>" --arg env "<ENV>" --arg tc "<CMD or empty>" \
+     jq -n --arg ep "<ENDPOINT>" --arg env "<ENV>" --arg tc '<CMD, or nothing>' \
        '{endpoint: $ep, env: $env} + (if $tc == "" then {} else {tokenCommand: $tc} end)' > .cyoda/instance.json.tmp ) \
      && chmod 600 .cyoda/instance.json.tmp && mv .cyoda/instance.json.tmp .cyoda/instance.json
    ```
    Never a token, client id or secret in it.
-7. **Keep it out of git:** in a git repo, `git -C "<ROOT>" check-ignore -q .cyoda/instance.json`. Exit 1 (not ignored): append a `.cyoda/` line to `<ROOT>/.gitignore` (create it if missing; keep the existing lines, and start on a new line). Exit 0: nothing to do.
+7. **Keep it out of git:** in a git repo, `git check-ignore -q "<ROOT>/.cyoda/instance.json"`. Exit 1 (not ignored): append a `.cyoda/` line to `<ROOT>/.gitignore` (create it if missing; keep the existing lines, and start on a new line). Exit 0: nothing to do. Then `git ls-files --error-unmatch "<ROOT>/.cyoda/instance.json"`: exit 0 means it is tracked, and the plugin ignores a tracked file's `tokenCommand`; give `git rm --cached .cyoda/instance.json` for the developer to run.
 8. **Report:** go to [Finish](#finish), and add: "Only this project uses it; other directories keep the machine-wide profile."
 
 ## Write the profile
@@ -115,6 +118,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh` again and report in the `sta
 
 - `Connected to cyoda-go v<VERSION> — <ENDPOINT> [profile: <PROFILE>]` (`[project: <PROFILE>]` when `SOURCE=project`), plus ` [PRODUCTION]` when `ENV=production`.
 - Then every `WARN=` line, as it is.
+- After local or connect mode, if the status still shows `SOURCE=project`, say: "This project is linked to `<ENDPOINT>` in `.cyoda/instance.json`, which takes precedence here (status shows `[project: <PROFILE>]`); the new profile applies in other directories."
 
 End with one hand-off and a one-line reason:
 - Needs a token (connect step 6, or link step 5 with none yet): "This instance requires a token. Next, type `/cyoda:auth` to set up a token script for `<PROFILE>`."

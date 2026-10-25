@@ -15,6 +15,7 @@ Find out why something happened, from the instance's own records, then explain i
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | 2xx | continue |
+| 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr, stop, and say "next, type `/cyoda:setup`" |
 | 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error and say "next, type `/cyoda:auth`". Otherwise the error is evidence: read it (Path A) |
 | 3 | production refusal (any non-GET) | search and stats POSTs are reads: say so, ask "Run this read-only query on production? (yes/no)", and only on yes re-run with `--confirm-production` |
 | 4 | the profile's tokenCommand failed | show stderr and say "next, type `/cyoda:auth`" |

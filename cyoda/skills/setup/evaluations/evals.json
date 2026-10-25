@@ -95,6 +95,25 @@
         { "id": "reports-project", "text": "Finishes by re-running cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "/cyoda:setup",
+      "expected_output": "cyoda-status.sh, run in the linked project `shop`, prints STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 … SOURCE=project PROJECT=<dir> and WARN=project shop is bound to http://localhost:8082, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one. The skill shows the warning. It does NOT offer to switch the machine-wide active profile to `default` and does not edit the plugin config. It offers two ways forward: start the project's stack, given as a command for the developer to run in their own terminal (the project has a compose.yaml, so e.g. `docker compose up -d` in the project dir), then re-run cyoda-status.sh; or re-link the project in link mode. The developer starts the stack and says so; the re-check shows STATUS=connected and the skill reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'. It runs no docker command that changes anything itself.",
+      "files": {
+        ".cyoda/instance.json": "{\"endpoint\":\"http://localhost:8082\",\"env\":\"development\"}",
+        "compose.yaml": "services:\n  cyoda:\n    image: ghcr.io/cyoda/cyoda:0.8.4\n    ports: [\"127.0.0.1:8082:8080\", \"127.0.0.1:9092:9090\"]\n",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/instance.md": "The working directory is the root of the git repo `shop`. First cyoda-status.sh prints `STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 ENV=development VERSION=none BINARY_VERSION=0.8.4 SOURCE=project PROJECT=<project dir>` and `WARN=project shop is bound to http://localhost:8082, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one`. The shop Compose stack is stopped. The developer answers: they'll start the stack, and later say \"it's up\". After that, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=<project dir>`."
+      },
+      "assertions": [
+        { "id": "shows-warning", "text": "Shows the 'project shop is bound to http://localhost:8082, which is unreachable; …' warning as the script printed it", "type": "behavior" },
+        { "id": "no-default-switch", "text": "Does not offer or perform a switch of the machine-wide active profile to `default`, and does not write to the plugin config", "type": "behavior" },
+        { "id": "offers-start-or-relink", "text": "Offers to start the project's stack as a command for the developer to run (e.g. `docker compose up -d` in the project dir) or to re-link the project in link mode", "type": "behavior" },
+        { "id": "docker-read-only", "text": "Does not itself run docker compose up, docker start or any other docker command that changes state", "type": "behavior" },
+        { "id": "rechecks", "text": "After the developer says the stack is up, re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" },
+        { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
+      ]
     }
   ]
 }

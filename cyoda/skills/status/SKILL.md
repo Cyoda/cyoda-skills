@@ -11,7 +11,7 @@ Read-only. One script call, one status line, then the warnings.
 ## Steps
 
 1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Don't read the config or curl the instance yourself, and don't run the profile's `tokenCommand`: the script probes the public `/api/help` only. If it exits non-zero (an invalid config file, or `CYODA_PROFILE` naming a profile that doesn't exist), show its stderr as it is and stop.
-2. Its first line is `STATUS=<s> PROFILE=<P> ENDPOINT=<E> ENV=<env> VERSION=<V> BINARY_VERSION=<B> SOURCE=<src>`, plus ` PROJECT=<dir>` when `SOURCE=project`. Report exactly one line:
+2. Its first line is `STATUS=<s> PROFILE=<P> ENDPOINT=<E> ENV=<env> VERSION=<V> BINARY_VERSION=<B> SOURCE=<src>`, plus ` PROJECT=<dir>` when `SOURCE=project`. `PROFILE` is in double quotes when it holds a space or a quote (`PROFILE="my shop"`; report it without the quotes, `\"` as `"`). `PROJECT` is always last and runs to the end of the line. Report exactly one line:
 
 | `STATUS` | Report |
 |---|---|
@@ -27,6 +27,8 @@ Read-only. One script call, one status line, then the warnings.
    - `active profile <P> is unreachable; run /cyoda:setup to switch to default`
    - `project <P> is bound to <E>, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one`
    - `<path>/.cyoda/config contains a stored token, which this plugin no longer reads; you can remove it` (legacy project file: only its endpoint and env are used)
+   - `<path>/.cyoda/instance.json contains a stored token, which this plugin no longer reads; you can remove it`
+   - `tokenCommand in <path>/.cyoda/instance.json ignored: <reason>`, where `<reason>` is `the file is not owned by you`, `the file is group- or world-writable; run chmod 600 on it` or `the file is tracked by git; run git rm --cached on it and keep .cyoda/ in .gitignore`. Calls then go without a token.
    - `no saved profile; using the default local instance <E> — type /cyoda:setup to save it` (no config file: `PROFILE=default` is implicit)
    - `no cyoda-go is answering at <E> — type /cyoda:setup to install or start one` (the implicit default is unreachable)
    - `local cyoda <B> differs from instance <V>; help is read from the instance`
