@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Print one STATUS line for the active profile, then WARN= lines.
+# Print one STATUS line for the bound instance (cyoda-profile.sh), then WARN= lines.
+# STATUS=… PROFILE=… ENDPOINT=… ENV=… VERSION=… BINARY_VERSION=… SOURCE=project|profile|default [PROJECT=<dir>]
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
-IMPLICIT=0; [ -f "$CONFIG" ] || IMPLICIT=1   # no config: cyoda-profile.sh's implicit default
 
 PROFILE_JSON="$("$HERE/cyoda-profile.sh")" || exit 1
 PROFILE="$(jq -r '.profile' <<<"$PROFILE_JSON")"
 ENDPOINT="$(jq -r '.endpoint // empty' <<<"$PROFILE_JSON")"
 ENVNAME="$(jq -r '.env' <<<"$PROFILE_JSON")"
+SOURCE="$(jq -r '.source // "profile"' <<<"$PROFILE_JSON")"
+PROJECT="$(jq -r '.projectDir // empty' <<<"$PROFILE_JSON")"
 
 BINVER="none"
 if command -v cyoda >/dev/null 2>&1; then
@@ -29,8 +29,10 @@ if [ -n "$ENDPOINT" ]; then
   body="${body%$'\n'*}"
   if [ -z "$code" ] || [ "$code" = "000" ]; then
     STATUS="unreachable"
-    if [ "$IMPLICIT" -eq 1 ]; then
+    if [ "$SOURCE" = "default" ]; then
       WARNS+=("no cyoda-go is answering at $ENDPOINT — type /cyoda:setup to install or start one")
+    elif [ "$SOURCE" = "project" ]; then
+      WARNS+=("project $PROFILE is bound to $ENDPOINT, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one")
     else
       WARNS+=("active profile $PROFILE is unreachable; run /cyoda:setup to switch to default")
     fi
@@ -44,6 +46,6 @@ if [ -n "$ENDPOINT" ]; then
   fi
 fi
 
-echo "STATUS=$STATUS PROFILE=$PROFILE ENDPOINT=${ENDPOINT:-none} ENV=$ENVNAME VERSION=$VERSION BINARY_VERSION=$BINVER"
+echo "STATUS=$STATUS PROFILE=$PROFILE ENDPOINT=${ENDPOINT:-none} ENV=$ENVNAME VERSION=$VERSION BINARY_VERSION=$BINVER SOURCE=$SOURCE${PROJECT:+ PROJECT=$PROJECT}"
 for w in "${WARNS[@]:-}"; do [ -n "$w" ] && echo "WARN=$w"; done
 exit 0

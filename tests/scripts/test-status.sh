@@ -11,6 +11,9 @@ source "$ROOT/tests/lib/server.sh"
 trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
+# Hermetic: no project binding from the caller's working directory.
+cd "$T" || exit 1
+unset CYODA_PROFILE
 
 test_status_connected() {
   start_server || return
@@ -20,6 +23,8 @@ test_status_connected() {
   assert_contains "$(echo "$out" | head -n1)" "STATUS=connected" "connected"
   assert_contains "$out" "VERSION=0.8.4" "version"
   assert_contains "$out" "PROFILE=p" "profile"
+  assert_contains "$(echo "$out" | head -n1)" "SOURCE=profile" "profile source"
+  if [[ "$(echo "$out" | head -n1)" == *PROJECT=* ]]; then _bad "no PROJECT field for a profile"; else _ok; fi
   stop_server
 }
 
@@ -44,6 +49,7 @@ test_status_no_config_local_up() {
   local ep="http://localhost:${SMOKE_HTTP_PORT}" out
   out="$(CYODA_DEFAULT_ENDPOINT="$ep" CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=default ENDPOINT=$ep ENV=development VERSION=0.8.4" "implicit default connected"
+  assert_contains "$(echo "$out" | head -n1)" "SOURCE=default" "implicit default source"
   assert_contains "$out" "WARN=no saved profile; using the default local instance $ep — type /cyoda:setup to save it" "implicit default warn"
   stop_server
 }
@@ -84,7 +90,34 @@ test_status_ignores_broken_token_command() {
   stop_server
 }
 
+test_status_project_binding() {
+  start_server || return
+  local pd ep="http://localhost:${SMOKE_HTTP_PORT}" out
+  pd="$(mkdir -p "$HOME/work/shop/.cyoda" "$HOME/work/shop/src" && cd "$HOME/work/shop" && pwd -P)"
+  echo "{\"endpoint\":\"$ep\",\"env\":\"production\"}" >"$pd/.cyoda/instance.json"
+  echo '{"active":"p","profiles":{"p":{"endpoint":"http://localhost:1"}}}' >"$T/g.json"
+  out="$(cd "$pd/src" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=shop ENDPOINT=$ep ENV=production VERSION=0.8.4" "project binding connected"
+  assert_contains "$(echo "$out" | head -n1)" "SOURCE=project PROJECT=$pd" "project source and dir"
+  echo '{"endpoint":"http://localhost:1"}' >"$pd/.cyoda/instance.json"
+  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable PROFILE=shop" "project binding unreachable"
+  assert_contains "$out" "WARN=project shop is bound to http://localhost:1, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one" "project unreachable warn"
+  if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for a project binding"; else _ok; fi
+  stop_server
+}
+
+test_status_unknown_env_profile() {
+  echo '{"active":"p","profiles":{"p":{"endpoint":"http://localhost:1"}}}' >"$T/g.json"
+  local out rc
+  out="$(CYODA_PLUGIN_CONFIG="$T/g.json" CYODA_PROFILE=nope bash "$S/cyoda-status.sh" 2>&1)"; rc=$?
+  assert_status 1 "$rc" "unknown CYODA_PROFILE: status exits 1"
+  assert_contains "$out" "CYODA_PROFILE=nope: no such profile" "unknown CYODA_PROFILE message forwarded"
+}
+
 test_status_connected
+test_status_project_binding
+test_status_unknown_env_profile
 test_status_ignores_broken_token_command
 test_status_unreachable
 test_status_not_configured

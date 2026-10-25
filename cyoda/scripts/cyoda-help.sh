@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Look up cyoda help. Usage: cyoda-help.sh <path...> [--section <NAME>]
-# Order: active instance, local binary, docs.cyoda.net mirror.
+# Order: bound instance (cyoda-profile.sh), local binary, docs.cyoda.net mirror.
 # Topic actions return either plain JSON with no .body (e.g. `workflows
 # schema-version versions`, `openapi json`) or non-JSON text (e.g. `grpc proto`,
 # `openapi yaml`); both are printed verbatim (instance or binary only; the web

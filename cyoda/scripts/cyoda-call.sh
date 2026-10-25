@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Authenticated call to the active instance's API.
+# Authenticated call to the bound instance's API (cyoda-profile.sh resolves it).
 # Usage: cyoda-call.sh [--confirm-production] <METHOD> <PATH> [curl args...]
 # PATH is relative to <endpoint>/api. Body to stdout, HTTP_STATUS=<code> to stderr.
 # Exit: 0 2xx, 22 >=400, 3 production refusal, 4 token command failed, 5 no endpoint.
@@ -21,6 +21,8 @@ PROFILE_JSON="$("$HERE/cyoda-profile.sh")"
 ENDPOINT="$(jq -r '.endpoint // empty' <<<"$PROFILE_JSON")"
 ENVNAME="$(jq -r '.env' <<<"$PROFILE_JSON")"
 TOKEN_CMD="$(jq -r '.tokenCommand // empty' <<<"$PROFILE_JSON")"
+# A project binding's tokenCommand (often relative) runs from the project root.
+TOKEN_DIR="$(jq -r 'if .source == "project" then .projectDir // empty else empty end' <<<"$PROFILE_JSON")"
 
 if [ -z "$ENDPOINT" ]; then
   echo "no endpoint configured; run /cyoda:setup" >&2
@@ -41,7 +43,7 @@ trap '[ -z "$HDR_DIR" ] || rm -rf "$HDR_DIR"' EXIT
 
 run_token() {
   local t
-  if ! t="$(CYODA_ENDPOINT="$ENDPOINT" bash -c "$TOKEN_CMD" 2>/dev/null)" || [ -z "$t" ]; then
+  if ! t="$(cd "${TOKEN_DIR:-.}" && CYODA_ENDPOINT="$ENDPOINT" bash -c "$TOKEN_CMD" 2>/dev/null)" || [ -z "$t" ]; then
     echo "token command failed: $TOKEN_CMD" >&2
     exit 4
   fi

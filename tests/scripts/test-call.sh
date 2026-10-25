@@ -12,6 +12,9 @@ trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 start_server || exit 1
 T="$SMOKE_TMP"
+# Hermetic: no project binding from the caller's working directory.
+cd "$T" || exit 1
+unset CYODA_PROFILE
 
 cfg() { # name json-profile
   echo "{\"active\":\"p\",\"profiles\":{\"p\":$1}}" >"$T/cfg.json"
@@ -110,6 +113,26 @@ SH
   assert_eq "$(cat "$T/seen-endpoint")" "$EP" "CYODA_ENDPOINT exported as stored"
 }
 
+test_call_project_relative_token_command() {
+  local pd; pd="$(mkdir -p "$HOME/proj/scripts" "$HOME/proj/.cyoda" "$HOME/proj/src" && cd "$HOME/proj" && pwd -P)"
+  cat >"$pd/scripts/tok.sh" <<SH
+#!/usr/bin/env bash
+echo "\$PWD|\$CYODA_ENDPOINT|\$1" >"$T/seen-project"
+echo tok
+SH
+  chmod +x "$pd/scripts/tok.sh"
+  echo "{\"endpoint\":\"$EP\",\"env\":\"development\",\"tokenCommand\":\"scripts/tok.sh token\"}" >"$pd/.cyoda/instance.json"
+  cfg "{\"endpoint\":\"http://localhost:1\"}"   # the global active profile must not be used
+  local rc
+  (cd "$pd/src" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>"$T/err"); rc=$?
+  assert_status 0 "$rc" "project binding: GET /model/ ok"
+  assert_eq "$(cat "$T/seen-project" 2>/dev/null)" "$pd|$EP|token" "relative tokenCommand runs from projectDir and sees CYODA_ENDPOINT"
+  echo "{\"endpoint\":\"$EP\",\"env\":\"production\"}" >"$pd/.cyoda/instance.json"
+  (cd "$pd/src" && bash "$S/cyoda-call.sh" POST /model/x/1/lock >/dev/null 2>&1); rc=$?
+  assert_status 3 "$rc" "production guard applies to a project binding"
+  rm -rf "$pd/.cyoda"
+}
+
 test_call_retries_once_on_401() {
   python3 "$HERE/stub401.py" "$T/stub.port" "$T/stub.hits" &
   local spid=$!
@@ -137,5 +160,6 @@ test_call_no_endpoint
 test_call_no_config_uses_default_endpoint
 test_call_header_quoting
 test_call_token_command_sees_endpoint
+test_call_project_relative_token_command
 test_call_retries_once_on_401
 report
