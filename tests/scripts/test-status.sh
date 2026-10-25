@@ -11,8 +11,11 @@ source "$ROOT/tests/lib/server.sh"
 trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
-# Hermetic: no project binding from the caller's working directory.
+# Hermetic: no project binding from the caller's working directory, no real HOME.
+mkdir -p "$T/home"
 cd "$T" || exit 1
+export HOME="$T/home"
+umask 022
 unset CYODA_PROFILE
 
 test_status_connected() {
@@ -107,6 +110,17 @@ test_status_project_binding() {
   stop_server
 }
 
+test_status_project_name_with_spaces() {
+  local pd out line
+  pd="$(mkdir -p "$HOME/work/my shop/.cyoda" && cd "$HOME/work/my shop" && pwd -P)"
+  echo '{"endpoint":"http://localhost:1"}' >"$pd/.cyoda/instance.json"
+  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
+  line="$(echo "$out" | head -n1)"
+  assert_contains "$line" 'PROFILE="my shop" ENDPOINT=http://localhost:1 ' "a profile name with spaces is double-quoted"
+  assert_eq "${line##* PROJECT=}" "$pd" "PROJECT is last and runs to the end of the line"
+  rm -rf "$HOME/work/my shop"
+}
+
 test_status_unknown_env_profile() {
   echo '{"active":"p","profiles":{"p":{"endpoint":"http://localhost:1"}}}' >"$T/g.json"
   local out rc
@@ -117,6 +131,7 @@ test_status_unknown_env_profile() {
 
 test_status_connected
 test_status_project_binding
+test_status_project_name_with_spaces
 test_status_unknown_env_profile
 test_status_ignores_broken_token_command
 test_status_unreachable

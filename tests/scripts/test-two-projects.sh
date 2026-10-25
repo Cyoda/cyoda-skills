@@ -13,6 +13,7 @@ source "$ROOT/tests/lib/assert.sh"
 
 IDS=(401 402)
 T="$(mktemp -d)"
+umask 022
 cleanup() { bash "$EV/stop.sh" "${IDS[@]}" >/dev/null 2>&1; rm -rf "$T"; }
 trap cleanup EXIT
 

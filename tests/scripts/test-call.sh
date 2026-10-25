@@ -14,6 +14,7 @@ start_server || exit 1
 T="$SMOKE_TMP"
 # Hermetic: no project binding from the caller's working directory.
 cd "$T" || exit 1
+umask 022
 unset CYODA_PROFILE
 
 cfg() { # name json-profile
@@ -133,6 +134,34 @@ SH
   rm -rf "$pd/.cyoda"
 }
 
+test_call_project_token_command_quoting() {
+  local pd rc; pd="$(mkdir -p "$HOME/quoted/scripts" "$HOME/quoted/.cyoda" && cd "$HOME/quoted" && pwd -P)"
+  cat >"$pd/scripts/tok.sh" <<SH
+#!/usr/bin/env bash
+printf '%s|%s\n' "\$TOKARG" "\$1" >"$T/seen-quoted"
+echo tok
+SH
+  chmod +x "$pd/scripts/tok.sh"
+  jq -n --arg ep "$EP" --arg tc "TOKARG='two words' scripts/tok.sh \"it's \\\$HOME\"" \
+    '{endpoint: $ep, tokenCommand: $tc}' >"$pd/.cyoda/instance.json"
+  (cd "$pd" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1); rc=$?
+  assert_status 0 "$rc" "tokenCommand with spaces and quotes: ok"
+  assert_eq "$(cat "$T/seen-quoted" 2>/dev/null)" "two words|it's \$HOME" "tokenCommand with spaces and quotes runs as written"
+  rm -rf "$pd/.cyoda"
+}
+
+test_call_untrusted_project_token_command_not_run() {
+  # A planted, group-writable shared/.cyoda/instance.json must not run its tokenCommand.
+  local pd rc; pd="$(mkdir -p "$HOME/shared/.cyoda" "$HOME/shared/work/sub" && cd "$HOME/shared" && pwd -P)"
+  rm -f "$T/pwned"
+  jq -n --arg ep "$EP" --arg tc "touch $T/pwned; echo tok" '{endpoint: $ep, tokenCommand: $tc}' >"$pd/.cyoda/instance.json"
+  chmod 664 "$pd/.cyoda/instance.json"
+  (cd "$pd/work/sub" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1); rc=$?
+  if [ -e "$T/pwned" ]; then _bad "untrusted project tokenCommand was executed"; else _ok; fi
+  assert_status 0 "$rc" "call goes ahead without a token (mock server)"
+  rm -rf "$pd"
+}
+
 test_call_retries_once_on_401() {
   python3 "$HERE/stub401.py" "$T/stub.port" "$T/stub.hits" &
   local spid=$!
@@ -161,5 +190,7 @@ test_call_no_config_uses_default_endpoint
 test_call_header_quoting
 test_call_token_command_sees_endpoint
 test_call_project_relative_token_command
+test_call_project_token_command_quoting
+test_call_untrusted_project_token_command_not_run
 test_call_retries_once_on_401
 report

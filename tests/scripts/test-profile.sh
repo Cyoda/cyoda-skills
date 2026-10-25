@@ -10,6 +10,7 @@ source "$ROOT/tests/lib/server.sh"
 trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
+umask 022
 # Hermetic: no project binding from the caller's working directory, no real HOME.
 mkdir -p "$T/home"
 cd "$T" || exit 1
@@ -162,6 +163,83 @@ test_profile_invalid_project_file() {
   assert_contains "$err" "invalid config: $pd/.cyoda/instance.json" "invalid project file message"
 }
 
+test_profile_symlinked_cwd() {
+  local pd out; pd="$(mkproj "$HOME/work/real")"
+  echo '{"endpoint":"http://localhost:8088"}' >"$pd/.cyoda/instance.json"
+  mkdir -p "$pd/src"
+  ln -s "$pd" "$HOME/work/alias"
+  out="$(prof "$HOME/work/alias/src")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .profile, .projectDir]')" "[\"project\",\"real\",\"$pd\"]" "symlinked working dir: binding found, projectDir is the physical path"
+}
+
+test_profile_outside_home_no_git_no_climb() {
+  local out base; base="$(mkdir -p "$T/outside/proj/sub" && cd "$T/outside" && pwd -P)"
+  mkdir -p "$base/proj/.cyoda"
+  echo '{"endpoint":"http://outside"}' >"$base/proj/.cyoda/instance.json"
+  out="$(prof "$base/proj/sub")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' "outside \$HOME without git: a parent .cyoda is not used"
+  out="$(prof "$base/proj")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["project","http://outside"]' "outside \$HOME without git: \$PWD itself is used"
+}
+
+test_profile_corrupt_legacy_next_to_instance() {
+  local pd out rc; pd="$(mkproj "$HOME/work/corrupt")"
+  echo '{oops' >"$pd/.cyoda/config"
+  echo '{"endpoint":"http://localhost:8090"}' >"$pd/.cyoda/instance.json"
+  out="$(prof "$pd" 2>/dev/null)"; rc=$?
+  assert_status 0 "$rc" "corrupt legacy file next to a valid instance.json: exit 0"
+  assert_eq "$(echo "$out" | jq -r .endpoint)" http://localhost:8090 "instance.json used despite a corrupt legacy file"
+}
+
+# trust <name>: a project with a tokenCommand; echoes its physical dir
+trusted_proj() {
+  local pd; pd="$(mkproj "$HOME/work/$1")"
+  echo '{"endpoint":"http://localhost:8092","tokenCommand":"scripts/auth.sh token"}' >"$pd/.cyoda/instance.json"
+  chmod 600 "$pd/.cyoda/instance.json"
+  echo "$pd"
+}
+
+test_profile_token_command_trusted() {
+  local pd out; pd="$(trusted_proj trusted)"
+  git -C "$pd" init -q
+  echo '.cyoda/' >"$pd/.gitignore"
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | jq -c '[.tokenCommand, .warnings]')" '["scripts/auth.sh token",[]]' "own, 0600, untracked: tokenCommand used"
+}
+
+test_profile_token_command_not_owned() {
+  local pd out; pd="$(trusted_proj notmine)"
+  mkdir -p "$T/idshim"
+  # shellcheck disable=SC2016 # literal script text
+  printf '#!/usr/bin/env bash\nif [ "$1" = -u ]; then echo 4242; else exec /usr/bin/id "$@"; fi\n' >"$T/idshim/id"
+  chmod +x "$T/idshim/id"
+  out="$(prof "$pd" PATH="$T/idshim:$PATH")"
+  assert_eq "$(echo "$out" | jq -c '[.endpoint, .tokenCommand]')" '["http://localhost:8092",null]' "file not owned by you: tokenCommand dropped"
+  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "tokenCommand in $pd/.cyoda/instance.json ignored: the file is not owned by you" "not-owned warning"
+}
+
+test_profile_token_command_group_writable() {
+  local pd out; pd="$(trusted_proj shared)"
+  chmod 664 "$pd/.cyoda/instance.json"
+  mkdir -p "$pd/work/sub"
+  out="$(prof "$pd/work/sub")"
+  assert_eq "$(echo "$out" | jq -r .tokenCommand)" null "group-writable file: tokenCommand dropped"
+  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "tokenCommand in $pd/.cyoda/instance.json ignored: the file is group- or world-writable; run chmod 600 on it" "group-writable warning"
+  chmod 606 "$pd/.cyoda/instance.json"
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | jq -r .tokenCommand)" null "world-writable file: tokenCommand dropped"
+}
+
+test_profile_token_command_tracked() {
+  local pd out; pd="$(trusted_proj tracked)"
+  git -C "$pd" init -q
+  git -C "$pd" add -f .cyoda/instance.json
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | jq -r .tokenCommand)" null "tracked instance.json: tokenCommand dropped"
+  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "tokenCommand in $pd/.cyoda/instance.json ignored: the file is tracked by git; run git rm --cached on it and keep .cyoda/ in .gitignore" "tracked warning"
+  assert_eq "$(echo "$out" | jq -r .endpoint)" http://localhost:8092 "tracked: endpoint still used"
+}
+
 test_profile_default_when_no_config
 test_profile_existing_config_without_endpoint
 test_profile_active_selected
@@ -177,4 +255,11 @@ test_profile_search_never_uses_home
 test_profile_env_override
 test_profile_env_override_unknown
 test_profile_invalid_project_file
+test_profile_symlinked_cwd
+test_profile_outside_home_no_git_no_climb
+test_profile_corrupt_legacy_next_to_instance
+test_profile_token_command_trusted
+test_profile_token_command_not_owned
+test_profile_token_command_group_writable
+test_profile_token_command_tracked
 report

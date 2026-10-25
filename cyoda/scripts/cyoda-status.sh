@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Print one STATUS line for the bound instance (cyoda-profile.sh), then WARN= lines.
 # STATUS=… PROFILE=… ENDPOINT=… ENV=… VERSION=… BINARY_VERSION=… SOURCE=project|profile|default [PROJECT=<dir>]
+# PROFILE is double-quoted when it contains whitespace or a quote ("my shop", \" inside).
+# PROJECT, when present, is last and runs to the end of the line (it may hold spaces).
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,6 +48,13 @@ if [ -n "$ENDPOINT" ]; then
   fi
 fi
 
-echo "STATUS=$STATUS PROFILE=$PROFILE ENDPOINT=${ENDPOINT:-none} ENV=$ENVNAME VERSION=$VERSION BINARY_VERSION=$BINVER SOURCE=$SOURCE${PROJECT:+ PROJECT=$PROJECT}"
+qval() { # value -> value, or "value" with \" when it has whitespace or a quote
+  case "$1" in
+    *[[:space:]]* | *\"*) local v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; printf '"%s"' "$v" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+echo "STATUS=$STATUS PROFILE=$(qval "$PROFILE") ENDPOINT=${ENDPOINT:-none} ENV=$ENVNAME VERSION=$VERSION BINARY_VERSION=$BINVER SOURCE=$SOURCE${PROJECT:+ PROJECT=$PROJECT}"
 for w in "${WARNS[@]:-}"; do [ -n "$w" ] && echo "WARN=$w"; done
 exit 0
