@@ -207,37 +207,65 @@ test_profile_token_command_trusted() {
   assert_eq "$(echo "$out" | jq -c '[.tokenCommand, .warnings]')" '["scripts/auth.sh token",[]]' "own, 0600, untracked: tokenCommand used"
 }
 
-test_profile_token_command_not_owned() {
+W_OWN="not owned by you"
+W_WRITE="group- or world-writable (run chmod 600 on it)"
+W_GIT="tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)"
+
+# ignored <out> <file> <reason> <msg>: the binding is ignored entirely, with a warning
+ignored() {
+  assert_eq "$(echo "$1" | jq -c '[.source, .endpoint, .tokenCommand, has("projectDir")]')" '["profile","http://global",null,false]' "$4: falls through to the active profile"
+  assert_eq "$(echo "$1" | jq -r '.warnings[0]')" "ignoring $2: $3" "$4: warning"
+}
+
+test_profile_untrusted_not_owned() {
   local pd out; pd="$(trusted_proj notmine)"
   mkdir -p "$T/idshim"
   # shellcheck disable=SC2016 # literal script text
   printf '#!/usr/bin/env bash\nif [ "$1" = -u ]; then echo 4242; else exec /usr/bin/id "$@"; fi\n' >"$T/idshim/id"
   chmod +x "$T/idshim/id"
   out="$(prof "$pd" PATH="$T/idshim:$PATH")"
-  assert_eq "$(echo "$out" | jq -c '[.endpoint, .tokenCommand]')" '["http://localhost:8092",null]' "file not owned by you: tokenCommand dropped"
-  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "tokenCommand in $pd/.cyoda/instance.json ignored: the file is not owned by you" "not-owned warning"
+  ignored "$out" "$pd/.cyoda/instance.json" "$W_OWN" "not owned"
 }
 
-test_profile_token_command_group_writable() {
+test_profile_untrusted_writable() {
   local pd out; pd="$(trusted_proj shared)"
   chmod 664 "$pd/.cyoda/instance.json"
   mkdir -p "$pd/work/sub"
   out="$(prof "$pd/work/sub")"
-  assert_eq "$(echo "$out" | jq -r .tokenCommand)" null "group-writable file: tokenCommand dropped"
-  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "tokenCommand in $pd/.cyoda/instance.json ignored: the file is group- or world-writable; run chmod 600 on it" "group-writable warning"
+  ignored "$out" "$pd/.cyoda/instance.json" "$W_WRITE" "group-writable"
   chmod 606 "$pd/.cyoda/instance.json"
   out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -r .tokenCommand)" null "world-writable file: tokenCommand dropped"
+  ignored "$out" "$pd/.cyoda/instance.json" "$W_WRITE" "world-writable"
 }
 
-test_profile_token_command_tracked() {
+test_profile_untrusted_tracked() {
   local pd out; pd="$(trusted_proj tracked)"
   git -C "$pd" init -q
   git -C "$pd" add -f .cyoda/instance.json
   out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -r .tokenCommand)" null "tracked instance.json: tokenCommand dropped"
-  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "tokenCommand in $pd/.cyoda/instance.json ignored: the file is tracked by git; run git rm --cached on it and keep .cyoda/ in .gitignore" "tracked warning"
-  assert_eq "$(echo "$out" | jq -r .endpoint)" http://localhost:8092 "tracked: endpoint still used"
+  ignored "$out" "$pd/.cyoda/instance.json" "$W_GIT" "tracked"
+}
+
+test_profile_untrusted_legacy() {
+  local pd out; pd="$(mkproj "$HOME/work/oldshared")"
+  echo '{"endpoint":"http://attacker"}' >"$pd/.cyoda/config"
+  chmod 666 "$pd/.cyoda/config"
+  out="$(prof "$pd")"
+  ignored "$out" "$pd/.cyoda/config" "$W_WRITE" "writable legacy file"
+  chmod 644 "$pd/.cyoda/config"
+  git -C "$pd" init -q
+  git -C "$pd" add -f .cyoda/config
+  out="$(prof "$pd")"
+  ignored "$out" "$pd/.cyoda/config" "$W_GIT" "tracked legacy file"
+}
+
+test_profile_untrusted_falls_through_to_default() {
+  local pd out; pd="$(trusted_proj nocfg)"
+  chmod 664 "$pd/.cyoda/instance.json"
+  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/none.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["default","http://localhost:1"]' "no config: falls through to the implicit default"
+  assert_eq "$(echo "$out" | jq -c '.warnings | length')" 2 "ignoring warning plus the implicit-default warning"
+  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "ignoring $pd/.cyoda/instance.json: $W_WRITE" "ignoring warning first"
 }
 
 test_profile_default_when_no_config
@@ -259,7 +287,9 @@ test_profile_symlinked_cwd
 test_profile_outside_home_no_git_no_climb
 test_profile_corrupt_legacy_next_to_instance
 test_profile_token_command_trusted
-test_profile_token_command_not_owned
-test_profile_token_command_group_writable
-test_profile_token_command_tracked
+test_profile_untrusted_not_owned
+test_profile_untrusted_writable
+test_profile_untrusted_tracked
+test_profile_untrusted_legacy
+test_profile_untrusted_falls_through_to_default
 report

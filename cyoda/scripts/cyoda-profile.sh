@@ -7,9 +7,9 @@
 #      .cyoda/config, endpoint and env only) from $PWD upwards. The search stops
 #      at the git repo root or below $HOME, whichever comes first; $HOME itself
 #      and its ancestors are never searched. Outside $HOME with no git repo, only
-#      $PWD is checked. source "project", profile = basename. Its tokenCommand is
-#      dropped, with a warning, unless the file is yours, not group/world-writable
-#      and not tracked by git.
+#      $PWD is checked. source "project", profile = basename. A binding file that
+#      isn't yours, is group/world-writable or is tracked by git is ignored
+#      entirely, with a warning, and the lookup falls through to 3./4.
 #   3. The active profile in CYODA_PLUGIN_CONFIG (source "profile").
 #   4. No config file: an implicit `default` for the local instance (source
 #      "default"). CYODA_DEFAULT_ENDPOINT overrides its endpoint; it exists for tests only.
@@ -61,24 +61,25 @@ find_project() {
   done
 }
 
-# A project file's tokenCommand runs commands as the developer, so it is used only
-# from a file the developer owns, that no one else can write, and that git doesn't
-# track (anyone with commit access could change it). Echo why not, or nothing.
-untrusted_reason() { # project-dir file
+# A project file can be planted or committed by someone else, and it chooses where
+# calls go and which command runs as the developer. It is trusted only if the
+# developer owns it, no one else can write it, and git doesn't track it (anyone
+# with commit access could change it). Echo why not, or nothing.
+untrusted_reason() { # project-dir file path-relative-to-project-dir
   local f="$2"
   if [ -z "$(find -H "$f" -maxdepth 0 -user "$(id -u)" 2>/dev/null)" ]; then
-    echo "the file is not owned by you"
+    echo "not owned by you"
   elif [ -n "$(find -H "$f" -maxdepth 0 \( -perm -020 -o -perm -002 \) 2>/dev/null)" ]; then
-    echo "the file is group- or world-writable; run chmod 600 on it"
-  elif git -C "$1" ls-files --error-unmatch -- .cyoda/instance.json >/dev/null 2>&1; then
-    echo "the file is tracked by git; run git rm --cached on it and keep .cyoda/ in .gitignore"
+    echo "group- or world-writable (run chmod 600 on it)"
+  elif git -C "$1" ls-files --error-unmatch -- "$3" >/dev/null 2>&1; then
+    echo "tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)"
   fi
 }
 
 has_token() { jq -e 'type == "object" and has("token")' "$1" >/dev/null 2>&1; }
 
-project_json() { # dir
-  local dir="$1" inst="$1/.cyoda/instance.json" legacy="$1/.cyoda/config" src tc="" why
+project_json() { # dir (its binding file already passed untrusted_reason)
+  local dir="$1" inst="$1/.cyoda/instance.json" legacy="$1/.cyoda/config" src tc=""
   local warns=()
   if [ -f "$inst" ]; then
     # instance.json wins; the legacy file is only checked for a stored token.
@@ -87,10 +88,6 @@ project_json() { # dir
     if [ -f "$legacy" ] && has_token "$legacy"; then warns+=("$(stored_token_warning "$legacy")"); fi
     if has_token "$inst"; then warns+=("$(stored_token_warning "$inst")"); fi
     tc="$(jq -r '.tokenCommand // empty' "$inst")"
-    if [ -n "$tc" ]; then
-      why="$(untrusted_reason "$dir" "$inst")"
-      if [ -n "$why" ]; then warns+=("tokenCommand in $inst ignored: $why"); tc=""; fi
-    fi
   else
     # Legacy .cyoda/config: endpoint and env only, never a tokenCommand.
     check_json "$legacy"
@@ -148,17 +145,24 @@ if [ -n "$WANT" ]; then
   exit 0
 fi
 
-# 2. Project binding.
+# 2. Project binding, if its file is trusted; an untrusted one is ignored entirely.
+IGNORED='[]'
 PROJECT="$(find_project)"
 if [ -n "$PROJECT" ]; then
-  project_json "$PROJECT"
-  exit 0
+  REL=".cyoda/instance.json"; [ -f "$PROJECT/$REL" ] || REL=".cyoda/config"
+  WHY="$(untrusted_reason "$PROJECT" "$PROJECT/$REL" "$REL")"
+  if [ -z "$WHY" ]; then
+    project_json "$PROJECT"
+    exit 0
+  fi
+  IGNORED="$(jq -cn --arg w "ignoring $PROJECT/$REL: $WHY" '[$w]')"
 fi
+with_ignored() { jq -c --argjson x "$IGNORED" '.warnings = ($x + .warnings)'; }
 
 # 3./4. Active machine-wide profile, or the implicit default.
 if [ ! -f "$CONFIG" ]; then
-  default_json
+  default_json | with_ignored
   exit 0
 fi
 check_json "$CONFIG"
-profile_json "$(jq -r '.active // "default"' "$CONFIG")"
+profile_json "$(jq -r '.active // "default"' "$CONFIG")" | with_ignored

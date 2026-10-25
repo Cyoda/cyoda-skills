@@ -150,15 +150,17 @@ SH
   rm -rf "$pd/.cyoda"
 }
 
-test_call_untrusted_project_token_command_not_run() {
-  # A planted, group-writable shared/.cyoda/instance.json must not run its tokenCommand.
+test_call_untrusted_project_file_ignored() {
+  # A planted, group-writable shared/.cyoda/instance.json is ignored entirely:
+  # its tokenCommand never runs and its endpoint is never called.
   local pd rc; pd="$(mkdir -p "$HOME/shared/.cyoda" "$HOME/shared/work/sub" && cd "$HOME/shared" && pwd -P)"
   rm -f "$T/pwned"
-  jq -n --arg ep "$EP" --arg tc "touch $T/pwned; echo tok" '{endpoint: $ep, tokenCommand: $tc}' >"$pd/.cyoda/instance.json"
+  jq -n --arg tc "touch $T/pwned; echo tok" '{endpoint: "http://localhost:1", tokenCommand: $tc}' >"$pd/.cyoda/instance.json"
   chmod 664 "$pd/.cyoda/instance.json"
+  cfg "{\"endpoint\":\"$EP\"}"
   (cd "$pd/work/sub" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1); rc=$?
   if [ -e "$T/pwned" ]; then _bad "untrusted project tokenCommand was executed"; else _ok; fi
-  assert_status 0 "$rc" "call goes ahead without a token (mock server)"
+  assert_status 0 "$rc" "call goes to the machine-wide profile, not the planted endpoint"
   rm -rf "$pd"
 }
 
@@ -191,6 +193,6 @@ test_call_header_quoting
 test_call_token_command_sees_endpoint
 test_call_project_relative_token_command
 test_call_project_token_command_quoting
-test_call_untrusted_project_token_command_not_run
+test_call_untrusted_project_file_ignored
 test_call_retries_once_on_401
 report
