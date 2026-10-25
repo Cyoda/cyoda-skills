@@ -43,7 +43,7 @@ Use the `cyoda:design` skill with the developer's idea (`$ARGUMENTS` if given). 
 ## Step 2 — Instance
 
 From Step 0's status:
-- `STATUS=connected`: confirm "Use `<ENDPOINT>` [profile: `<PROFILE>`] for this app? (yes/no)". On yes, go to Step 3. On no, "next, type `/cyoda:setup` to start a local instance or connect to another one".
+- `STATUS=connected`: confirm "Use `<ENDPOINT>` [profile: `<PROFILE>`] for this app? (yes/no)" (`[project: <PROFILE>]` when `SOURCE=project`). On yes, go to Step 3. On no, "next, type `/cyoda:setup` to start a local instance or connect to another one".
 - `STATUS=not_configured` or `unreachable`: "Next, type `/cyoda:setup` to install and start cyoda-go locally (or connect to an instance you already run)." Wait. When the developer is back, re-run `cyoda-status.sh` and show the line.
 - A `[PRODUCTION]` profile: suggest a development instance for building, and leave the choice to the developer.
 

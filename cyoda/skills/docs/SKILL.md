@@ -12,7 +12,7 @@ Answer from `cyoda help`, the version-specific reference built into cyoda-go, an
 
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> [--section "<NAME>"]`. It tries, in this order, and stops at the first that answers:
 
-1. **The active profile's instance**: `GET <endpoint>/api/help/<topic>` (public, no token), so the help matches the server being targeted.
+1. **The bound instance** (the project's `.cyoda/instance.json`, else the active profile): `GET <endpoint>/api/help/<topic>` (public, no token), so the help matches the server being targeted.
 2. **The local binary**: `cyoda help <topic> --format=json`.
 3. **The web help mirror**: `https://docs.cyoda.net/help/<topic>.md`, the same content as the binary, pinned to the docs' version. It returns the whole page and ignores `--section`, so find the section by its heading.
 

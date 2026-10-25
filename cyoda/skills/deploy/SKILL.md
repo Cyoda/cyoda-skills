@@ -187,7 +187,7 @@ jq --arg p "<NAME>" --arg ep "<API_URL>" --arg env "<env>" --arg tc "<the tokenC
 Close with one hand-off and its reason:
 - Shared or Helm without a token script: "Once it's up, next, type `/cyoda:auth` to create the token script for this instance's bootstrap client."
 - Profile written: "Once `/api/health` answers, next, type `/cyoda:setup` to switch to profile `<NAME>`."
-- No profile: "`verify.sh` is the smoke check for the new instance. To point the other skills at it later, next, type `/cyoda:setup` and connect to `<API_URL>`."
+- No profile: "`verify.sh` is the smoke check for the new instance. To point the other skills at it later, next, type `/cyoda:setup` and connect to `<API_URL>` (or link this project to it)."
 
 ## Known upstream issues
 

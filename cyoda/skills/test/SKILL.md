@@ -79,7 +79,7 @@ Then offer, one at a time:
 The template [templates/smoke-test.sh](templates/smoke-test.sh) reads everything from the environment, so it's copied unchanged:
 
 1. Pick one model and one manual transition from Step 2. Copy `${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh` to `scripts/smoke-test.sh` if a `scripts/` directory exists, else to `smoke-test.sh` at the project root. If a different file is already there, ask before overwriting.
-2. Give the run command with the discovered values. Take the endpoint from `cyoda-status.sh` and the profile's `tokenCommand` from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-profile.sh` (omit `CYODA_TOKEN_COMMAND` when there is none, as in mock mode):
+2. Give the run command with the discovered values. Take the endpoint from `cyoda-status.sh` and the profile's `tokenCommand` from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-profile.sh` (omit `CYODA_TOKEN_COMMAND` when there is none, as in mock mode). With `"source":"project"` the `tokenCommand` may be relative to `projectDir`: run the command from there:
    ```bash
    ENTITY_NAME=<e> MODEL_VERSION=<v> TRANSITION_NAME=<t> EXPECTED_STATE=<next> \
    CYODA_ENDPOINT='<endpoint>' CYODA_TOKEN_COMMAND='<tokenCommand>' bash scripts/smoke-test.sh
