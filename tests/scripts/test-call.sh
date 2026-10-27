@@ -114,52 +114,55 @@ SH
   assert_eq "$(cat "$T/seen-endpoint")" "$EP" "CYODA_ENDPOINT exported as stored"
 }
 
+# pcfg <projects-json>: an active profile at localhost:1 (must not be used) plus projects
+pcfg() {
+  jq -n --argjson pr "$1" '{active: "p", profiles: {p: {endpoint: "http://localhost:1"}}, projects: $pr}' >"$T/cfg.json"
+  export CYODA_PLUGIN_CONFIG="$T/cfg.json"
+}
+
 test_call_project_relative_token_command() {
-  local pd; pd="$(mkdir -p "$HOME/proj/scripts" "$HOME/proj/.cyoda" "$HOME/proj/src" && cd "$HOME/proj" && pwd -P)"
+  local pd rc; pd="$(mkdir -p "$HOME/proj/scripts" "$HOME/proj/src" && cd "$HOME/proj" && pwd -P)"
   cat >"$pd/scripts/tok.sh" <<SH
 #!/usr/bin/env bash
 echo "\$PWD|\$CYODA_ENDPOINT|\$1" >"$T/seen-project"
 echo tok
 SH
   chmod +x "$pd/scripts/tok.sh"
-  echo "{\"endpoint\":\"$EP\",\"env\":\"development\",\"tokenCommand\":\"scripts/tok.sh token\"}" >"$pd/.cyoda/instance.json"
-  cfg "{\"endpoint\":\"http://localhost:1\"}"   # the global active profile must not be used
-  local rc
+  pcfg "$(jq -n --arg k "$pd" --arg ep "$EP" '{($k): {endpoint: $ep, env: "development", tokenCommand: "scripts/tok.sh token"}}')"
   (cd "$pd/src" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>"$T/err"); rc=$?
-  assert_status 0 "$rc" "project binding: GET /model/ ok"
+  assert_status 0 "$rc" "project entry: GET /model/ ok"
   assert_eq "$(cat "$T/seen-project" 2>/dev/null)" "$pd|$EP|token" "relative tokenCommand runs from projectDir and sees CYODA_ENDPOINT"
-  echo "{\"endpoint\":\"$EP\",\"env\":\"production\"}" >"$pd/.cyoda/instance.json"
+  pcfg "$(jq -n --arg k "$pd" --arg ep "$EP" '{($k): {endpoint: $ep, env: "production"}}')"
   (cd "$pd/src" && bash "$S/cyoda-call.sh" POST /model/x/1/lock >/dev/null 2>&1); rc=$?
-  assert_status 3 "$rc" "production guard applies to a project binding"
-  rm -rf "$pd/.cyoda"
+  assert_status 3 "$rc" "production guard applies to a project entry"
 }
 
 test_call_project_token_command_quoting() {
-  local pd rc; pd="$(mkdir -p "$HOME/quoted/scripts" "$HOME/quoted/.cyoda" && cd "$HOME/quoted" && pwd -P)"
+  local pd rc; pd="$(mkdir -p "$HOME/quoted/scripts" && cd "$HOME/quoted" && pwd -P)"
   cat >"$pd/scripts/tok.sh" <<SH
 #!/usr/bin/env bash
 printf '%s|%s\n' "\$TOKARG" "\$1" >"$T/seen-quoted"
 echo tok
 SH
   chmod +x "$pd/scripts/tok.sh"
-  jq -n --arg ep "$EP" --arg tc "TOKARG='two words' scripts/tok.sh \"it's \\\$HOME\"" \
-    '{endpoint: $ep, tokenCommand: $tc}' >"$pd/.cyoda/instance.json"
+  local tc="TOKARG='two words' scripts/tok.sh \"it's \\\$HOME\"" pr
+  pr="$(jq -n --arg k "$pd" --arg ep "$EP" --arg tc "$tc" '{($k): {endpoint: $ep, tokenCommand: $tc}}')"
+  pcfg "$pr"
   (cd "$pd" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1); rc=$?
   assert_status 0 "$rc" "tokenCommand with spaces and quotes: ok"
   assert_eq "$(cat "$T/seen-quoted" 2>/dev/null)" "two words|it's \$HOME" "tokenCommand with spaces and quotes runs as written"
-  rm -rf "$pd/.cyoda"
 }
 
-test_call_untrusted_project_file_ignored() {
-  # A planted, group-writable shared/.cyoda/instance.json is ignored entirely:
-  # its tokenCommand never runs and its endpoint is never called.
+test_call_planted_project_file_never_run() {
+  # Regression: a .cyoda/ file in the project tree is never read, so its
+  # tokenCommand never runs and its endpoint is never called.
   local pd rc; pd="$(mkdir -p "$HOME/shared/.cyoda" "$HOME/shared/work/sub" && cd "$HOME/shared" && pwd -P)"
   rm -f "$T/pwned"
   jq -n --arg tc "touch $T/pwned; echo tok" '{endpoint: "http://localhost:1", tokenCommand: $tc}' >"$pd/.cyoda/instance.json"
-  chmod 664 "$pd/.cyoda/instance.json"
+  cp "$pd/.cyoda/instance.json" "$pd/.cyoda/config"
   cfg "{\"endpoint\":\"$EP\"}"
   (cd "$pd/work/sub" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1); rc=$?
-  if [ -e "$T/pwned" ]; then _bad "untrusted project tokenCommand was executed"; else _ok; fi
+  if [ -e "$T/pwned" ]; then _bad "planted in-tree tokenCommand was executed"; else _ok; fi
   assert_status 0 "$rc" "call goes to the machine-wide profile, not the planted endpoint"
   rm -rf "$pd"
 }
@@ -193,6 +196,6 @@ test_call_header_quoting
 test_call_token_command_sees_endpoint
 test_call_project_relative_token_command
 test_call_project_token_command_quoting
-test_call_untrusted_project_file_ignored
+test_call_planted_project_file_never_run
 test_call_retries_once_on_401
 report

@@ -11,7 +11,7 @@ trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
 umask 022
-# Hermetic: no project binding from the caller's working directory, no real HOME.
+# Hermetic: temp HOME, and every config is a temp CYODA_PLUGIN_CONFIG.
 mkdir -p "$T/home"
 cd "$T" || exit 1
 export HOME="$T/home"
@@ -62,311 +62,112 @@ test_profile_invalid_json() {
   assert_contains "$err" "invalid config: $T/bad.json" "invalid config message"
 }
 
-# --- project binding (.cyoda/instance.json, legacy .cyoda/config) ---
+# --- project bindings: the "projects" map in the machine-wide config ---
 
-GLOBAL="$T/global.json"
-echo '{"active":"g","profiles":{"g":{"endpoint":"http://global","env":"development"},"stg":{"endpoint":"http://stg","env":"production","tokenCommand":"/x/stg.sh"}}}' >"$GLOBAL"
+W="$HOME/work"
+mkdir -p "$W"
+# real <dir>: mkdir -p and echo the physical path
+real() { mkdir -p "$1" && (cd "$1" && pwd -P); }
+# cfg <projects-json>: config with an active profile g, a profile stg, and the projects map
+cfg() {
+  jq -n --argjson pr "$1" '{active: "g", profiles: {g: {endpoint: "http://global", env: "development"},
+    stg: {endpoint: "http://stg", env: "production", tokenCommand: "/x/stg.sh"}}, projects: $pr}' >"$T/p.json"
+}
+# prof <cwd> [VAR=VAL ...]: cyoda-profile.sh from <cwd> with that config
+prof() { local d="$1"; shift; (cd "$d" && env CYODA_PLUGIN_CONFIG="$T/p.json" "$@" bash "$S/cyoda-profile.sh"); }
+fields() { jq -c '[.source, .profile, .endpoint, .env, .tokenCommand, .projectDir]'; }
 
-# mkproj <dir>: creates <dir>/.cyoda and echoes the physical path of <dir>
-mkproj() { mkdir -p "$1/.cyoda" && (cd "$1" && pwd -P); }
-# prof <cwd> [VAR=VAL ...]: runs cyoda-profile.sh from <cwd> with the global config
-prof() { local d="$1"; shift; (cd "$d" && env CYODA_PLUGIN_CONFIG="$GLOBAL" "$@" bash "$S/cyoda-profile.sh"); }
+test_project_wins_over_active() {
+  local pd out; pd="$(real "$W/shop")"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://localhost:8082", tokenCommand: "scripts/auth.sh token"}}')"
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | fields)" "[\"project\",\"shop\",\"http://localhost:8082\",\"development\",\"scripts/auth.sh token\",\"$pd\"]" "project entry wins over the active profile; env defaults to development"
+  assert_eq "$(echo "$out" | jq -c .warnings)" '[]' "no warnings"
+}
 
-test_profile_project_wins_over_active() {
-  local pd out; pd="$(mkproj "$HOME/work/shop")"
-  echo '{"endpoint":"http://localhost:8082","env":"development","tokenCommand":"scripts/auth.sh token"}' >"$pd/.cyoda/instance.json"
-  mkdir -p "$pd/src/deep"
+test_project_subdirectory_matches() {
+  local pd out; pd="$(real "$W/sub")"; mkdir -p "$pd/src/deep"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://localhost:8084", env: "production"}}')"
   out="$(prof "$pd/src/deep")"
-  assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .env, .tokenCommand, .source, .projectDir]')" \
-    "[\"shop\",\"http://localhost:8082\",\"development\",\"scripts/auth.sh token\",\"project\",\"$pd\"]" "project file wins, found from a subdirectory"
-  assert_eq "$(echo "$out" | jq -c .warnings)" '[]' "no warnings for a clean project file"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .env, .projectDir]')" "[\"project\",\"http://localhost:8084\",\"production\",\"$pd\"]" "a subdirectory of a project matches"
 }
 
-test_profile_project_env_defaults() {
-  local pd out; pd="$(mkproj "$HOME/work/envless")"
-  echo '{"endpoint":"http://localhost:8084"}' >"$pd/.cyoda/instance.json"
+test_project_nested_nearest_wins() {
+  local outer inner out; outer="$(real "$W/outer")"; inner="$(real "$W/outer/inner")"; mkdir -p "$inner/src" "$outer/src"
+  cfg "$(jq -n --arg o "$outer" --arg i "$inner" '{($o): {endpoint: "http://outer"}, ($i): {endpoint: "http://inner"}}')"
+  out="$(prof "$inner/src")"
+  assert_eq "$(echo "$out" | jq -c '[.endpoint, .profile]')" '["http://inner","inner"]' "the nearest of nested projects wins"
+  out="$(prof "$outer/src")"
+  assert_eq "$(echo "$out" | jq -r .endpoint)" http://outer "outside the inner project, the outer one applies"
+}
+
+test_project_symlinked_cwd() {
+  local pd out; pd="$(real "$W/realdir")"; mkdir -p "$pd/src"
+  ln -s "$pd" "$W/alias"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://real"}}')"
+  out="$(prof "$W/alias/src")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .projectDir]')" "[\"project\",\"$pd\"]" "a symlinked cwd matches via -ef"
+  cfg "$(jq -n --arg k "$W/alias" '{($k): {endpoint: "http://alias"}}')"
+  out="$(prof "$pd/src")"
+  assert_eq "$(echo "$out" | jq -c '[.endpoint, .projectDir]')" "[\"http://alias\",\"$W/alias\"]" "a symlink key matches the real cwd; projectDir is the key"
+}
+
+test_project_case_variant() {
+  local pd out; pd="$(real "$W/casey")"
+  if [ ! -d "$W/CASEY" ]; then echo "  skip: case-variant match needs a case-insensitive filesystem" >&2; return; fi
+  cfg "$(jq -n --arg k "$W/CASEY" '{($k): {endpoint: "http://case"}}')"
   out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -c '[.env, .tokenCommand]')" '["development",null]' "project env defaults to development, no tokenCommand"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["project","http://case"]' "a case-variant key matches on a case-insensitive filesystem"
 }
 
-test_profile_project_production() {
-  local pd out; pd="$(mkproj "$HOME/work/live")"
-  echo '{"endpoint":"https://live.example.com","env":"production"}' >"$pd/.cyoda/instance.json"
+test_project_missing_key_skipped() {
+  local pd out; pd="$(real "$W/alive")"
+  cfg "$(jq -n --arg k "$pd" '{"/nonexistent/cyoda/gone": {endpoint: "http://gone"}, ($k): {endpoint: "http://alive"}}')"
   out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -r .env)" production "project production env"
+  assert_eq "$(echo "$out" | jq -r .endpoint)" http://alive "a missing project dir key is skipped"
+  out="$(prof "$T")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .warnings]')" '["profile","http://global",[]]' "outside any project: the active profile, silently"
 }
 
-test_profile_legacy_config() {
-  local pd out; pd="$(mkproj "$HOME/work/sioms")"
-  echo '{"endpoint":"http://localhost:8080","env":"development","token":"eyJsecret","tokenCommand":"/evil.sh"}' >"$pd/.cyoda/config"
-  out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .env, .tokenCommand, .source, .projectDir]')" \
-    "[\"sioms\",\"http://localhost:8080\",\"development\",null,\"project\",\"$pd\"]" "legacy .cyoda/config: endpoint and env only"
-  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "$pd/.cyoda/config contains a stored token, which this plugin no longer reads; you can remove it" "legacy token warning"
-  if [[ "$out" == *eyJsecret* ]]; then _bad "legacy token echoed"; else _ok; fi
-}
-
-test_profile_instance_wins_over_legacy() {
-  local pd out; pd="$(mkproj "$HOME/work/both")"
-  echo '{"endpoint":"http://localhost:8080"}' >"$pd/.cyoda/config"
-  echo '{"endpoint":"http://localhost:8086","env":"development"}' >"$pd/.cyoda/instance.json"
-  out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -r .endpoint)" http://localhost:8086 "instance.json wins over legacy config"
-}
-
-test_profile_search_stops_at_git_root() {
-  local outer out; outer="$(mkproj "$HOME/work/outer")"
-  echo '{"endpoint":"http://outer"}' >"$outer/.cyoda/instance.json"
-  mkdir -p "$outer/repo/sub"
-  git -C "$outer/repo" init -q
-  out="$(prof "$outer/repo/sub")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' ".cyoda above the git root is not used"
-  mkdir -p "$outer/repo/.cyoda"
-  echo '{"endpoint":"http://repo"}' >"$outer/repo/.cyoda/instance.json"
-  out="$(prof "$outer/repo/sub")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["project","http://repo"]' ".cyoda at the git root is used"
-}
-
-test_profile_search_never_uses_home() {
-  mkdir -p "$HOME/.cyoda" "$HOME/plain"
-  echo '{"endpoint":"http://home"}' >"$HOME/.cyoda/instance.json"
-  local out; out="$(prof "$HOME/plain")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' "\$HOME/.cyoda is never a project binding"
-  out="$(prof "$HOME")"
-  assert_eq "$(echo "$out" | jq -r .source)" profile "not even from \$HOME itself"
-  rm -rf "$HOME/.cyoda"
-}
-
-test_profile_env_override() {
-  local pd out; pd="$(mkproj "$HOME/work/ovr")"
-  echo '{"endpoint":"http://localhost:8082"}' >"$pd/.cyoda/instance.json"
+test_project_env_override() {
+  local pd out; pd="$(real "$W/ovr")"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://localhost:8082"}}')"
   out="$(prof "$pd" CYODA_PROFILE=stg)"
   assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .env, .tokenCommand, .source, has("projectDir")]')" \
-    '["stg","http://stg","production","/x/stg.sh","profile",false]' "CYODA_PROFILE wins over the project file and the active profile"
+    '["stg","http://stg","production","/x/stg.sh","profile",false]' "CYODA_PROFILE wins over the project entry and the active profile"
 }
 
-test_profile_env_override_unknown() {
+test_project_env_override_unknown() {
   local err rc
+  cfg '{}'
   err="$(prof "$T" CYODA_PROFILE=nope 2>&1 >/dev/null)"; rc=$?
   assert_status 1 "$rc" "unknown CYODA_PROFILE exits 1"
-  assert_contains "$err" "CYODA_PROFILE=nope: no such profile in $GLOBAL (profiles: g, stg)" "unknown CYODA_PROFILE message"
+  assert_contains "$err" "CYODA_PROFILE=nope: no such profile in $T/p.json (profiles: g, stg)" "unknown CYODA_PROFILE message"
   err="$(cd "$T" && CYODA_PLUGIN_CONFIG="$T/none.json" CYODA_PROFILE=nope bash "$S/cyoda-profile.sh" 2>&1 >/dev/null)"; rc=$?
   assert_status 1 "$rc" "unknown CYODA_PROFILE without a config exits 1"
   assert_contains "$err" "CYODA_PROFILE=nope: no such profile" "message without a config"
 }
 
-test_profile_invalid_project_file() {
-  local pd err rc; pd="$(mkproj "$HOME/work/broken")"
-  echo '{oops' >"$pd/.cyoda/instance.json"
-  err="$(prof "$pd" 2>&1 >/dev/null)"; rc=$?
-  assert_status 1 "$rc" "invalid project file exits 1"
-  assert_contains "$err" "invalid config: $pd/.cyoda/instance.json" "invalid project file message"
+test_projects_only_config_keeps_implicit_default() {
+  local pd out; pd="$(real "$W/only")"
+  jq -n --arg k "$pd" '{projects: {($k): {endpoint: "http://only"}}}' >"$T/only.json"
+  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/only.json" bash "$S/cyoda-profile.sh")"
+  assert_eq "$(echo "$out" | jq -r .endpoint)" http://only "a config holding only projects: the project matches"
+  out="$(cd "$T" && CYODA_PLUGIN_CONFIG="$T/only.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["default","http://localhost:1"]' "elsewhere it keeps the implicit default (no profiles saved)"
 }
 
-test_profile_symlinked_cwd() {
-  local pd out; pd="$(mkproj "$HOME/work/real")"
-  echo '{"endpoint":"http://localhost:8088"}' >"$pd/.cyoda/instance.json"
-  mkdir -p "$pd/src"
-  ln -s "$pd" "$HOME/work/alias"
-  out="$(prof "$HOME/work/alias/src")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .profile, .projectDir]')" "[\"project\",\"real\",\"$pd\"]" "symlinked working dir: binding found, projectDir is the physical path"
-}
-
-test_profile_outside_home_no_git_no_climb() {
-  local out base; base="$(mkdir -p "$T/outside/proj/sub" && cd "$T/outside" && pwd -P)"
-  mkdir -p "$base/proj/.cyoda"
-  echo '{"endpoint":"http://outside"}' >"$base/proj/.cyoda/instance.json"
-  out="$(prof "$base/proj/sub")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' "outside \$HOME without git: a parent .cyoda is not used"
-  out="$(prof "$base/proj")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["project","http://outside"]' "outside \$HOME without git: \$PWD itself is used"
-}
-
-test_profile_corrupt_legacy_next_to_instance() {
-  local pd out rc; pd="$(mkproj "$HOME/work/corrupt")"
-  echo '{oops' >"$pd/.cyoda/config"
-  echo '{"endpoint":"http://localhost:8090"}' >"$pd/.cyoda/instance.json"
-  out="$(prof "$pd" 2>/dev/null)"; rc=$?
-  assert_status 0 "$rc" "corrupt legacy file next to a valid instance.json: exit 0"
-  assert_eq "$(echo "$out" | jq -r .endpoint)" http://localhost:8090 "instance.json used despite a corrupt legacy file"
-}
-
-# trust <name>: a project with a tokenCommand; echoes its physical dir
-trusted_proj() {
-  local pd; pd="$(mkproj "$HOME/work/$1")"
-  echo '{"endpoint":"http://localhost:8092","tokenCommand":"scripts/auth.sh token"}' >"$pd/.cyoda/instance.json"
-  chmod 600 "$pd/.cyoda/instance.json"
-  echo "$pd"
-}
-
-test_profile_token_command_trusted() {
-  local pd out; pd="$(trusted_proj trusted)"
-  git -C "$pd" init -q
-  echo '.cyoda/' >"$pd/.gitignore"
+test_project_planted_file_never_read() {
+  # Regression for the removed in-tree binding files: a planted .cyoda/ is just data.
+  local pd out; pd="$(real "$W/planted")"; mkdir -p "$pd/.cyoda"
+  jq -n --arg tc "touch $T/pwned; echo tok" '{endpoint: "http://attacker", tokenCommand: $tc}' >"$pd/.cyoda/instance.json"
+  cp "$pd/.cyoda/instance.json" "$pd/.cyoda/config"
+  cfg '{}'
   out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -c '[.tokenCommand, .warnings]')" '["scripts/auth.sh token",[]]' "own, 0600, untracked: tokenCommand used"
-}
-
-W_WRITE="group- or world-writable (run chmod 600 on it)"
-W_GIT="tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)"
-
-# ignored <out> <file> <reason> <msg>: the binding is ignored entirely, with a warning
-ignored() {
-  assert_eq "$(echo "$1" | jq -c '[.source, .endpoint, .tokenCommand, has("projectDir")]')" '["profile","http://global",null,false]' "$4: falls through to the active profile"
-  assert_eq "$(echo "$1" | jq -r '.warnings[0]')" "ignoring $2: $3" "$4: warning"
-}
-
-test_profile_untrusted_writable() {
-  local pd out; pd="$(trusted_proj shared)"
-  chmod 664 "$pd/.cyoda/instance.json"
-  mkdir -p "$pd/work/sub"
-  out="$(prof "$pd/work/sub")"
-  ignored "$out" "$pd/.cyoda/instance.json" "$W_WRITE" "group-writable"
-  chmod 606 "$pd/.cyoda/instance.json"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .tokenCommand]')" '["profile","http://global",null]' "no entry: an in-tree .cyoda/ file is ignored"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://mine"}}')"
   out="$(prof "$pd")"
-  ignored "$out" "$pd/.cyoda/instance.json" "$W_WRITE" "world-writable"
-}
-
-test_profile_untrusted_tracked() {
-  local pd out; pd="$(trusted_proj tracked)"
-  git -C "$pd" init -q
-  git -C "$pd" add -f .cyoda/instance.json
-  out="$(prof "$pd")"
-  ignored "$out" "$pd/.cyoda/instance.json" "$W_GIT" "tracked"
-}
-
-test_profile_untrusted_legacy() {
-  local pd out; pd="$(mkproj "$HOME/work/oldshared")"
-  echo '{"endpoint":"http://attacker"}' >"$pd/.cyoda/config"
-  chmod 666 "$pd/.cyoda/config"
-  out="$(prof "$pd")"
-  ignored "$out" "$pd/.cyoda/config" "$W_WRITE" "writable legacy file"
-  chmod 644 "$pd/.cyoda/config"
-  git -C "$pd" init -q
-  git -C "$pd" add -f .cyoda/config
-  out="$(prof "$pd")"
-  ignored "$out" "$pd/.cyoda/config" "$W_GIT" "tracked legacy file"
-}
-
-test_profile_untrusted_falls_through_to_default() {
-  local pd out; pd="$(trusted_proj nocfg)"
-  chmod 664 "$pd/.cyoda/instance.json"
-  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/none.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["default","http://localhost:1"]' "no config: falls through to the implicit default"
-  assert_eq "$(echo "$out" | jq -c '.warnings | length')" 2 "ignoring warning plus the implicit-default warning"
-  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "ignoring $pd/.cyoda/instance.json: $W_WRITE" "ignoring warning first"
-}
-
-# --- clone bypasses of the tracked-by-git check; all must fail closed ---
-
-gitc() { git -c user.email=t@example.com -c user.name=t -c init.defaultBranch=main -c protocol.file.allow=always "$@"; }
-plant_json() { jq -n --arg tc "touch $T/pwned; echo tok" '{endpoint: "http://attacker", tokenCommand: $tc}'; }
-# never_runs <dir> <msg>: cyoda-call.sh from <dir> must not run the planted command
-never_runs() {
-  rm -f "$T/pwned"
-  echo '{"active":"x","profiles":{"x":{"endpoint":"http://localhost:1"}}}' >"$T/dead.json"
-  (cd "$1" && CYODA_PLUGIN_CONFIG="$T/dead.json" bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1)
-  if [ -e "$T/pwned" ]; then _bad "$2: planted tokenCommand ran"; else _ok; fi
-}
-# clone_of <origin> <name>: plain clone into $HOME/work/<name>; echoes its physical path
-clone_of() { gitc clone -q --recurse-submodules "$1" "$HOME/work/$2" 2>/dev/null && (cd "$HOME/work/$2" && pwd -P); }
-
-test_bypass_symlinked_cyoda_dir() {
-  local o="$T/origin-a" c out; mkdir -p "$o/conf"
-  gitc -C "$T" init -q origin-a
-  plant_json >"$o/conf/instance.json"
-  ln -s conf "$o/.cyoda"
-  gitc -C "$o" add -A && gitc -C "$o" commit -qm plant
-  c="$(clone_of "$o" clone-a)"
-  out="$(prof "$c")"
-  ignored "$out" "$c/.cyoda/instance.json" "symlink" "(a) committed .cyoda -> conf symlink"
-  never_runs "$c" "(a)"
-}
-
-test_bypass_submodule_cyoda() {
-  local sub="$T/origin-sub" o="$T/origin-b" c out
-  gitc -C "$T" init -q origin-sub
-  plant_json >"$sub/instance.json"
-  gitc -C "$sub" add -A && gitc -C "$sub" commit -qm plant
-  gitc -C "$T" init -q origin-b
-  gitc -C "$o" submodule -q add "$sub" .cyoda 2>/dev/null
-  gitc -C "$o" commit -qm sub
-  c="$(clone_of "$o" clone-b)"
-  [ -f "$c/.cyoda/instance.json" ] || { _bad "(b) fixture: submodule not checked out"; return; }
-  out="$(prof "$c")"
-  ignored "$out" "$c/.cyoda/instance.json" ".cyoda is a git repository or submodule" "(b) submodule at .cyoda"
-  never_runs "$c" "(b)"
-}
-
-test_bypass_case_variant() {
-  local o="$T/origin-c" c out
-  gitc -C "$T" init -q origin-c
-  mkdir -p "$o/.CYODA"
-  plant_json >"$o/.CYODA/INSTANCE.JSON"
-  gitc -C "$o" add -A && gitc -C "$o" commit -qm plant
-  c="$(clone_of "$o" clone-c)"
-  if [ ! -f "$c/.cyoda/instance.json" ]; then
-    echo "  skip: (c) case-variant bypass needs a case-insensitive filesystem" >&2; return
-  fi
-  out="$(prof "$c")"
-  ignored "$out" "$c/.cyoda/instance.json" "$W_GIT" "(c) committed .CYODA/INSTANCE.JSON"
-  never_runs "$c" "(c)"
-}
-
-test_untrusted_symlinked_file() {
-  local pd out; pd="$(mkproj "$HOME/work/symfile")"
-  plant_json >"$pd/elsewhere.json"
-  ln -s ../elsewhere.json "$pd/.cyoda/instance.json"
-  out="$(prof "$pd")"
-  ignored "$out" "$pd/.cyoda/instance.json" "symlink" "symlinked binding file"
-  never_runs "$pd" "symlinked binding file"
-}
-
-test_untrusted_writable_cyoda_dir() {
-  local pd out; pd="$(mkproj "$HOME/work/opendir")"
-  plant_json >"$pd/.cyoda/instance.json"
-  chmod 600 "$pd/.cyoda/instance.json"
-  chmod 775 "$pd/.cyoda"
-  out="$(prof "$pd")"
-  ignored "$out" "$pd/.cyoda/instance.json" ".cyoda directory is group- or world-writable (run chmod 700 on it)" "group-writable .cyoda dir"
-  never_runs "$pd" "group-writable .cyoda dir"
-  chmod 755 "$pd/.cyoda"
-}
-
-test_untrusted_cyoda_dir_not_owned() {
-  local pd out; pd="$(trusted_proj dirnotmine)"
-  mkdir -p "$T/idshim2"
-  # A fake `id -u` makes both the dir and the file foreign; the dir is reported first.
-  # (The file's own owner check uses the same owned() helper; a file owned by
-  # another user can't be created without root.)
-  # shellcheck disable=SC2016 # literal script text
-  printf '#!/usr/bin/env bash\nif [ "$1" = -u ]; then echo 4242; else exec /usr/bin/id "$@"; fi\n' >"$T/idshim2/id"
-  chmod +x "$T/idshim2/id"
-  out="$(prof "$pd" PATH="$T/idshim2:$PATH")"
-  ignored "$out" "$pd/.cyoda/instance.json" ".cyoda directory not owned by you" ".cyoda dir not owned"
-}
-
-test_git_fsmonitor_hook_never_runs() {
-  local pd; pd="$(trusted_proj fsmon)"
-  gitc -C "$pd" init -q
-  printf '#!/usr/bin/env bash\ntouch "%s"\n' "$T/fsmon-ran" >"$T/fsmon.sh"; chmod +x "$T/fsmon.sh"
-  git -C "$pd" config core.fsmonitor "$T/fsmon.sh"
-  rm -f "$T/fsmon-ran"
-  prof "$pd/.cyoda" >/dev/null
-  prof "$pd" >/dev/null
-  if [ -e "$T/fsmon-ran" ]; then _bad "a repo's core.fsmonitor hook ran"; else _ok; fi
-}
-
-test_trusted_happy_path_0700() {
-  local pd out; pd="$(trusted_proj happy)"
-  chmod 700 "$pd/.cyoda"
-  gitc -C "$pd" init -q
-  echo '.cyoda/' >"$pd/.gitignore"
-  out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .tokenCommand, .warnings]')" '["project","scripts/auth.sh token",[]]' "0700 .cyoda, 0600 untracked file you own: trusted"
-  chmod 644 "$pd/.cyoda/instance.json"; chmod 755 "$pd/.cyoda"
-  out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | jq -r .source)" project "0755 .cyoda, 0644 file: trusted"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .tokenCommand]')" '["project","http://mine",null]' "with an entry: only the entry is used"
 }
 
 test_profile_default_when_no_config
@@ -374,30 +175,14 @@ test_profile_existing_config_without_endpoint
 test_profile_active_selected
 test_profile_stale_token
 test_profile_invalid_json
-test_profile_project_wins_over_active
-test_profile_project_env_defaults
-test_profile_project_production
-test_profile_legacy_config
-test_profile_instance_wins_over_legacy
-test_profile_search_stops_at_git_root
-test_profile_search_never_uses_home
-test_profile_env_override
-test_profile_env_override_unknown
-test_profile_invalid_project_file
-test_profile_symlinked_cwd
-test_profile_outside_home_no_git_no_climb
-test_profile_corrupt_legacy_next_to_instance
-test_profile_token_command_trusted
-test_profile_untrusted_writable
-test_profile_untrusted_tracked
-test_profile_untrusted_legacy
-test_profile_untrusted_falls_through_to_default
-test_bypass_symlinked_cyoda_dir
-test_bypass_submodule_cyoda
-test_bypass_case_variant
-test_untrusted_symlinked_file
-test_untrusted_writable_cyoda_dir
-test_untrusted_cyoda_dir_not_owned
-test_git_fsmonitor_hook_never_runs
-test_trusted_happy_path_0700
+test_project_wins_over_active
+test_project_subdirectory_matches
+test_project_nested_nearest_wins
+test_project_symlinked_cwd
+test_project_case_variant
+test_project_missing_key_skipped
+test_project_env_override
+test_project_env_override_unknown
+test_projects_only_config_keeps_implicit_default
+test_project_planted_file_never_read
 report

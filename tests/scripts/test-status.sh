@@ -11,7 +11,7 @@ source "$ROOT/tests/lib/server.sh"
 trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
-# Hermetic: no project binding from the caller's working directory, no real HOME.
+# Hermetic: temp HOME; every config is a temp CYODA_PLUGIN_CONFIG.
 mkdir -p "$T/home"
 cd "$T" || exit 1
 export HOME="$T/home"
@@ -93,28 +93,33 @@ test_status_ignores_broken_token_command() {
   stop_server
 }
 
+# pcfg <file> <dir> <endpoint> [env]: active profile at localhost:1 plus one project entry
+pcfg() {
+  jq -n --arg k "$2" --arg ep "$3" --arg env "${4:-development}" \
+    '{active: "p", profiles: {p: {endpoint: "http://localhost:1"}}, projects: {($k): {endpoint: $ep, env: $env}}}' >"$1"
+}
+
 test_status_project_binding() {
   start_server || return
   local pd ep="http://localhost:${SMOKE_HTTP_PORT}" out
-  pd="$(mkdir -p "$HOME/work/shop/.cyoda" "$HOME/work/shop/src" && cd "$HOME/work/shop" && pwd -P)"
-  echo "{\"endpoint\":\"$ep\",\"env\":\"production\"}" >"$pd/.cyoda/instance.json"
-  echo '{"active":"p","profiles":{"p":{"endpoint":"http://localhost:1"}}}' >"$T/g.json"
+  pd="$(mkdir -p "$HOME/work/shop/src" && cd "$HOME/work/shop" && pwd -P)"
+  pcfg "$T/g.json" "$pd" "$ep" production
   out="$(cd "$pd/src" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=shop ENDPOINT=$ep ENV=production VERSION=0.8.4" "project binding connected"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=shop ENDPOINT=$ep ENV=production VERSION=0.8.4" "project entry connected"
   assert_contains "$(echo "$out" | head -n1)" "SOURCE=project PROJECT=$pd" "project source and dir"
-  echo '{"endpoint":"http://localhost:1"}' >"$pd/.cyoda/instance.json"
+  pcfg "$T/g.json" "$pd" "http://localhost:1"
   out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable PROFILE=shop" "project binding unreachable"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable PROFILE=shop" "project entry unreachable"
   assert_contains "$out" "WARN=project shop is bound to http://localhost:1, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one" "project unreachable warn"
-  if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for a project binding"; else _ok; fi
+  if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for a project entry"; else _ok; fi
   stop_server
 }
 
 test_status_project_name_with_spaces() {
   local pd out line
-  pd="$(mkdir -p "$HOME/work/my shop/.cyoda" && cd "$HOME/work/my shop" && pwd -P)"
-  echo '{"endpoint":"http://localhost:1"}' >"$pd/.cyoda/instance.json"
-  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
+  pd="$(mkdir -p "$HOME/work/my shop" && cd "$HOME/work/my shop" && pwd -P)"
+  pcfg "$T/sp.json" "$pd" "http://localhost:1"
+  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/sp.json" bash "$S/cyoda-status.sh")"
   line="$(echo "$out" | head -n1)"
   assert_contains "$line" 'PROFILE="my shop" ENDPOINT=http://localhost:1 ' "a profile name with spaces is double-quoted"
   assert_eq "${line##* PROJECT=}" "$pd" "PROJECT is last and runs to the end of the line"

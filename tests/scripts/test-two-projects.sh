@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Two projects, two throwaway cyoda-go servers (tests/evals/start.sh ids 401, 402):
-# each project's .cyoda/instance.json reaches its own server, whatever the
-# machine-wide active profile says. Project A runs JWT with a relative project
-# token script; project B runs mock auth.
+# each project's entry in the plugin config's "projects" map reaches its own
+# server, whatever the active profile says. Project A runs JWT with a relative
+# project token script; project B runs mock auth.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
@@ -34,18 +34,19 @@ EPB="http://localhost:$((20000 + 402 * 100 + 80))"
 mkdir -p "$T/home"
 export HOME="$T/home"
 export CYODA_PLUGIN_CONFIG="$T/global.json"
-echo '{"active":"g","profiles":{"g":{"endpoint":"http://localhost:1"}}}' >"$CYODA_PLUGIN_CONFIG"
 unset CYODA_PROFILE
 # Project A's token script reads the client credentials from the environment,
-# as /cyoda:auth sets it up; instance.json holds only the relative command.
+# as /cyoda:auth sets it up; the project entry holds only the relative command.
 export CYODA_CLIENT_ID=evalclient CYODA_CLIENT_SECRET=evalsecret
 
 PA="$HOME/work/alpha"; PB="$HOME/work/beta"
-mkdir -p "$PA/.cyoda" "$PA/scripts" "$PA/src" "$PB/.cyoda" "$PB/src"
+mkdir -p "$PA/scripts" "$PA/src" "$PB/src"
 cp "$ROOT/cyoda/skills/auth/templates/get-token.sh" "$PA/scripts/get-token.sh"
 chmod +x "$PA/scripts/get-token.sh"
-echo "{\"endpoint\":\"$EPA\",\"env\":\"development\",\"tokenCommand\":\"scripts/get-token.sh\"}" >"$PA/.cyoda/instance.json"
-echo "{\"endpoint\":\"$EPB\",\"env\":\"development\"}" >"$PB/.cyoda/instance.json"
+jq -n --arg a "$(cd "$PA" && pwd -P)" --arg b "$(cd "$PB" && pwd -P)" --arg epa "$EPA" --arg epb "$EPB" '{
+  active: "g", profiles: {g: {endpoint: "http://localhost:1"}},
+  projects: {($a): {endpoint: $epa, env: "development", tokenCommand: "scripts/get-token.sh"},
+             ($b): {endpoint: $epb, env: "development"}}}' >"$CYODA_PLUGIN_CONFIG"
 
 call() { (cd "$1" && shift && bash "$S/cyoda-call.sh" "$@" 2>/dev/null); }
 import_model() { # dir entity
