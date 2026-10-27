@@ -5,13 +5,15 @@
 #   1. CYODA_PROFILE=<name>: that profile, over everything (unknown: exit 1).
 #   2. A "projects" entry whose key (a project dir) is $PWD or its nearest ancestor,
 #      compared with -ef (same inode, so symlinks and letter case don't matter).
-#      Keys whose dir is gone are skipped. source "project", profile = key's basename.
+#      Only absolute keys for existing dirs owned by you count; keys whose dir is
+#      gone are skipped silently, relative/~/newline/foreign keys with a warning.
+#      source "project", profile = key's basename.
 #   3. The active profile (source "profile").
 #   4. No config, or one with no "active" and no "profiles": an implicit `default`
 #      for the local instance (source "default"). CYODA_DEFAULT_ENDPOINT overrides
 #      its endpoint; it exists for tests only.
-# Nothing in the project tree is read. Exit 0, except invalid JSON or an unknown
-# CYODA_PROFILE (exit 1).
+# Nothing in the project tree is read. Exit 0, except invalid JSON, a malformed
+# projects map, or an unknown CYODA_PROFILE (exit 1).
 set -euo pipefail
 
 CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
@@ -54,20 +56,41 @@ project_json() { # key
       }' "$CONFIG"
 }
 
-# Echo the projects key for $PWD or its nearest ancestor, or nothing.
+# Set KEY to the projects key for $PWD or its nearest ancestor (or ""). Only an
+# absolute key for an existing dir you own can match: a relative or ~ key would
+# resolve against $PWD, i.e. inside whatever repo you are in. Skipped keys warn.
+WARNS=()
+KEY=""
 find_project() {
   local keys=() k dir
-  while IFS= read -r k; do [ -n "$k" ] && [ -d "$k" ] && keys+=("$k"); done \
-    < <(jq -r '(.projects // {}) | keys[]' "$CONFIG")
+  if [ "$(jq '[(.projects // {}) | keys[] | select(test("\n"))] | length' "$CONFIG")" != 0 ]; then
+    WARNS+=("a projects key contains a newline; skipped")
+  fi
+  while IFS= read -r k; do
+    case "$k" in
+      /*) if [ -d "$k" ]; then keys+=("$k"); fi ;;
+      *) WARNS+=("projects key $k is not an absolute path; skipped") ;;
+    esac
+  done < <(jq -r '(.projects // {}) | keys[] | select(test("\n") | not)' "$CONFIG")
   [ ${#keys[@]} -gt 0 ] || return 0
-  dir="$(pwd -P)"
+  # A deleted or unreadable $PWD: no project.
+  dir="$(pwd -P 2>/dev/null)" || return 0
+  case "$dir" in /*) ;; *) return 0 ;; esac
   while :; do
     for k in "${keys[@]}"; do
-      if [ "$dir" -ef "$k" ]; then printf '%s\n' "$k"; return 0; fi
+      [ "$dir" -ef "$k" ] || continue
+      if [ -O "$k" ]; then KEY="$k"; return 0; fi
+      WARNS+=("projects entry $k skipped: the directory is not owned by you")
     done
     [ "$dir" = / ] && return 0
-    dir="$(dirname "$dir")"
+    dir="${dir%/*}"
+    [ -n "$dir" ] || dir=/
   done
+}
+
+with_warns() {
+  jq -c --argjson x "$(printf '%s\n' ${WARNS[@]+"${WARNS[@]}"} | jq -Rn '[inputs | select(length > 0)]')" \
+    '.warnings = ($x + .warnings)'
 }
 
 if [ ! -f "$CONFIG" ]; then
@@ -84,6 +107,17 @@ if ! jq -e 'type == "object"' "$CONFIG" >/dev/null 2>&1; then
   exit 1
 fi
 
+BAD="$(jq -r '
+  if has("projects") and (.projects | type) != "object" then "projects must be an object"
+  else [(.projects // {}) | to_entries[]
+        | select((.value | type) != "object" or (.value.endpoint | type) != "string")
+        | "\(.key) needs an object with a string endpoint"] | first // empty
+  end' "$CONFIG")"
+if [ -n "$BAD" ]; then
+  echo "invalid projects entry in $CONFIG: $BAD" >&2
+  exit 1
+fi
+
 if [ -n "$WANT" ]; then
   if ! jq -e --arg p "$WANT" '(.profiles // {}) | has($p)' "$CONFIG" >/dev/null; then
     echo "CYODA_PROFILE=$WANT: no such profile in $CONFIG (profiles: $(jq -r '(.profiles // {}) | keys | join(", ")' "$CONFIG"))" >&2
@@ -93,14 +127,15 @@ if [ -n "$WANT" ]; then
   exit 0
 fi
 
-KEY="$(find_project)"
+find_project
 if [ -n "$KEY" ]; then
-  project_json "$KEY"
+  project_json "$KEY" | with_warns
   exit 0
 fi
 
+# No active profile and no profiles saved (e.g. only projects): the implicit default.
 if ! jq -e 'has("active") or has("profiles")' "$CONFIG" >/dev/null; then
-  default_json
+  default_json | with_warns
   exit 0
 fi
-profile_json "$(jq -r '.active // "default"' "$CONFIG")"
+profile_json "$(jq -r '.active // "default"' "$CONFIG")" | with_warns

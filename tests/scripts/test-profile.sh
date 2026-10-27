@@ -170,6 +170,61 @@ test_project_planted_file_never_read() {
   assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .tokenCommand]')" '["project","http://mine",null]' "with an entry: only the entry is used"
 }
 
+# run_limited <secs> <cmd...>: run with a hard time limit (no coreutils timeout on macOS)
+run_limited() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+
+test_project_deleted_cwd_does_not_hang() {
+  local pd gone out rc; pd="$(real "$W/keep")"; gone="$(real "$W/gone")"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://keep"}}')"
+  out="$(cd "$gone" && rmdir "$gone" && CYODA_PLUGIN_CONFIG="$T/p.json" run_limited 5 bash "$S/cyoda-profile.sh" 2>/dev/null)"; rc=$?
+  assert_status 0 "$rc" "deleted cwd: finishes (no hang) and exits 0"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' "deleted cwd: falls through to the active profile"
+}
+
+test_project_relative_keys_skipped() {
+  local pd out; pd="$(real "$W/rel")"; mkdir -p "$pd/foo"
+  ln -s .. "$pd/foo/bar"
+  cfg '{".": {"endpoint": "http://dot"}, "foo/bar": {"endpoint": "http://foobar"}, "~/work/rel": {"endpoint": "http://tilde"}}'
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' "relative and ~ keys never match"
+  assert_contains "$(echo "$out" | jq -r '.warnings | join("|")')" "projects key . is not an absolute path; skipped" "relative key warning"
+  out="$(prof "$pd/foo")"
+  assert_eq "$(echo "$out" | jq -r .source)" profile "a repo's foo/bar -> .. symlink can't capture key foo/bar"
+}
+
+test_project_foreign_dir_skipped() {
+  local out
+  # -O can't be faked by a PATH shim; a root-owned dir stands in for one re-created by another user.
+  cfg "$(jq -n '{"/": {endpoint: "http://root"}, "/usr": {endpoint: "http://usr"}}')"
+  out="$(prof /usr/bin)"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' "a key whose dir you don't own is skipped"
+  assert_contains "$(echo "$out" | jq -r '.warnings | join("|")')" "projects entry /usr skipped: the directory is not owned by you" "foreign dir warning"
+}
+
+test_project_newline_key_warned() {
+  local pd out; pd="$(real "$W/nl")"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://nl"}, "/a\nb": {endpoint: "http://bad"}}')"
+  out="$(prof "$pd")"
+  assert_eq "$(echo "$out" | jq -r .endpoint)" http://nl "a key with a newline doesn't break the others"
+  assert_contains "$(echo "$out" | jq -r '.warnings | join("|")')" "a projects key contains a newline; skipped" "newline key warning"
+}
+
+test_project_malformed_projects() {
+  local err rc
+  echo '{"active":"g","profiles":{"g":{"endpoint":"http://g"}},"projects":[]}' >"$T/p.json"
+  err="$(prof "$T" 2>&1 >/dev/null)"; rc=$?
+  assert_status 1 "$rc" "projects not an object: exit 1"
+  assert_contains "$err" "invalid projects entry in $T/p.json: projects must be an object" "projects not an object: message"
+  echo '{"projects":{"/x":"http://x"}}' >"$T/p.json"
+  err="$(prof "$T" 2>&1 >/dev/null)"; rc=$?
+  assert_status 1 "$rc" "entry not an object: exit 1"
+  assert_contains "$err" "invalid projects entry in $T/p.json: /x needs an object with a string endpoint" "entry not an object: message"
+  echo '{"projects":{"/y":{"env":"development"}}}' >"$T/p.json"
+  err="$(prof "$T" 2>&1 >/dev/null)"; rc=$?
+  assert_status 1 "$rc" "entry without endpoint: exit 1"
+  assert_contains "$err" "invalid projects entry in $T/p.json: /y needs an object with a string endpoint" "entry without endpoint: message"
+}
+
 test_profile_default_when_no_config
 test_profile_existing_config_without_endpoint
 test_profile_active_selected
@@ -185,4 +240,9 @@ test_project_env_override
 test_project_env_override_unknown
 test_projects_only_config_keeps_implicit_default
 test_project_planted_file_never_read
+test_project_deleted_cwd_does_not_hang
+test_project_relative_keys_skipped
+test_project_foreign_dir_skipped
+test_project_newline_key_warned
+test_project_malformed_projects
 report
