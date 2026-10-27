@@ -7,9 +7,9 @@ disable-model-invocation: true
 
 # Cyoda auth (cyoda-go)
 
-Sets up a **token script** in the developer's project and points the current binding's `tokenCommand` at it (the project's `.cyoda/instance.json`, or else the active profile). The plugin's scripts run it before each API call, so every call gets a fresh JWT.
+Sets up a **token script** in the developer's project and points the current binding's `tokenCommand` at it (this project's entry in the plugin config's `projects` map, or else the active profile). The plugin's scripts run it before each API call, so every call gets a fresh JWT.
 
-**The plugin stores no tokens or secrets.** The script reads the client credentials from the developer's own environment or keychain. A profile or project file holds only `endpoint`, `env` and `tokenCommand`. Never ask the developer to paste a secret into the conversation, and never print a token.
+**The plugin stores no tokens or secrets.** The script reads the client credentials from the developer's own environment or keychain. A profile or project entry holds only `endpoint`, `env` and `tokenCommand`. Never ask the developer to paste a secret into the conversation, and never print a token.
 
 **Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` and say which one you used.
 
@@ -19,7 +19,7 @@ A Cloud or migration question: reply only "That's not covered by this plugin." D
 
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show every `WARN=` line.
 - `STATUS=not_configured` or `unreachable`: say "next, type `/cyoda:setup` to connect to the instance first" and stop.
-- Note `PROFILE`, `ENDPOINT` and `SOURCE`; this run sets up that binding. `SOURCE=project`: it is this project's `.cyoda/instance.json` (`PROJECT=<dir>`). To set up another one, the developer switches profiles or links the project with `/cyoda:setup` first.
+- Note `PROFILE`, `ENDPOINT` and `SOURCE`; this run sets up that binding. `SOURCE=project`: it is this project's `projects` entry (`PROJECT=<dir>`, the entry's key). To set up another one, the developer switches profiles or links the project with `/cyoda:setup` first.
 
 ## Step 1 — Does it need a token?
 
@@ -94,11 +94,12 @@ Run it once without showing the token:
 
 ## Step 6 — Point the profile at it
 
-`SOURCE=project`: set `tokenCommand` in `<PROJECT>/.cyoda/instance.json` only. A path relative to the project root (e.g. `scripts/get-token.sh`) works there: the plugin runs it from the project root. The plugin ignores the whole file if it or `.cyoda/` fails a trust check (a symlink, not the developer's, writable by others, tracked by git; status then warns `ignoring <file>: …`). Keep it 0600:
+`SOURCE=project`: set `tokenCommand` on this project's entry only, keyed by `PROJECT` from Step 0. A path relative to the project root (e.g. `scripts/get-token.sh`) works there: the plugin runs it from the project root.
 
 ```bash
-F="<PROJECT>/.cyoda/instance.json"
-( umask 077; jq --arg tc "<PATH>" '.tokenCommand = $tc' "$F" > "$F.tmp" ) && chmod 600 "$F.tmp" && mv "$F.tmp" "$F"
+CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
+( umask 077; jq --arg k '<PROJECT>' --arg tc '<PATH>' '.projects[$k].tokenCommand = $tc' "$CONFIG" > "$CONFIG.tmp" ) \
+  && chmod 600 "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
 ```
 
 Otherwise set `tokenCommand` to the script's **absolute** path, on the profile from Step 0 only:
@@ -122,7 +123,7 @@ Read `cyoda-help.sh auth tokens --section "REQUEST FLOW"` and `--section TOKEN`,
 
 ## Finish
 
-Report: the script's path, the profile (or project file) and its `tokenCommand`, and the verify result. Then hand off with a one-line reason: "next, type `/cyoda:build` to register your entity models", or "type `/cyoda:status`" to re-check the connection.
+Report: the script's path, the profile (or project entry) and its `tokenCommand`, and the verify result. Then hand off with a one-line reason: "next, type `/cyoda:build` to register your entity models", or "type `/cyoda:status`" to re-check the connection.
 
 ## Common mistakes
 
@@ -131,7 +132,7 @@ Report: the script's path, the profile (or project file) and its `tokenCommand`,
 | Asking for the secret in chat, or writing it to a file | Env var or `CYODA_CLIENT_SECRET_CMD` in the developer's shell |
 | Creating a client through `cyoda-call.sh` (its response, with `client_secret`, lands in the conversation) | A command the developer runs in their own terminal, secret straight to a 0600 file |
 | Printing the token to check it | Count its parts with `awk` |
-| Relative `tokenCommand` in a machine-wide profile | Absolute path there; only a project's `.cyoda/instance.json` may use a path relative to the project root |
+| Relative `tokenCommand` in a machine-wide profile | Absolute path there; only a `projects` entry may use a path relative to the project root |
 | Saving `tokenCommand` before the test passes | Test first (Step 5) |
 | Writing a token script for a mock instance | Mock: "no token needed", stop |
 | Telling the app to use a refresh token | There is none; mint again before expiry |

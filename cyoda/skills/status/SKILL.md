@@ -19,22 +19,19 @@ Read-only. One script call, one status line, then the warnings.
 | `unreachable` | `cyoda-go unreachable — <E> <TAG>` |
 | `not_configured` | `Not connected — type /cyoda:setup` |
 
-   - `<TAG>` comes from `SOURCE`: `project` → `[project: <P>]` (this project's `.cyoda/instance.json`; `<P>` is the project dir's name); `profile` or `default` → `[profile: <P>]`.
+   - `<TAG>` comes from `SOURCE`: `project` → `[project: <P>]` (this project's entry in the plugin config's `projects` map; `<P>` is the project dir's name); `profile` or `default` → `[profile: <P>]`.
    - Append ` [PRODUCTION]` to a `connected` or `unreachable` line when `ENV=production`.
    - `VERSION=unknown`: write `version unknown` in place of `v<V>`.
    - `<V>` is the instance's version. `BINARY_VERSION` is the local `cyoda` binary; don't report it as the instance version.
 3. Print **every** `WARN=` line after the status line, as it is, one per line, prefixed `Warning: `. Don't drop, merge or reword them. The texts the script emits:
    - `active profile <P> is unreachable; run /cyoda:setup to switch to default`
    - `project <P> is bound to <E>, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one`
-   - `<path>/.cyoda/config contains a stored token, which this plugin no longer reads; you can remove it` (legacy project file: only its endpoint and env are used)
-   - `<path>/.cyoda/instance.json contains a stored token, which this plugin no longer reads; you can remove it`
-   - `ignoring <path>/.cyoda/instance.json: <reason>` (or `…/.cyoda/config`), where `<reason>` is one of `symlink`, `.cyoda directory not owned by you`, `.cyoda directory is group- or world-writable (run chmod 700 on it)`, `not owned by you`, `group- or world-writable (run chmod 600 on it)`, `.cyoda is a git repository or submodule`, `tracked by git (run git rm --cached on it and keep .cyoda/ in .gitignore)`, `git could not check whether it is tracked`. The project binding is ignored entirely, so the line shows the machine-wide profile or the default (`SOURCE` is not `project`).
    - `no saved profile; using the default local instance <E> — type /cyoda:setup to save it` (no config file: `PROFILE=default` is implicit)
    - `no cyoda-go is answering at <E> — type /cyoda:setup to install or start one` (the implicit default is unreachable)
    - `local cyoda <B> differs from instance <V>; help is read from the instance`
    - `profile <P> contains a stored token, which this plugin no longer reads; you can remove it`
 
-Nothing else: don't switch profiles, edit the config or `.cyoda/instance.json`, install or upgrade anything. When a fix needs a side effect, say which command to type: "type `/cyoda:setup`" (connection, profile switch) or "type `/cyoda:auth`" (token). Never say you'll invoke them.
+Nothing else: don't switch profiles, edit the config, install or upgrade anything. When a fix needs a side effect, say which command to type: "type `/cyoda:setup`" (connection, profile switch) or "type `/cyoda:auth`" (token). Never say you'll invoke them.
 
 ## Examples
 
@@ -61,7 +58,7 @@ Warning: local cyoda 0.9.0 differs from instance 0.8.4; help is read from the in
 | Mistake | Fix |
 |---|---|
 | Labels such as "Local cyoda-go" | Every instance is `cyoda-go`; production is the `[PRODUCTION]` tag only |
-| `[profile: <P>]` for `SOURCE=project` | `[project: <P>]`: the project's binding wins over the machine-wide active profile |
+| `[profile: <P>]` for `SOURCE=project` | `[project: <P>]`: the project's entry wins over the machine-wide active profile |
 | Reporting `BINARY_VERSION` as the version | Report `VERSION` (from the instance) |
 | Showing only the first warning | Print every `WARN=` line |
 | Running the tokenCommand or an authenticated call | Not needed: `/api/help` is public |

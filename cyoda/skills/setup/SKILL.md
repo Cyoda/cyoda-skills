@@ -1,17 +1,17 @@
 ---
 name: setup
-description: Use when the developer types /cyoda:setup to install and start a local cyoda-go, to connect the plugin to an existing self-hosted cyoda-go instance, to link the current project to its own instance (e.g. its Docker Compose stack), or to switch away from an unreachable or outdated connection profile.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-docker-instances.sh*) Bash(brew *) Bash(cyoda *) Bash(command -v *) Bash(curl *) Bash(mkdir *) Bash(jq *) Bash(mv *) Bash(cat *) Bash(sleep *) Bash(git rev-parse *) Bash(git check-ignore *) Bash(git ls-files *) Bash(ls *) Bash(chmod *)
+description: Use when the developer types /cyoda:setup to install and start a local cyoda-go, to connect the plugin to an existing self-hosted cyoda-go instance, to link or unlink the current project to its own instance (e.g. its Docker Compose stack), or to switch away from an unreachable or outdated connection profile.
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-docker-instances.sh*) Bash(brew *) Bash(cyoda *) Bash(command -v *) Bash(curl *) Bash(mkdir *) Bash(jq *) Bash(mv *) Bash(cat *) Bash(sleep *) Bash(git rev-parse *) Bash(pwd *) Bash(ls *) Bash(chmod *)
 disable-model-invocation: true
 ---
 
 # Cyoda setup
 
-Three modes: **local** (install and run cyoda-go on this machine, profile `default`), **connect** (add a machine-wide profile for a cyoda-go instance that already runs somewhere, e.g. one made with `/cyoda:deploy`) and **link** (bind this project to its own instance in `<project>/.cyoda/instance.json`, private to this developer). The scripts every other skill uses read, in order: `CYODA_PROFILE=<name>` if set, the project's `.cyoda/instance.json`, the active profile, the local default.
+Three modes: **local** (install and run cyoda-go on this machine, profile `default`), **connect** (add a machine-wide profile for a cyoda-go instance that already runs somewhere, e.g. one made with `/cyoda:deploy`) and **link** (bind this project directory to its own instance: an entry in the plugin config's `projects` map, keyed by the directory's real path, so it stays private to this developer and nothing is written into the project). The scripts every other skill uses read, in order: `CYODA_PROFILE=<name>` if set, the `projects` entry for the working directory or its nearest ancestor, the active profile, the local default.
 
 **Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` once the binary is installed (before that, the help mirror at https://docs.cyoda.net/help/ has the same content).
 
-**The plugin stores no tokens or secrets.** A profile or project file holds only `endpoint`, `env` (`development` | `production`) and `tokenCommand`.
+**The plugin stores no tokens or secrets.** A profile or project entry holds only `endpoint`, `env` (`development` | `production`) and `tokenCommand`.
 
 ## Step 0 — Where things stand
 
@@ -19,12 +19,11 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. It prints `STATUS=… PROFI
 
 - Show every `WARN=` line as it is, e.g. "profile old contains a stored token, which this plugin no longer reads; you can remove it". Don't read, print or reuse a stored token. Remove it only if the developer says yes: `jq 'del(.profiles["<P>"].token)'` (write it back as in [Write the profile](#write-the-profile)).
 - `SOURCE=project` (this project is linked, `PROJECT=<dir>`). Never offer the active-profile switch below for it: that changes the machine-wide config, and this project would still use its own binding.
-  - `STATUS=connected`: say so; [link mode](#link-mode) replaces the binding only on a yes.
+  - `STATUS=connected`: say so. [Link mode](#link-mode) re-links it (replacing the entry) and [unlink](#unlink) removes it, each only on a yes.
   - `STATUS=unreachable`: the project's own instance isn't answering. Offer two ways: (1) start it: if `<PROJECT>` has a Compose file (`ls <PROJECT>/compose.yaml <PROJECT>/compose.yml <PROJECT>/docker-compose.yml <PROJECT>/docker-compose.yaml`), give `cd <PROJECT> && docker compose up -d` for the developer to run in their own terminal (you don't run it); with no Compose file, ask how they start it, or offer a re-link; when they say it's up, run `cyoda-status.sh` again and go to [Finish](#finish); or (2) re-link the project to another instance in [link mode](#link-mode).
-- `WARN=ignoring <file>: <reason>`: the project's binding failed a trust check (a symlink, not the developer's, writable by others, in a `.cyoda` repo or submodule, or tracked by git), so it is ignored entirely and `SOURCE` is not `project`. Give the fix the warning names as a command (`chmod 600 <file>`, `chmod 700 <dir>`, `git rm --cached <file>`); run a `chmod` yourself only on a yes, and only on a file the developer says is theirs. For a symlink or a `.cyoda` repo, offer to re-link in [link mode](#link-mode) instead. Then run `cyoda-status.sh` again. An untracked binding file you own (for example from an unpacked archive) is trusted by design, so check a downloaded project's `.cyoda/` before running skills in it.
 - `WARN=no saved profile; …`: there is no config file, so the scripts used the local default `http://localhost:8080`. Unless the request says connect or link: `STATUS=connected` means a local cyoda-go already answers, so go to local mode to save it as `default` (its checks skip what's done); `STATUS=unreachable` (`WARN=no cyoda-go is answering at …`) means nothing runs locally yet, so go to local mode.
 - `STATUS=unreachable` for a saved profile (`SOURCE=profile`): offer to switch the active profile to `default`: on a yes, `jq '.active = "default"'` (written back the same way), leaving the unreachable profile in place, then go to [Finish](#finish). If `default` doesn't exist or isn't running either, continue with local mode.
-- Otherwise ask which mode, unless the request already says: "Run cyoda-go **locally**, or **connect** to an instance that already runs elsewhere?" Inside a project directory (`git rev-parse --show-toplevel` succeeds, or the working directory isn't `$HOME`), add: "Or **link this project** to an instance (only this project uses it, e.g. its Docker Compose stack)?"
+- Otherwise ask which mode, unless the request already says: "Run cyoda-go **locally**, or **connect** to an instance that already runs elsewhere?" Inside a project directory (`git rev-parse --show-toplevel` succeeds, or the working directory isn't `$HOME`), add: "Or **link this project** to an instance (only this project uses it, e.g. its Docker Compose stack)?" If the project root has a legacy `.cyoda/config` or `.cyoda/instance.json` (older plugin versions wrote them; the scripts no longer read them), mention it and suggest linking, which can import it.
 
 A Cloud or migration question: say only "That's not covered by this plugin." and continue. Don't name or describe the product or offer alternatives for it.
 
@@ -69,31 +68,45 @@ A Cloud or migration question: say only "That's not covered by this plugin." and
 
 ## Link mode
 
-Binds one project to one instance. Other directories keep the machine-wide profile; the plugin config is not touched.
+Binds one project directory (and everything below it) to one instance. Other directories keep the machine-wide profile. The binding is an entry in the plugin config; nothing is written into the project.
 
-1. **Project root:** `git rev-parse --show-toplevel`, else the working directory. If that is `$HOME`, say a link needs a project directory and offer connect mode instead. `<ROOT>` is the root, `<NAME>` its basename. If `<ROOT>/.cyoda/instance.json` exists, show it and ask before replacing it. A legacy `<ROOT>/.cyoda/config` (written by an older plugin): offer its `endpoint` as the suggestion, never copy its `token`; the new file takes precedence over it.
-2. **Pick the instance:** if `command -v docker` succeeds, run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh`. Each line is `CONTAINER=… COMPOSE_PROJECT=… ENDPOINT=… IMAGE=…`, one running cyoda-go container with the host side of its REST port (container port `8080`: `cyoda help run --section "PORT LAYOUT"`). List them numbered as `<COMPOSE_PROJECT> (<CONTAINER>) — <ENDPOINT>`, suggest the one whose compose project matches `<NAME>`, and ask the developer to pick one or type a URL. `ENDPOINT=none`: its REST port isn't published, so it can't be picked. Exit 4 or no lines: say what came back and ask for a URL. Without docker: ask for a URL. Normalise a typed URL as in connect step 1.
+1. **Project root:** propose `git rev-parse --show-toplevel`, else the working directory, and let the developer confirm or change it. If it is `$HOME`, say a link needs a project directory and offer connect mode instead. `<NAME>` is its basename. The key is its real path: `cd "<ROOT>" && pwd -P`. Re-linking: when Step 0 showed `SOURCE=project` for this root, use its `PROJECT` value as the key, so the entry is replaced, not duplicated.
+2. **Legacy file (once):** if `<ROOT>/.cyoda/config` or `<ROOT>/.cyoda/instance.json` exists, read only `jq '{endpoint, env}' <file>`: never print or take its `token` or `tokenCommand`. Offer: "This project has an old binding file, which the plugin no longer reads. Import its endpoint `<E>` and env `<env>`?" On a yes, use them below (still probed and confirmed). After the write, say the file is no longer read and give `rm <ROOT>/.cyoda/<file>` for the developer to run.
+3. **Pick the instance:** if `command -v docker` succeeds, run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh`. Each line is `CONTAINER=… COMPOSE_PROJECT=… ENDPOINT=… IMAGE=…`, one running cyoda-go container with the host side of its REST port (container port `8080`: `cyoda help run --section "PORT LAYOUT"`). List them numbered as `<COMPOSE_PROJECT> (<CONTAINER>) — <ENDPOINT>`, suggest the one whose compose project matches `<NAME>`, and ask the developer to pick one or type a URL. `ENDPOINT=none`: its REST port isn't published, so it can't be picked. Exit 4 or no lines: say what came back and ask for a URL. Without docker: ask for a URL. Normalise a typed URL as in connect step 1.
 
    Docker is only read. Never run `docker run`, `start`, `stop`, `restart`, `rm` or `docker compose` anything: if the stack isn't up, the developer starts it and says when.
-3. **Probe:** `curl -sS --max-time 5 "<ENDPOINT>/api/health"` must return `{"status":"UP"}` (`cyoda help run --section "HEALTH PROBES"`); then `curl -s --max-time 5 "<ENDPOINT>/api/help" | jq -r .version` for the version. Not UP: show what came back and stop; write nothing.
-4. **Environment:** ask as in connect step 3.
-5. **Tokens:** `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<ENDPOINT>/api/model/"` with no token.
+4. **Probe:** `curl -sS --max-time 5 "<ENDPOINT>/api/health"` must return `{"status":"UP"}` (`cyoda help run --section "HEALTH PROBES"`); then `curl -s --max-time 5 "<ENDPOINT>/api/help" | jq -r .version` for the version. Not UP: show what came back and stop; write nothing.
+5. **Environment:** ask as in connect step 3.
+6. **Tokens:** `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<ENDPOINT>/api/model/"` with no token.
    - `200`: mock auth, no `tokenCommand`.
-   - `401` / `403`: read `cyoda-help.sh auth --section "WHICH PATH DO I NEED?"` and ask: "How does this project get tokens: a **script in the project** (e.g. `scripts/auth.sh token`), or **none yet**?" A project script may be relative to `<ROOT>`: the plugin runs it from there, with `CYODA_ENDPOINT` set. A command that assigns a literal value to a `…SECRET`, `…PASSWORD` or `…TOKEN` variable (e.g. `CYODA_CLIENT_SECRET=abc scripts/auth.sh`) would store a secret: refuse it and suggest the `*_CMD` form instead, e.g. `CYODA_CLIENT_SECRET_CMD='security find-generic-password -s shop-cyoda -w' scripts/get-token.sh`. Test it before saving, without showing the token. `<CMD>` goes inside single quotes, copied character for character, with each `'` in it written as `'\''` (the same rule everywhere `<CMD>` appears below):
+   - `401` / `403`: read `cyoda-help.sh auth --section "WHICH PATH DO I NEED?"` and ask: "How does this project get tokens: a **script in the project** (e.g. `scripts/auth.sh token`), or **none yet**?" When re-linking, offer the entry's current `tokenCommand`. A project script may be relative to `<ROOT>`: the plugin runs it from there, with `CYODA_ENDPOINT` set. A command that assigns a literal value to a `…SECRET`, `…PASSWORD` or `…TOKEN` variable (e.g. `CYODA_CLIENT_SECRET=abc scripts/auth.sh`) would store a secret: refuse it and suggest the `*_CMD` form instead, e.g. `CYODA_CLIENT_SECRET_CMD='security find-generic-password -s shop-cyoda -w' scripts/get-token.sh`. Test it before saving, without showing the token. `<CMD>` goes inside single quotes, copied character for character, with each `'` in it written as `'\''` (the same rule everywhere `<CMD>` appears below):
      ```bash
      ( set -o pipefail; cd "<ROOT>" && CYODA_ENDPOINT="<ENDPOINT>" bash -c '<CMD>' | awk -F. '{print NF " parts, " length($0) " chars"}' ); echo "exit=$?"
      ```
      `exit=0` and `3 parts`: use it as `tokenCommand`. Otherwise show the script's stderr, don't save it, and treat it as none yet. None yet: no `tokenCommand`; the hand-off is `/cyoda:auth`.
-6. **Write** `<ROOT>/.cyoda/instance.json` atomically, mode 0600 in a 0700 `.cyoda/` (leave out `tokenCommand` when there is none):
+7. **Write** `projects[<KEY>]` into the plugin config atomically, mode 0600, replacing any entry with that key (leave out `tokenCommand` when there is none):
    ```bash
-   cd "<ROOT>" && mkdir -p .cyoda && chmod 700 .cyoda && ( umask 077
-     jq -n --arg ep "<ENDPOINT>" --arg env "<ENV>" --arg tc '<CMD, or nothing>' \
-       '{endpoint: $ep, env: $env} + (if $tc == "" then {} else {tokenCommand: $tc} end)' > .cyoda/instance.json.tmp ) \
-     && chmod 600 .cyoda/instance.json.tmp && mv .cyoda/instance.json.tmp .cyoda/instance.json
+   CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
+   mkdir -p "$(dirname "$CONFIG")"
+   [ -f "$CONFIG" ] || echo '{"projects":{}}' > "$CONFIG"
+   ( umask 077; jq --arg k '<KEY>' --arg ep "<ENDPOINT>" --arg env "<ENV>" --arg tc '<CMD, or nothing>' \
+       '.projects[$k] = ({endpoint: $ep, env: $env} + (if $tc == "" then {} else {tokenCommand: $tc} end))' \
+       "$CONFIG" > "$CONFIG.tmp" ) && chmod 600 "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
    ```
-   Never a token, client id or secret in it.
-7. **Keep it out of git:** in a git repo, `git check-ignore -q "<ROOT>/.cyoda/instance.json"`. Exit 1 (not ignored): append a `.cyoda/` line to `<ROOT>/.gitignore` (create it if missing; keep the existing lines, and start on a new line). Exit 0: nothing to do. Then `git ls-files --error-unmatch "<ROOT>/.cyoda/instance.json"`: exit 0 means it is tracked, and the plugin ignores a tracked binding file entirely; give `git rm --cached .cyoda/instance.json` for the developer to run.
+   A new config holds only `projects`, so other directories keep the local default. Never a token, client id or secret in it. A denied write: as in [Write the profile](#write-the-profile).
 8. **Report:** go to [Finish](#finish), and add: "Only this project uses it; other directories keep the machine-wide profile."
+
+## Unlink
+
+When Step 0 shows `SOURCE=project` and the developer wants this project to stop using its own instance: confirm, then delete the entry by its `PROJECT` key and go to [Finish](#finish):
+
+```bash
+CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
+( umask 077; jq --arg k '<PROJECT>' 'del(.projects[$k])' "$CONFIG" > "$CONFIG.tmp" ) \
+  && chmod 600 "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+```
+
+Not linked (`SOURCE` is not `project`): say so and change nothing.
 
 ## Write the profile
 
@@ -118,7 +131,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh` again and report in the `sta
 
 - `Connected to cyoda-go v<VERSION> — <ENDPOINT> [profile: <PROFILE>]` (`[project: <PROFILE>]` when `SOURCE=project`), plus ` [PRODUCTION]` when `ENV=production`.
 - Then every `WARN=` line, as it is.
-- After local or connect mode, if the status still shows `SOURCE=project`, say: "This project is linked to `<ENDPOINT>` in `.cyoda/instance.json`, which takes precedence here (status shows `[project: <PROFILE>]`); the new profile applies in other directories."
+- After local or connect mode, if the status still shows `SOURCE=project`, say: "This project is linked to `<ENDPOINT>` (its `projects` entry), which takes precedence here (status shows `[project: <PROFILE>]`); the new profile applies in other directories."
 
 End with one hand-off and a one-line reason:
 - Needs a token (connect step 6, or link step 5 with none yet): "This instance requires a token. Next, type `/cyoda:auth` to set up a token script for `<PROFILE>`."
@@ -134,5 +147,6 @@ End with one hand-off and a one-line reason:
 | Storing `.../api` as the endpoint | Store the base URL; scripts add `/api` |
 | Asking for a client secret in connect mode | Hand off: "next, type `/cyoda:auth`" |
 | Starting or stopping containers in link mode | Docker is read only; the developer runs the stack |
-| Writing the link into the plugin config | Link mode writes only `<ROOT>/.cyoda/instance.json` |
+| Writing a link into the project (a `.cyoda/` file, `.gitignore`) | Link mode writes only `projects[<KEY>]` in the plugin config |
+| A second entry for a re-linked project | Reuse the `PROJECT` key from Step 0 |
 | Deleting an old profile or stored token unasked | Show the warning; change it only on a yes |

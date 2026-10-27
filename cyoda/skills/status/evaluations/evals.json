@@ -67,16 +67,15 @@
     {
       "id": 5,
       "prompt": "Which cyoda instance is this project using?",
-      "expected_output": "Runs cyoda-status.sh from the project. It prints STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop and no WARN lines. The skill reports exactly 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]': the project's own binding, not the machine-wide active profile team-dev, and not a [profile: …] tag.",
+      "expected_output": "Runs cyoda-status.sh from the project. It prints STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop and no WARN lines. The skill reports exactly 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]': this project's entry in the plugin config, not the machine-wide active profile team-dev, and not a [profile: …] tag.",
       "files": {
-        ".cyoda/instance.json": "{\"endpoint\":\"http://localhost:8082\",\"env\":\"development\",\"tokenCommand\":\"scripts/auth.sh token\"}",
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\",\"env\":\"development\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\",\"env\":\"development\"}},\"projects\":{\"/Users/dev/work/shop\":{\"endpoint\":\"http://localhost:8082\",\"env\":\"development\",\"tokenCommand\":\"scripts/auth.sh token\"}}}",
         "_simulated/status.txt": "STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop"
       },
       "assertions": [
         { "id": "project-line", "text": "Reports exactly 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" },
         { "id": "not-profile-tag", "text": "Does not write '[profile: shop]' or '[profile: team-dev]', and does not present the machine-wide active profile team-dev as the instance in use", "type": "behavior" },
-        { "id": "read-only", "text": "Does not edit .cyoda/instance.json or the plugin config, and does not run the tokenCommand", "type": "behavior" },
+        { "id": "read-only", "text": "Does not edit the plugin config and does not run the tokenCommand", "type": "behavior" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
       ]
     }
