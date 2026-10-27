@@ -1,7 +1,7 @@
 ---
 name: auth
 description: Use when the developer types /cyoda:auth to get API tokens for a cyoda-go instance that isn't running mock auth (M2M client, OIDC, trusted key, on-behalf-of), after a 401/403 or a failing tokenCommand, or to learn how their own app should obtain and renew cyoda-go tokens.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-call.sh *) Bash(*get-token.sh*) Bash(curl *) Bash(jq *) Bash(ls *) Bash(cp *) Bash(chmod *) Bash(mv *) Bash(cmp *)
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-config-write.sh *) Bash(*cyoda-call.sh *) Bash(*get-token.sh*) Bash(curl *) Bash(jq *) Bash(ls *) Bash(cp *) Bash(chmod *) Bash(mv *) Bash(cmp *)
 disable-model-invocation: true
 ---
 
@@ -97,18 +97,16 @@ Run it once without showing the token:
 `SOURCE=project`: set `tokenCommand` on this project's entry only, keyed by `PROJECT` from Step 0. A path relative to the project root (e.g. `scripts/get-token.sh`) works there: the plugin runs it from the project root.
 
 ```bash
-CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
-( umask 077; jq --arg k '<PROJECT>' --arg tc '<PATH>' '.projects[$k].tokenCommand = $tc' "$CONFIG" > "$CONFIG.tmp" ) \
-  && chmod 600 "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh '.projects[$k].tokenCommand = $tc' --arg k '<PROJECT>' --arg tc '<PATH>'
 ```
 
 Otherwise set `tokenCommand` to the script's **absolute** path, on the profile from Step 0 only:
 
 ```bash
-CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
-jq --arg p "<PROFILE>" --arg tc "<ABS_PATH>" '.profiles[$p].tokenCommand = $tc' \
-  "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh '.profiles[$p].tokenCommand = $tc' --arg p '<PROFILE>' --arg tc '<ABS_PATH>'
 ```
+
+The script is the only way to change the config: it keeps the other sections and leaves the file 0600. Each placeholder sits in single quotes, copied character for character, with each `'` in it written as `'\''`. Exit 1: show its stderr; exit 3: the config isn't writable (don't try `sudo`, `chmod` or `chown`).
 
 If another profile needs other credentials, its `tokenCommand` can set them in front of the same script, for example `CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-prod -w' /abs/path/get-token.sh`. That keeps a staging secret away from prod, and still stores no secret.
 

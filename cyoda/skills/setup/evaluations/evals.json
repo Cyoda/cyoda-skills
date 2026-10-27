@@ -48,7 +48,7 @@
         { "id": "normalises-endpoint", "text": "Stores the endpoint as https://cyoda-dev.internal.example.com (no trailing /api or slash)", "type": "behavior" },
         { "id": "probes-health", "text": "Probes <endpoint>/api/health before writing the profile", "type": "behavior" },
         { "id": "asks-env", "text": "Asks whether the instance is development or production", "type": "behavior" },
-        { "id": "profile-fields", "text": "Writes profile team-dev with only endpoint and env (no token, no secret, no tokenCommand yet), keeps the existing `default` profile, and sets active to team-dev", "type": "behavior" },
+        { "id": "profile-fields", "text": "Writes profile team-dev with only endpoint and env (no token, no secret, no tokenCommand yet) through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh with values passed as --arg, keeps the existing `default` profile, and sets active to team-dev", "type": "behavior" },
         { "id": "detects-auth", "text": "Detects that the instance is not mock auth from the 401 on an unauthenticated GET /api/model/", "type": "behavior" },
         { "id": "no-credentials", "text": "Does not ask for a client id, secret or token", "type": "behavior" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
@@ -89,7 +89,7 @@
         { "id": "probes", "text": "Probes http://localhost:8082/api/health (UP) and reads the version from /api/help before writing anything", "type": "behavior" },
         { "id": "asks-env", "text": "Asks whether the instance is development or production", "type": "behavior" },
         { "id": "token-way", "text": "Detects that a token is needed from the 401 on an unauthenticated GET /api/model/, asks how tokens are obtained, keeps the relative command `scripts/auth.sh token`, and test-runs it from the project root without printing the token", "type": "behavior" },
-        { "id": "writes-entry", "text": "Writes the binding as `projects[\"/Users/dev/work/shop\"]` (the real path from `pwd -P`) in the plugin config ${CYODA_PLUGIN_CONFIG:-~/.config/cyoda/cyoda-plugin-config.json}, with exactly endpoint http://localhost:8082, env development and tokenCommand `scripts/auth.sh token`, via jq to a temp file then mv, mode 0600; no token, client id or secret in it", "type": "behavior" },
+        { "id": "writes-entry", "text": "Writes the binding as `projects[\"/Users/dev/work/shop\"]` (the real path from `pwd -P`) in the plugin config ${CYODA_PLUGIN_CONFIG:-~/.config/cyoda/cyoda-plugin-config.json}, with exactly endpoint http://localhost:8082, env development and tokenCommand `scripts/auth.sh token`, through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh with the values passed as --arg (the config stays 0600); no token, client id or secret in it", "type": "behavior" },
         { "id": "keeps-profiles", "text": "Keeps the `default` profile and `active` unchanged in the plugin config", "type": "behavior" },
         { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" },
         { "id": "reports-project", "text": "Finishes by re-running cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" },
@@ -126,7 +126,7 @@
       "assertions": [
         { "id": "uses-existing-key", "text": "Uses the existing entry's key /Users/dev/work/shop (the status PROJECT value) as the key to replace", "type": "behavior" },
         { "id": "probes", "text": "Probes http://localhost:8086/api/health and /api/help before writing", "type": "behavior" },
-        { "id": "replaces-entry", "text": "Replaces projects[\"/Users/dev/work/shop\"] with endpoint http://localhost:8086 (env development, tokenCommand scripts/auth.sh token) atomically with mode 0600, leaving exactly one entry for this project and the profiles unchanged", "type": "behavior" },
+        { "id": "replaces-entry", "text": "Replaces projects[\"/Users/dev/work/shop\"] with endpoint http://localhost:8086 (env development, tokenCommand scripts/auth.sh token) through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg), leaving exactly one entry for this project and the profiles unchanged", "type": "behavior" },
         { "id": "reports-project", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8086 [project: shop]'", "type": "format" },
         { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }
@@ -141,7 +141,7 @@
         "_simulated/instance.md": "The working directory is /Users/dev/work/shop. First cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. After the entry is removed, cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`. The developer answers yes to the unlink."
       },
       "assertions": [
-        { "id": "deletes-entry", "text": "Deletes projects[\"/Users/dev/work/shop\"] (the key from status PROJECT) from the plugin config via jq to a temp file then mv, mode 0600, keeping `profiles` and `active`", "type": "behavior" },
+        { "id": "deletes-entry", "text": "Deletes projects[\"/Users/dev/work/shop\"] (the key from status PROJECT) from the plugin config through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (key as --arg), keeping `profiles` and `active`", "type": "behavior" },
         { "id": "confirms", "text": "Asks for confirmation before deleting the entry", "type": "behavior" },
         { "id": "reports-profile", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'", "type": "format" },
         { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" },
@@ -161,7 +161,7 @@
         { "id": "offers-import", "text": "Notices the legacy .cyoda/config and offers to import its endpoint and env into the project entry, asking the developer to confirm", "type": "behavior" },
         { "id": "no-token", "text": "Never prints, copies or stores the `token` from the legacy file (reads only endpoint and env) and stores no tokenCommand from it", "type": "behavior" },
         { "id": "probes", "text": "Probes http://localhost:8080/api/health and /api/help before writing, and detects mock auth from a 200 on an unauthenticated GET /api/model/", "type": "behavior" },
-        { "id": "writes-entry", "text": "Writes projects[\"/Users/dev/work/sioms\"] = {endpoint: http://localhost:8080, env: development} into the plugin config atomically, mode 0600, keeping the `team` profile and `active`", "type": "behavior" },
+        { "id": "writes-entry", "text": "Writes projects[\"/Users/dev/work/sioms\"] = {endpoint: http://localhost:8080, env: development} into the plugin config through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg), keeping the `team` profile and `active`", "type": "behavior" },
         { "id": "suggests-delete", "text": "Says the old .cyoda/config is no longer read and gives a command for the developer to delete it, without deleting it itself", "type": "behavior" },
         { "id": "reports-project", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: sioms]'", "type": "format" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" }

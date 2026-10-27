@@ -1,7 +1,7 @@
 ---
 name: deploy
 description: Use when the developer types /cyoda:deploy to move a working local cyoda-go app to a self-hosted cyoda-go instance (Docker Compose, Helm on Kubernetes, Terraform), or needs a seed script, verify script, compose file or secrets checklist for one.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-call.sh GET *) Bash(jq *) Bash(find *) Bash(ls *) Bash(mkdir *) Bash(cp *) Bash(cmp *) Bash(cat *) Bash(mv *) Bash(grep *)
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-config-write.sh *) Bash(*cyoda-call.sh GET *) Bash(jq *) Bash(find *) Bash(ls *) Bash(mkdir *) Bash(cp *) Bash(cmp *) Bash(cat *) Bash(mv *) Bash(grep *)
 disable-model-invocation: true
 ---
 
@@ -176,13 +176,12 @@ Ask: "Add a profile for the new instance, so `status`, `build` and `debug` can t
 The `tokenCommand` names this instance's own client in front of the script, so it never picks up whatever `CYODA_CLIENT_ID`/`CYODA_CLIENT_SECRET` the shell holds for another instance (the same pattern as `/cyoda:auth` Step 6): `CYODA_CLIENT_ID=<id> CYODA_CLIENT_SECRET_CMD='<command that prints the secret>' <absolute path to the token script>`, with Helm's `<APP>-deployer` and `<SECRET_CMD>`, or the shared bootstrap id and the developer's secret command.
 
 ```bash
-CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
-mkdir -p "$(dirname "$CONFIG")"
-[ -f "$CONFIG" ] || echo '{"active":"default","profiles":{}}' > "$CONFIG"
-jq --arg p "<NAME>" --arg ep "<API_URL>" --arg env "<env>" --arg tc "<the tokenCommand above, or empty>" \
+${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh \
   '.profiles[$p] = ((.profiles[$p] // {}) + {endpoint: $ep, env: $env} + (if $tc == "" then {} else {tokenCommand: $tc} end))' \
-  "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+  --arg p '<NAME>' --arg ep '<API_URL>' --arg env '<env>' --arg tc '<the tokenCommand above, or empty>'
 ```
+
+The script is the only way to change the plugin config: it keeps the other sections and leaves the file 0600. Each placeholder sits in single quotes, copied character for character, with each `'` in it written as `'\''` (the `tokenCommand` above has its own quotes). Exit 1: show its stderr; exit 3: the config isn't writable.
 
 Close with one hand-off and its reason:
 - Shared or Helm without a token script: "Once it's up, next, type `/cyoda:auth` to create the token script for this instance's bootstrap client."

@@ -10,7 +10,7 @@ Read-only. One script call, one status line, then the warnings.
 
 ## Steps
 
-1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Don't read the config or curl the instance yourself, and don't run the profile's `tokenCommand`: the script probes the public `/api/help` only. If it exits non-zero (an invalid config file, or `CYODA_PROFILE` naming a profile that doesn't exist), show its stderr as it is and stop.
+1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Don't read the config or curl the instance yourself, and don't run the profile's `tokenCommand`: the script probes the public `/api/help` only. If it exits non-zero (an invalid config file or `projects` entry, or `CYODA_PROFILE` naming a profile that doesn't exist), show its stderr as it is and stop.
 2. Its first line is `STATUS=<s> PROFILE=<P> ENDPOINT=<E> ENV=<env> VERSION=<V> BINARY_VERSION=<B> SOURCE=<src>`, plus ` PROJECT=<dir>` when `SOURCE=project`. `PROFILE` is in double quotes when it holds a space or a quote (`PROFILE="my shop"`; report it without the quotes, `\"` as `"`). `PROJECT` is always last and runs to the end of the line. Report exactly one line:
 
 | `STATUS` | Report |
@@ -26,7 +26,8 @@ Read-only. One script call, one status line, then the warnings.
 3. Print **every** `WARN=` line after the status line, as it is, one per line, prefixed `Warning: `. Don't drop, merge or reword them. The texts the script emits:
    - `active profile <P> is unreachable; run /cyoda:setup to switch to default`
    - `project <P> is bound to <E>, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one`
-   - `no saved profile; using the default local instance <E> — type /cyoda:setup to save it` (no config file: `PROFILE=default` is implicit)
+   - `projects key <K> is not an absolute path; skipped`, `a projects key contains a newline; skipped`, `projects entry <K> skipped: the directory is not owned by you` (a link that can't apply; `/cyoda:setup` re-links)
+   - `no saved profile; using the default local instance <E> — type /cyoda:setup to save it` (no active profile and no linked project here: `PROFILE=default` is implicit)
    - `no cyoda-go is answering at <E> — type /cyoda:setup to install or start one` (the implicit default is unreachable)
    - `local cyoda <B> differs from instance <V>; help is read from the instance`
    - `profile <P> contains a stored token, which this plugin no longer reads; you can remove it`
