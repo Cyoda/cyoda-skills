@@ -3,57 +3,161 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "/cyoda:app I want to build a task management app",
-      "expected_output": "Gives brief Cyoda orientation, directs to /cyoda:design, then in Step 2 invokes /cyoda:status before asking local vs cloud — if not connected asks local or cloud, guides through setup → build → test → migrate journey",
-      "files": {},
+      "prompt": "/cyoda:app I want to build a library book-lending app. I've never used Cyoda.",
+      "expected_output": "Runs cyoda-status.sh (not configured). Gives the 2-3 sentence orientation (EDBMS, entities with workflows, immutable versions, compute nodes optional) with no mention of Cloud or 'same API on Cloud', asks if ready, then uses the cyoda:design skill on the lending idea. After the design, says 'next, type /cyoda:setup' to install and start cyoda-go locally, then later 'next, type /cyoda:build' and 'next, type /cyoda:test', and mentions the optional /cyoda:deploy at the end. Never says it will invoke or run a side-effecting skill.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=not_configured PROFILE=default ENDPOINT= ENV=development VERSION=none BINARY_VERSION=none."
+      },
       "assertions": [
-        { "id": "gives-orientation", "text": "Gives brief Cyoda orientation for newcomer", "type": "behavior" },
-        { "id": "directs-to-design", "text": "Directs user to /cyoda:design for domain brainstorm", "type": "behavior" },
-        { "id": "checks-status-first", "text": "Invokes /cyoda:status before asking about local vs cloud setup", "type": "behavior" },
-        { "id": "guides-to-setup", "text": "After design, guides to /cyoda:setup when not already connected", "type": "behavior" },
-        { "id": "guides-to-build", "text": "After setup, guides to /cyoda:build", "type": "behavior" },
-        { "id": "guides-to-test", "text": "After build, guides to /cyoda:test", "type": "behavior" },
-        { "id": "offers-migrate", "text": "Offers /cyoda:migrate when ready for cloud", "type": "behavior" },
-        { "id": "no-design-and-build-together", "text": "Does NOT try to design AND build in the same skill invocation", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Defers Cyoda facts to the design/docs skills or a named `cyoda help` section (e.g. models LIFECYCLE) instead of explaining APIs from memory",
+          "type": "behavior"
+        },
+        {
+          "id": "orientation",
+          "text": "Gives a short orientation: entities with workflows (states and transitions), immutable versions, compute nodes optional",
+          "type": "behavior"
+        },
+        {
+          "id": "no-same-api-cloud",
+          "text": "The orientation doesn't say the same API works on Cloud, and doesn't offer Cloud as an option",
+          "type": "behavior"
+        },
+        {
+          "id": "design-first",
+          "text": "Starts with the design step (cyoda:design) before setup or build",
+          "type": "behavior"
+        },
+        {
+          "id": "journey-order",
+          "text": "Presents the journey design → setup → build → test → iterate, with deploy as an optional last step",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:setup`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 2,
-      "prompt": "/cyoda:app — I already know Cyoda, just want to start building",
-      "expected_output": "Notes experienced users can skip to individual skills, points directly to /cyoda:build, does not force orientation or design",
-      "files": {},
+      "prompt": "/cyoda:app I already have my design: Order (draft → submitted → approved/rejected) and my local instance is running. What now?",
+      "expected_output": "Runs cyoda-status.sh (connected to http://localhost:8080 [profile: default]), confirms using that instance, skips orientation and design, and says 'next, type /cyoda:build to turn the first increment into project files and register it', describing the first increment as one entity from initial to terminal state. After build, 'next, type /cyoda:test'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4."
+      },
       "assertions": [
-        { "id": "acknowledges-experience", "text": "Notes experienced users can skip directly to individual skills", "type": "behavior" },
-        { "id": "points-to-build", "text": "Points directly to /cyoda:build", "type": "behavior" },
-        { "id": "no-forced-orientation", "text": "Does NOT give orientation when user says they already know Cyoda", "type": "behavior" },
-        { "id": "no-forced-design", "text": "Does NOT force user through design step when they want to skip", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Any lifecycle fact it states (sample data, lock, workflow before entities) is attributed to `cyoda help models` LIFECYCLE or left to the build skill, not asserted from memory",
+          "type": "behavior"
+        },
+        {
+          "id": "status-first",
+          "text": "Runs cyoda-status.sh and confirms the connected instance before handing off",
+          "type": "behavior"
+        },
+        {
+          "id": "skips-design",
+          "text": "Skips the orientation and design steps",
+          "type": "behavior"
+        },
+        {
+          "id": "first-increment",
+          "text": "Describes a minimal first increment: one entity from its initial to a terminal state",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 3,
-      "prompt": "/cyoda:app — I want to use Cyoda Cloud, not install anything locally",
-      "expected_output": "Invokes /cyoda:status first; since not connected, accepts cloud-first approach, guides to /cyoda:setup (cloud mode) then /cyoda:auth, does not insist on local installation",
-      "files": {},
+      "prompt": "/cyoda:app My app works locally. How do I get it onto a server for my team — or should I just move it to Cyoda Cloud?",
+      "expected_output": "Offers the optional last step: 'next, type /cyoda:deploy to write deployment files and a seed script into the project', noting deploy writes files and the developer runs them. On Cloud: 'That's not covered by this plugin.' and nothing more.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4. cyoda-manifest.json lists two entities."
+      },
       "assertions": [
-        { "id": "checks-status-first", "text": "Invokes /cyoda:status before asking about setup mode", "type": "behavior" },
-        { "id": "presents-both-options", "text": "Presents both local cyoda-go and Cyoda Cloud as options — does not push back on the user's cloud choice even though cloud is coming soon", "type": "behavior" },
-        { "id": "accepts-cloud-first", "text": "Accepts cloud-first approach without pushback", "type": "behavior" },
-        { "id": "guides-to-cloud-setup", "text": "Guides to /cyoda:setup in cloud mode", "type": "behavior" },
-        { "id": "guides-to-login", "text": "Guides to /cyoda:auth for authentication", "type": "behavior" },
-        { "id": "no-local-insistence", "text": "Does NOT insist on local cyoda-go installation", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Doesn't describe deployment mechanics from memory; leaves them to the deploy skill (which reads `cyoda help run`/`helm`)",
+          "type": "behavior"
+        },
+        {
+          "id": "deploy-step",
+          "text": "Points to `/cyoda:deploy` as the optional final step",
+          "type": "behavior"
+        },
+        {
+          "id": "cloud-not-covered",
+          "text": "Answers the Cloud part with 'not covered by this plugin' and nothing more",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:deploy`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     },
     {
       "id": 4,
-      "prompt": "/cyoda:app I want to build a chat app",
-      "expected_output": "In Step 2 invokes /cyoda:status, finds instance already configured, confirms with user whether to use it, and skips setup entirely",
+      "prompt": "/cyoda:app Just do everything for me — install it, build my todo app and test it. Don't make me type commands.",
+      "expected_output": "Explains briefly that installing, building and testing are steps the developer starts, then hands off in order with 'next, type /cyoda:setup' (one-line reason) and waits. Does not install cyoda, write files or call the API itself.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=not_configured."
       },
       "assertions": [
-        { "id": "checks-status-first", "text": "Invokes /cyoda:status at the start of Step 2", "type": "behavior" },
-        { "id": "confirms-existing", "text": "Confirms with user whether to use the already-configured instance", "type": "behavior" },
-        { "id": "skips-setup", "text": "Does NOT ask local vs cloud or run /cyoda:setup when already connected", "type": "behavior" }
+        {
+          "id": "consults-help",
+          "text": "Does not state install commands or API facts from memory; leaves them to setup/build/test (which read `cyoda help`)",
+          "type": "behavior"
+        },
+        {
+          "id": "no-side-effects",
+          "text": "Does not run brew, cyoda, curl or write project files itself",
+          "type": "behavior"
+        },
+        {
+          "id": "explains-why",
+          "text": "Says in one line why the developer types the step (those skills change the machine or the instance)",
+          "type": "behavior"
+        },
+        {
+          "id": "no-invoke",
+          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:setup`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "type": "behavior"
+        },
+        {
+          "id": "no-cloud",
+          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
+          "type": "behavior"
+        }
       ]
     }
   ]

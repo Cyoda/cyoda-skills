@@ -11,7 +11,7 @@ This repository contains **Cyoda skills** — reusable instructions that teach y
 Install via the Claude Code plugin marketplace:
 
 ```
-/plugin marketplace add Cyoda-platform/cyoda-skills
+/plugin marketplace add Cyoda/cyoda-skills
 /plugin install cyoda@cyoda
 /reload-plugins
 ```
@@ -26,23 +26,35 @@ Then start building:
 
 Point your agent to this repository and ask it to read the skill files before building:
 
-> "Read the skills in https://github.com/Cyoda-platform/cyoda-skills and use them to help me build a Cyoda application."
+> "Read the skills in https://github.com/Cyoda/cyoda-skills and use them to help me build a Cyoda application."
 
 ## Skills
 
 | Skill | Purpose |
 |---|---|
 | `/cyoda:app` | Start here — walks the full build journey |
-| `/cyoda:setup` | Install cyoda-go locally or connect to Cyoda Cloud |
-| `/cyoda:auth` | Authenticate to Cyoda Cloud (obtain JWT) |
+| `/cyoda:setup` | Install and start cyoda-go locally |
+| `/cyoda:auth` | Get tokens for a self-hosted cyoda-go |
 | `/cyoda:design` | Brainstorm entities and workflows for your app |
 | `/cyoda:build` | Incrementally build and register entity models and workflows |
 | `/cyoda:compute` | Implement compute node processors and criteria services via gRPC |
 | `/cyoda:test` | Smoke-test your running Cyoda instance |
+| `/cyoda:deploy` | Generate Docker Compose or Helm deploy artifacts with idempotent seed and verify scripts |
 | `/cyoda:debug` | Diagnose failures and browse entity history |
-| `/cyoda:migrate` | Lift-and-shift from local cyoda-go to Cyoda Cloud |
 | `/cyoda:docs` | Look up Cyoda documentation |
 | `/cyoda:status` | Check connection status |
+
+## Connection config
+
+The plugin keeps its connections in `~/.config/cyoda/cyoda-plugin-config.json`: machine-wide profiles (no tokens; a `tokenCommand` fetches a fresh one per call) and, under `projects`, per-project links. `/cyoda:setup` can link a project directory to its own instance; inside it that link wins over the active profile, so several projects with their own cyoda-go stacks can be worked on at once. Nothing is written into the project. `CYODA_PROFILE=<name>` picks a machine-wide profile over both. Details: [cyoda/README.md](cyoda/README.md#connection-config).
+
+## Release notes — 0.4.0
+
+- Cloud support and `migrate` are removed (parked; see `docs/history/cloud-skills.md`).
+- Run `/plugin marketplace update cyoda` to pick up this release.
+- Stored tokens in ~/.config/cyoda/cyoda-plugin-config.json are no longer read.
+- New `deploy` skill.
+- Skills with side effects now start only when you type them.
 
 ## Links
 

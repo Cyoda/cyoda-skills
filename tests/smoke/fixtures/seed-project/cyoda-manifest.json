@@ -1,0 +1,19 @@
+{
+  "manifestVersion": 1,
+  "entities": [
+    {
+      "name": "order",
+      "modelVersion": 1,
+      "sample": "src/data/order-v1-sample.json",
+      "workflow": "src/workflows/order-v1-workflow.json",
+      "config": "src/config/order-v1-config.json"
+    },
+    {
+      "name": "customer",
+      "modelVersion": 1,
+      "sample": "src/data/customer-v1-sample.json",
+      "workflow": "src/workflows/customer-v1-workflow.json",
+      "config": "src/config/customer-v1-config.json"
+    }
+  ]
+}

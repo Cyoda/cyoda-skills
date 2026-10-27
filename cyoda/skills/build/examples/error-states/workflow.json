@@ -1,0 +1,49 @@
+{
+  "workflows": [
+    {
+      "version": "${SCHEMA_VERSION}",
+      "name": "registration",
+      "initialState": "validating",
+      "active": true,
+      "states": {
+        "validating": {
+          "transitions": [
+            {
+              "name": "validation-passed",
+              "next": "ready",
+              "manual": false,
+              "criterion": {
+                "type": "simple",
+                "jsonPath": "$.email",
+                "operatorType": "NOT_NULL"
+              }
+            },
+            { "name": "validation-failed", "next": "errored", "manual": false }
+          ]
+        },
+        "errored": {
+          "transitions": [
+            {
+              "name": "retry",
+              "next": "validating",
+              "manual": false,
+              "criterion": {
+                "type": "simple",
+                "jsonPath": "$.email",
+                "operatorType": "NOT_NULL"
+              }
+            }
+          ]
+        },
+        "ready": {
+          "transitions": [
+            { "name": "complete", "next": "completed", "manual": true },
+            { "name": "cancel", "next": "cancelled", "manual": true }
+          ]
+        },
+        "completed": {},
+        "cancelled": {}
+      }
+    }
+  ]
+}

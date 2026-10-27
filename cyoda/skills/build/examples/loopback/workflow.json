@@ -1,0 +1,33 @@
+{
+  "workflows": [
+    {
+      "version": "${SCHEMA_VERSION}",
+      "name": "order-approval",
+      "initialState": "draft",
+      "active": true,
+      "states": {
+        "draft": {
+          "transitions": [
+            { "name": "submit", "next": "submitted", "manual": true }
+          ]
+        },
+        "submitted": {
+          "transitions": [
+            {
+              "name": "approve",
+              "next": "approved",
+              "manual": false,
+              "criterion": {
+                "type": "simple",
+                "jsonPath": "$.amount",
+                "operatorType": "LESS_OR_EQUAL",
+                "value": 1000
+              }
+            }
+          ]
+        },
+        "approved": {}
+      }
+    }
+  ]
+}

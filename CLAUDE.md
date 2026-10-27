@@ -16,57 +16,35 @@ Each skill lives in its own directory under `skills/` with:
 Rules that are easy to get wrong:
 - `SKILL.md` files stay under 500 lines — reference supporting files rather than embedding content inline
 - Never embed Cyoda docs in skill bodies — `cyoda:docs` fetches them dynamically at runtime
-- Skills with side effects (`setup`, `build`, `test`, `migrate`, `app`) must have `disable-model-invocation: true`
+- Skills with side effects (`setup`, `build`, `test`, `app`, `deploy`, `auth`) must have `disable-model-invocation: true`
+- Shared helpers live in `cyoda/scripts/`. Skills invoke them with a plain instruction "Run `${CLAUDE_PLUGIN_ROOT}/scripts/<name>.sh`" (substituted in skill markdown). Do not rely on ```! blocks expanding `${CLAUDE_PLUGIN_ROOT}` (not verified: the probe could not run in the sandbox).
 
 ## Running evals
 
-Evals live in `cyoda/skills/<skill>/evaluations/evals.json`. Results go in `cyoda-evals-workspace/iteration-N/`.
+Evals live in `cyoda/skills/<skill>/evaluations/evals.json`. Results go in `cyoda-evals-workspace/iteration-N/<skill>/eval-<id>/with_skill/` (one `iteration-N` per run session). Tooling and prompt templates: `tests/evals/` (see its README).
 
-**Skill-creator plugin path:** `~/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator/`
+**Skill-creator path** (`SC` below): `~/.claude/plugins/marketplaces/claude-plugins-official/plugins/skill-creator/skills/skill-creator/`
 
 ### Process
 
-**1. Spawn executor subagents** (one per eval, all in parallel, background):
-- Read `SKILL.md` from the skill path
-- Simulate the skill executing the eval prompt using fixture files from `files` block
-- Write transcript to `cyoda-evals-workspace/iteration-N/<skill>/eval-<id>/with_skill/outputs/transcript.md`
-- Capture `total_tokens` and `duration_ms` from task notification → save as `timing.json` in the same `with_skill/` dir
-
-**2. Spawn grader subagents** (one per eval, all in parallel, background):
-- Read grader instructions from `<skill-creator-path>/agents/grader.md`
-- Grade each assertion in the eval's `assertions` array against the transcript
-- Save `grading.json` to `with_skill/` (same dir as `timing.json`)
-
-**3. Aggregate:**
+1. **Instance per eval.** Anything the skill does to an instance runs against a real throwaway cyoda-go: `bash tests/evals/start.sh <id> [jwt]`, then `python3 tests/evals/setup.py iteration-N <skill> <eval> <id> [--seed-project]`. Simulate the instance (`setup.py … none`, `*-sim.md` prompts) only when the fixture needs specific entity ids/histories or a compute node. Help lookups always run for real.
+2. **Executors** (one per eval, all in parallel, background): prompt from `bash tests/evals/prompt.sh exec-prompt[-sim].md iteration-N <skill> <eval>`. Each writes `with_skill/outputs/transcript.md`. When its task notification arrives: `bash tests/evals/timing.sh iteration-N <skill> <eval> <total_tokens> <duration_ms>`.
+3. **Graders** (one per eval, all in parallel, after the executors): prompt from `prompt.sh grade-prompt[-sim].md …`. Each saves `grading.json` in the `with_skill/` directory, next to `timing.json`.
+4. `bash tests/evals/stop.sh` (expect "still listening: 0").
+5. **Aggregate and view:**
 ```bash
-# Fix null fields that crash the aggregator
-for f in cyoda-evals-workspace/iteration-N/<skill>/eval-*/with_skill/grading.json; do
-  jq '.execution_metrics.total_tool_calls //= 0 | .execution_metrics.output_chars //= 0' "$f" > /tmp/g.json && mv /tmp/g.json "$f"
-  mkdir -p "$(dirname $f)/run-1"
-  cp "$f" "$(dirname $f)/run-1/grading.json"
-  cp "$(dirname $f)/timing.json" "$(dirname $f)/run-1/timing.json" 2>/dev/null || true
+SC=~/.claude/plugins/marketplaces/claude-plugins-official/plugins/skill-creator/skills/skill-creator
+W="$PWD/cyoda-evals-workspace/iteration-N/<skill>"
+for f in "$W"/eval-*/with_skill/grading.json; do   # the aggregator reads run-1/ and crashes on null metrics
+  d="$(dirname "$f")"; mkdir -p "$d/run-1"
+  jq '.execution_metrics.total_tool_calls //= 0 | .execution_metrics.output_chars //= 0' "$f" > "$d/g.tmp" && mv "$d/g.tmp" "$f"
+  cp "$f" "$d/run-1/grading.json"
+  cp "$d/timing.json" "$d/run-1/timing.json" 2>/dev/null || true
 done
-
-cd ~/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator
-python3 -m scripts.aggregate_benchmark /path/to/cyoda-evals-workspace/iteration-N/<skill> --skill-name cyoda-<skill>
+(cd "$SC" && python3 -m scripts.aggregate_benchmark "$W" --skill-name cyoda-<skill>)
+python3 "$SC/eval-viewer/generate_review.py" "$W" --skill-name "cyoda:<skill>" \
+  --benchmark "$W/benchmark.json" --static /tmp/cyoda-<skill>-review.html && open /tmp/cyoda-<skill>-review.html
 ```
-
-**4. Generate viewer:**
-```bash
-SC=~/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator
-python3 "$SC/eval-viewer/generate_review.py" \
-  cyoda-evals-workspace/iteration-N/<skill> \
-  --skill-name "cyoda:<skill>" \
-  --benchmark cyoda-evals-workspace/iteration-N/<skill>/benchmark.json \
-  --static /tmp/cyoda-<skill>-review.html
-open /tmp/cyoda-<skill>-review.html
-```
-
-### Notes
-- Run all executor agents in the same turn (parallel background)
-- Run all grader agents in the same turn after executors complete
-- The aggregator expects `run-1/grading.json` inside each `with_skill/` dir — the fix loop above creates it
-- One eval run = one `iteration-N` directory; increment N for each new run session
 
 ## References
 
@@ -74,3 +52,9 @@ open /tmp/cyoda-<skill>-review.html
 - OpenAPI: https://docs.cyoda.net/openapi/openapi.json
 - Plugins guide: https://code.claude.com/docs/en/plugins
 - Skills guide: https://code.claude.com/docs/en/skills.md
+
+## Smoke tests
+
+- `tests/smoke/run.sh [--only NN] [--allow-version]` — lint, script tests, then scenarios against a throwaway in-memory cyoda-go (needs v0.8.4)
+- `tests/smoke/lint.sh` — stale-string lint over `cyoda/` (exit 1 on any hit; needs `shellcheck`)
+- `tests/smoke/test-harness.sh` — tests for the harness itself

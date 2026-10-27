@@ -1,0 +1,45 @@
+{
+  "workflows": [
+    {
+      "version": "${SCHEMA_VERSION}",
+      "name": "order-fulfilment",
+      "initialState": "draft",
+      "active": true,
+      "states": {
+        "draft": {
+          "transitions": [
+            {
+              "name": "confirm",
+              "next": "confirmed",
+              "manual": true,
+              "criterion": {
+                "type": "function",
+                "function": {
+                  "name": "has-address",
+                  "config": {
+                    "calculationNodesTags": "smoke-compute",
+                    "attachEntity": true,
+                    "responseTimeoutMs": 5000
+                  }
+                }
+              },
+              "processors": [
+                {
+                  "type": "externalized",
+                  "name": "create-shipment",
+                  "executionMode": "SYNC",
+                  "config": {
+                    "calculationNodesTags": "smoke-compute",
+                    "attachEntity": true,
+                    "responseTimeoutMs": 10000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "confirmed": {}
+      }
+    }
+  ]
+}

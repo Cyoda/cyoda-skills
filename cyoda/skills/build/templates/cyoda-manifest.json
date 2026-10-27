@@ -1,0 +1,12 @@
+{
+  "manifestVersion": 1,
+  "entities": [
+    {
+      "name": "${ENTITY_NAME}",
+      "modelVersion": 1,
+      "sample": "${ENTITY_NAME}/sample.json",
+      "workflow": "${ENTITY_NAME}/workflow.json",
+      "config": "${ENTITY_NAME}/config.json"
+    }
+  ]
+}
