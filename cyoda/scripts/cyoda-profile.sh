@@ -8,10 +8,11 @@
 #      Only absolute keys for existing dirs owned by you count; keys whose dir is
 #      gone are skipped silently, relative/~/newline/foreign keys with a warning.
 #      source "project", profile = key's basename.
-#   3. The active profile (source "profile").
-#   4. No config, or one with no "active" and no "profiles": an implicit `default`
-#      for the local instance (source "default"). CYODA_DEFAULT_ENDPOINT overrides
-#      its endpoint; it exists for tests only.
+#   3. The active profile (`active`, default "default"), if it is saved (source
+#      "profile"); one without an endpoint gives endpoint null (not_configured).
+#   4. No active profile (no config, or `active` names no saved profile): an
+#      implicit `default` for the local instance (source "default").
+#      CYODA_DEFAULT_ENDPOINT overrides its endpoint; it exists for tests only.
 # Nothing in the project tree is read. Exit 0, except invalid JSON, a malformed
 # projects map, or an unknown CYODA_PROFILE (exit 1).
 set -euo pipefail
@@ -133,9 +134,11 @@ if [ -n "$KEY" ]; then
   exit 0
 fi
 
-# No active profile and no profiles saved (e.g. only projects): the implicit default.
-if ! jq -e 'has("active") or has("profiles")' "$CONFIG" >/dev/null; then
+# The active profile (no "active" key means "default"); if it isn't saved, there is
+# no active profile: the implicit default.
+ACTIVE="$(jq -r '.active // "default"' "$CONFIG")"
+if ! jq -e --arg p "$ACTIVE" '(.profiles // {}) | has($p)' "$CONFIG" >/dev/null; then
   default_json | with_warns
   exit 0
 fi
-profile_json "$(jq -r '.active // "default"' "$CONFIG")" | with_warns
+profile_json "$ACTIVE" | with_warns

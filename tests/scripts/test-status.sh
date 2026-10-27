@@ -40,8 +40,8 @@ test_status_unreachable() {
 }
 
 test_status_not_configured() {
-  # A config file that exists but has no endpoint for the active profile.
-  echo '{"profiles":{}}' >"$T/empty.json"
+  # An existing active profile with no endpoint.
+  echo '{"active":"p","profiles":{"p":{}}}' >"$T/empty.json"
   local out; out="$(CYODA_PLUGIN_CONFIG="$T/empty.json" bash "$S/cyoda-status.sh")"
   assert_contains "$out" "STATUS=not_configured" "not configured"
   assert_contains "$out" "ENDPOINT=none" "no endpoint"

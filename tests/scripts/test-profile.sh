@@ -25,9 +25,27 @@ test_profile_default_when_no_config() {
 }
 
 test_profile_existing_config_without_endpoint() {
-  echo '{"profiles":{}}' >"$T/empty.json"
+  # not_configured only for an existing active profile without an endpoint.
+  echo '{"active":"p","profiles":{"p":{"env":"development"}}}' >"$T/empty.json"
   local out; out="$(CYODA_PLUGIN_CONFIG="$T/empty.json" bash "$S/cyoda-profile.sh")"
-  assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .warnings]')" '["default",null,[]]' "existing config: no implicit endpoint"
+  assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .source, .warnings]')" '["p",null,"profile",[]]' "active profile without endpoint: no implicit endpoint"
+}
+
+test_profile_no_active_key_falls_back_to_default() {
+  echo '{"profiles":{"x":{"endpoint":"http://x"}}}' >"$T/noactive.json"
+  local out; out="$(CYODA_PLUGIN_CONFIG="$T/noactive.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .profile, .endpoint]')" '["default","default","http://localhost:1"]' "profiles but no active key: implicit default"
+  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "no saved profile; using the default local instance http://localhost:1 — type /cyoda:setup to save it" "implicit default warning"
+  echo '{"profiles":{}}' >"$T/noactive.json"
+  out="$(CYODA_PLUGIN_CONFIG="$T/noactive.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
+  assert_eq "$(echo "$out" | jq -r .source)" default "empty profiles, no active key: implicit default"
+}
+
+test_profile_active_names_missing_profile() {
+  echo '{"active":"gone","profiles":{"x":{"endpoint":"http://x"}}}' >"$T/missing.json"
+  local out; out="$(CYODA_PLUGIN_CONFIG="$T/missing.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["default","http://localhost:1"]' "active names a missing profile: implicit default"
+  assert_contains "$(echo "$out" | jq -r '.warnings[0]')" "no saved profile; using the default local instance" "implicit default warning"
 }
 
 test_profile_active_selected() {
@@ -227,6 +245,8 @@ test_project_malformed_projects() {
 
 test_profile_default_when_no_config
 test_profile_existing_config_without_endpoint
+test_profile_no_active_key_falls_back_to_default
+test_profile_active_names_missing_profile
 test_profile_active_selected
 test_profile_stale_token
 test_profile_invalid_json
