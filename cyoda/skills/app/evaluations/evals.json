@@ -58,7 +58,7 @@
       "assertions": [
         {
           "id": "consults-help",
-          "text": "Any lifecycle fact it states (sample data, lock, workflow before entities) is attributed to `cyoda help models` LIFECYCLE or left to the build skill, not asserted from memory",
+          "text": "Any claim about registration order (sample data, then lock, then workflow, before any entities) is attributed to `cyoda help models` LIFECYCLE or left to the build skill, not asserted from memory. Naming what a first increment contains is not an order claim.",
           "type": "behavior"
         },
         {

@@ -44,7 +44,7 @@ Client settings, by the convention in `cyoda help config grpc`: `CYODA_COMPUTE_G
 
 ## Step 3 — Keep-alive and eviction
 
-Read `grpc --section KEEPALIVE` and `cyoda help config grpc`. The server sends `CalculationMemberKeepAliveEvent` every `CYODA_KEEPALIVE_INTERVAL` seconds (default 10). It evicts a member that sends nothing for `CYODA_KEEPALIVE_TIMEOUT` seconds (default 30), or whose stream write stalls that long. Any response or `EventAckResponse` counts as activity. On eviction every call in flight on that member fails with `COMPUTE_MEMBER_DISCONNECTED`.
+Read `grpc --section KEEPALIVE` and `cyoda help config grpc`, and take the defaults you quote from there. The server sends `CalculationMemberKeepAliveEvent` every `CYODA_KEEPALIVE_INTERVAL` seconds. It evicts a member that sends nothing for `CYODA_KEEPALIVE_TIMEOUT` seconds, or whose stream write stalls that long. Any response or `EventAckResponse` counts as activity. On eviction every call in flight on that member fails with `COMPUTE_MEMBER_DISCONNECTED`.
 
 ## Step 4 — Tag routing
 

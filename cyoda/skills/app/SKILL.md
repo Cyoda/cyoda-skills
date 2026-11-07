@@ -74,7 +74,7 @@ When the app runs locally and the developer wants it elsewhere: "next, type `/cy
 | `cyoda:debug` | A failed transition or call, an unexpected state, or an entity's history |
 | `cyoda:status` | Which instance is connected |
 
-Cloud, hosted offerings or migration: reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it.
+If the developer asks about Cloud, hosted offerings or migration, your whole answer to that part is the sentence "That's not covered by this plugin." — no heading or label before it, no product name, no description, no alternatives.
 
 ## Common mistakes
 

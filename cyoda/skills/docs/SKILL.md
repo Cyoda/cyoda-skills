@@ -42,7 +42,7 @@ Get field names and types from these, never from memory or examples:
 | Need | Run | Notes |
 |---|---|---|
 | CloudEvent JSON schemas (compute-node messages) | `cyoda-help.sh cloudevents json` | One JSON map; pick one: `\| jq '.schemas["processing/EntityCriteriaCalculationResponse.json"]'` |
-| gRPC service `.proto` | `cyoda-help.sh grpc proto` | Proto text, printed as is. `cyoda-help.sh grpc json` gives the descriptor set as JSON |
+| gRPC service `.proto` | `cyoda-help.sh grpc proto` | Proto text, printed as is. `cyoda-help.sh grpc json` gives the descriptor set as JSON. When the answer is about a compute-node message, say the node's gRPC stubs are generated from this proto in the developer's language |
 | REST API (OpenAPI 3.1) | `cyoda-help.sh openapi json` (or `openapi yaml`) | About 0.5 MB; pick one path: `\| jq '.paths["/entity/{entityId}"]'`. Tags: `cyoda-help.sh openapi tags` |
 
 These are actions, not topics: the instance or binary output is printed verbatim (JSON or text), `--section` is rejected (exit 6), and the web mirror doesn't serve them (exit 2 with neither an instance nor a binary). `cyoda-help.sh workflows schema-version versions` is another, printing `{"current", "supported"}`.

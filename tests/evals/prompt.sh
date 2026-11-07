@@ -13,5 +13,5 @@ sed -e "s|{{REPO}}|$(esc "$REPO")|g" -e "s|{{SKILL_NAME}}|$(esc "$3")|g" -e "s|{
     -e "s|{{ITERATION}}|$(esc "$2")|g" -e "s|{{OUT}}|$(esc "$OUT")|g" -e "s|{{SKILL_CREATOR}}|$(esc "$SC")|g" "$tpl"
 if [ "${5:-}" = "--no-cyoda" ]; then
   # shellcheck disable=SC2016 # backticks are Markdown, not command substitution
-  printf '\n- `cyoda` is NOT installed for this eval: prefix every command with `PATH="%s"`, which hides the binary.\n' "$(bash "$HERE/nocyoda-path.sh")"
+  printf '\n- `cyoda` is NOT installed for this eval: prefix every command with `PATH="%s"`, which hides the binary. Never drop or change that prefix, even when a lookup fails: then the failure is the result.\n' "$(bash "$HERE/nocyoda-path.sh")"
 fi

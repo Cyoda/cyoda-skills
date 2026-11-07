@@ -92,9 +92,17 @@ if command -v cyoda >/dev/null 2>&1; then
   fi
 fi
 
-# 3. Web mirror (whole page)
-if page="$(curl -fsS --max-time 10 "https://docs.cyoda.net/help/$URLPATH.md" 2>/dev/null)" && [ -n "$page" ]; then
-  ver="$(curl -fsS --max-time 10 https://docs.cyoda.net/help/index.json 2>/dev/null | jq -r '.version // "unknown"' 2>/dev/null)" || ver=unknown
+# 3. Web mirror (whole page). The mirror serves sub-topic pages under lowercase
+# paths (errors/workflow_schema_version_unsupported.md) while topic ids keep
+# their case (errors.WORKFLOW_SCHEMA_VERSION_UNSUPPORTED): try as given, then lowercase.
+WEB="${CYODA_HELP_WEB_BASE:-https://docs.cyoda.net/help}"
+page=""
+for p in "$URLPATH" "$(tr '[:upper:]' '[:lower:]' <<<"$URLPATH")"; do
+  page="$(curl -fsS --max-time 10 "$WEB/$p.md" 2>/dev/null)" && [ -n "$page" ] && break
+  page=""
+done
+if [ -n "$page" ]; then
+  ver="$(curl -fsS --max-time 10 "$WEB/index.json" 2>/dev/null | jq -r '.version // "unknown"' 2>/dev/null)" || ver=unknown
   echo "SOURCE=web VERSION=${ver:-unknown}" >&2
   [ -n "$SECTION" ] && echo "note: --section is ignored for web pages; showing the whole page" >&2
   printf '%s\n' "$page"

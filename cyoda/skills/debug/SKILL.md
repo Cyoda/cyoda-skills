@@ -86,7 +86,7 @@ Read `models --section LIFECYCLE` and `models --section ERRORS`.
 
 ### Path E — entities in an Errored state
 
-Count them per state, then list them and read each one's reason: [examples/queries.md](examples/queries.md) walks through [examples/queries/](examples/queries/) (grouped stats by state, a lifecycle-state search, point-in-time). Pass those files as `--data-binary @"${CLAUDE_PLUGIN_ROOT}/skills/debug/examples/queries/<file>"`. Best practice *Model error states explicitly*: the exit transition's criterion holds the entity until its data is fixed, then a loopback (Path B, step 6) lets it leave.
+Count them per state, then list them and read each one's reason from its own audit (one audit call per id; never assume the others match the first): [examples/queries.md](examples/queries.md) walks through [examples/queries/](examples/queries/) (grouped stats by state, a lifecycle-state search, point-in-time). Pass those files as `--data-binary @"${CLAUDE_PLUGIN_ROOT}/skills/debug/examples/queries/<file>"`. Best practice *Model error states explicitly*: the exit transition's criterion holds the entity until its data is fixed, then a loopback (Path B, step 6) lets it leave.
 
 ### Path F — an entity disappeared
 

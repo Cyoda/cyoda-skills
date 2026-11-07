@@ -16,6 +16,24 @@ export CYODA_PLUGIN_CONFIG="$T/none.json"
 # the binary tests don't pick up a developer's own cyoda-go on :8080.
 export CYODA_DEFAULT_ENDPOINT="http://localhost:1"
 
+test_help_web_lowercase_path() {
+  # The docs.cyoda.net mirror serves sub-topic pages under lowercase paths.
+  # A cyoda stub that knows no topic sends the lookup past the binary to the web.
+  mkdir -p "$T/stub" "$T/web/errors"
+  printf '#!/bin/sh\nexit 2\n' >"$T/stub/cyoda"; chmod +x "$T/stub/cyoda"
+  echo '{"version":"9.9.9"}' >"$T/web/index.json"
+  echo 'WEB PAGE BODY' >"$T/web/errors/some_error_code.md"
+  local port out err
+  port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
+  python3 -m http.server "$port" --bind 127.0.0.1 --directory "$T/web" >/dev/null 2>&1 &
+  local pid=$!
+  for _ in 1 2 3 4 5 6 7 8 9 10; do curl -fs "http://127.0.0.1:$port/index.json" >/dev/null 2>&1 && break; sleep 0.2; done
+  out="$(PATH="$T/stub:$PATH" CYODA_HELP_WEB_BASE="http://127.0.0.1:$port" bash "$S/cyoda-help.sh" errors SOME_ERROR_CODE 2>"$T/err")"
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+  assert_contains "$out" "WEB PAGE BODY" "lowercased web page"
+  assert_contains "$(cat "$T/err")" "SOURCE=web VERSION=9.9.9" "web source"
+}
+
 test_help_section_from_binary() {
   local out err
   out="$(bash "$S/cyoda-help.sh" models --section LIFECYCLE 2>"$T/err")"
@@ -133,4 +151,5 @@ test_help_ignores_broken_token_command
 test_help_unknown_topic
 test_help_unknown_section
 test_help_prefers_instance
+test_help_web_lowercase_path
 report
