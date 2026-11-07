@@ -36,7 +36,7 @@ test_status_unreachable() {
   local out
   out="$(CYODA_PLUGIN_CONFIG="$T/u.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable" "unreachable"
-  assert_contains "$out" "WARN=active profile dead is unreachable; run /cyoda:setup to switch to default" "unreachable warn"
+  assert_contains "$out" "WARN=active profile dead is unreachable; type /cyoda:setup to switch to default" "unreachable warn"
 }
 
 test_status_not_configured() {

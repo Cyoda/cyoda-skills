@@ -237,7 +237,7 @@
       "expected_output": "Runs cyoda-status.sh: STATUS=unreachable. Reads run --section \"HEALTH PROBES\": the API port serves GET /api/health; /livez and /readyz are only on the admin listener (127.0.0.1:9091). Asks whether the server is running and whether the profile endpoint is right; offers 'next, type /cyoda:setup' to switch profile or restart. Does not probe /readyz on port 8080.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"staging\":{\"endpoint\":\"http://staging.internal:8080\",\"env\":\"development\"}}}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=unreachable PROFILE=staging ENDPOINT=http://staging.internal:8080 ENV=development VERSION=none; WARN=active profile staging is unreachable; run /cyoda:setup to switch to default"
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=unreachable PROFILE=staging ENDPOINT=http://staging.internal:8080 ENV=development VERSION=none; WARN=active profile staging is unreachable; type /cyoda:setup to switch to default"
       },
       "assertions": [
         {

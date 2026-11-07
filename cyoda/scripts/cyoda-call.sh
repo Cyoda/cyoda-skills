@@ -26,7 +26,7 @@ TOKEN_CMD="$(jq -r '.tokenCommand // empty' <<<"$PROFILE_JSON")"
 TOKEN_DIR="$(jq -r 'if .source == "project" then .projectDir // empty else empty end' <<<"$PROFILE_JSON")"
 
 if [ -z "$ENDPOINT" ]; then
-  echo "no endpoint configured; run /cyoda:setup" >&2
+  echo "no endpoint configured; type /cyoda:setup" >&2
   exit 5
 fi
 

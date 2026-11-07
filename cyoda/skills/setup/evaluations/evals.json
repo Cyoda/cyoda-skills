@@ -58,7 +58,7 @@
     {
       "id": 4,
       "prompt": "/cyoda:setup",
-      "expected_output": "cyoda-status.sh prints STATUS=unreachable for the active profile `old`, with WARN lines 'profile old contains a stored token, which this plugin no longer reads; you can remove it' and 'active profile old is unreachable; run /cyoda:setup to switch to default'. The skill shows both warnings as they are, offers to switch the active profile to `default`, and on yes sets active to default (local cyoda is already installed and healthy), leaving the old profile in place, and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable for the active profile `old`, with WARN lines 'profile old contains a stored token, which this plugin no longer reads; you can remove it' and 'active profile old is unreachable; type /cyoda:setup to switch to default'. The skill shows both warnings as they are, offers to switch the active profile to `default`, and on yes sets active to default (local cyoda is already installed and healthy), leaving the old profile in place, and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"old\",\"profiles\":{\"old\":{\"endpoint\":\"https://gone.example.com\",\"token\":\"eyJhbGciOiJSUzI1NiJ9.e30.sig\"},\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
         "_simulated/instance.md": "`cyoda --version` prints `cyoda version 0.8.4`. https://gone.example.com does not answer. http://localhost:8080/api/health returns {\"status\":\"UP\"}. The developer answers yes to switching to default."

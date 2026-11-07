@@ -36,7 +36,7 @@ if [ -n "$ENDPOINT" ]; then
     elif [ "$SOURCE" = "project" ]; then
       WARNS+=("project $PROFILE is bound to $ENDPOINT, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one")
     else
-      WARNS+=("active profile $PROFILE is unreachable; run /cyoda:setup to switch to default")
+      WARNS+=("active profile $PROFILE is unreachable; type /cyoda:setup to switch to default")
     fi
   else
     STATUS="connected"

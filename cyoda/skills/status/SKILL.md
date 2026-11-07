@@ -24,7 +24,7 @@ Read-only. One script call, one status line, then the warnings.
    - `VERSION=unknown`: write `version unknown` in place of `v<V>`.
    - `<V>` is the instance's version. `BINARY_VERSION` is the local `cyoda` binary; don't report it as the instance version.
 3. Print **every** `WARN=` line after the status line, as it is, one per line, prefixed `Warning: `. Don't drop, merge or reword them. The texts the script emits:
-   - `active profile <P> is unreachable; run /cyoda:setup to switch to default`
+   - `active profile <P> is unreachable; type /cyoda:setup to switch to default`
    - `project <P> is bound to <E>, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one`
    - `projects key <K> is not an absolute path; skipped`, `a projects key contains a newline; skipped`, `projects entry <K> skipped: the directory is not owned by you` (a link that can't apply; `/cyoda:setup` re-links)
    - `no saved profile; using the default local instance <E> — type /cyoda:setup to save it` (no active profile and no linked project here: `PROFILE=default` is implicit)

@@ -20,14 +20,14 @@
     {
       "id": 2,
       "prompt": "Check my Cyoda status",
-      "expected_output": "cyoda-status.sh prints STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com ENV=development VERSION=none BINARY_VERSION=0.8.4 and WARN=active profile staging is unreachable; run /cyoda:setup to switch to default. The skill reports the unreachable form 'cyoda-go unreachable — https://cyoda-staging.example.com [profile: staging]', prints the WARN line, and suggests 'type `/cyoda:setup`' without running it.",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com ENV=development VERSION=none BINARY_VERSION=0.8.4 and WARN=active profile staging is unreachable; type /cyoda:setup to switch to default. The skill reports the unreachable form 'cyoda-go unreachable — https://cyoda-staging.example.com [profile: staging]', prints the WARN line, and suggests 'type `/cyoda:setup`' without running it.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"staging\":{\"endpoint\":\"https://cyoda-staging.example.com\",\"env\":\"development\",\"tokenCommand\":\"/work/shop/scripts/get-token.sh\"}}}",
-        "_simulated/status.txt": "STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com ENV=development VERSION=none BINARY_VERSION=0.8.4\nWARN=active profile staging is unreachable; run /cyoda:setup to switch to default"
+        "_simulated/status.txt": "STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com ENV=development VERSION=none BINARY_VERSION=0.8.4\nWARN=active profile staging is unreachable; type /cyoda:setup to switch to default"
       },
       "assertions": [
         { "id": "unreachable-line", "text": "Reports 'cyoda-go unreachable — https://cyoda-staging.example.com [profile: staging]'", "type": "format" },
-        { "id": "prints-warn", "text": "Prints the WARN text 'active profile staging is unreachable; run /cyoda:setup to switch to default'", "type": "behavior" },
+        { "id": "prints-warn", "text": "Prints the WARN text 'active profile staging is unreachable; type /cyoda:setup to switch to default'", "type": "behavior" },
         { "id": "no-switch", "text": "Does not edit the config or switch the active profile itself", "type": "behavior" },
         { "id": "no-token-command", "text": "Does not run the profile's tokenCommand", "type": "behavior" },
         { "id": "no-cloud", "text": "Does not mention Cyoda Cloud", "type": "behavior" },
