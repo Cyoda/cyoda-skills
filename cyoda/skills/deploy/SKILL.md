@@ -64,7 +64,10 @@ A team, CI or any host other than the developer's own machine needs **shared** o
 
 Ask: "Is this instance **production**?" The answer is the env name for `seed.sh --env` and the profile (`production` or `development`).
 
-For **production**, ask per entity: "Does any processor write fields to `<entity>` that aren't in its sample? A strict schema rejects them." Read `models --section LIFECYCLE` and `models --section ENDPOINTS` (changeLevel) first.
+For **production**, ask per entity, word for word (the second sentence is what makes the developer think before answering "no"):
+> Does any processor write fields to `<entity>` that aren't in its sample? A strict schema rejects them.
+
+Read `models --section LIFECYCLE` and `models --section ENDPOINTS` (changeLevel) first.
 - **No:** record `null` (strict).
 - **Yes:** ask which changeLevel, from the values listed there, least permissive first. Record it.
 

@@ -5,7 +5,7 @@ Helpers for running `cyoda/skills/<skill>/evaluations/evals.json` (process: "Run
 ## Real server or simulated instance
 
 - **Real server** for anything the skill does to an instance (status, register, create, transitions, auth). One throwaway in-memory cyoda-go per eval, then `setup.py` writes the fixtures and a plugin config pointed at it. Prompts: `exec-prompt.md`, `grade-prompt.md`.
-- **Simulated instance** when the fixture needs state a fresh server can't give cheaply: specific entity ids or histories, a running compute node, a remote or production endpoint. The executor answers instance calls from the eval's `_simulated/instance.md` (marked SIMULATED/ASSUMED). Prompts: `exec-prompt-sim.md`, `grade-prompt-sim.md`; run `setup.py … none`.
+- **Simulated instance** when the fixture needs state a fresh server can't give cheaply: specific entity ids or histories, a running compute node, a remote or production endpoint. The executor answers instance calls from `outputs/_simulated/instance.md` (marked SIMULATED/ASSUMED); setup.py writes it there in both modes, since it also holds the developer's scripted answers. Prompts: `exec-prompt-sim.md`, `grade-prompt-sim.md`; run `setup.py … none`.
 - **Help runs for real** in both: executors call `cyoda help` / `cyoda-help.sh` against the installed binary. For a "cyoda not installed" eval, render the prompt with `--no-cyoda`: it tells the executor to use the PATH from `nocyoda-path.sh`, which hides only the `cyoda` binary.
 
 ## Commands

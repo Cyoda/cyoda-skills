@@ -4,7 +4,8 @@ usage: python3 tests/evals/setup.py <iteration> <skill> <eval_id> <server_id|non
                                     [--seed-project] [--endpoint URL]
 
 - Fixtures (the eval's `files`, minus `_simulated/*`) go to
-  cyoda-evals-workspace/<iteration>/<skill>/eval-<id>/with_skill/outputs/project/.
+  cyoda-evals-workspace/<iteration>/<skill>/eval-<id>/with_skill/outputs/project/;
+  `_simulated/*` go to outputs/_simulated/ (outside the project), for the executor.
 - A `*cyoda-plugin-config*` fixture becomes outputs/plugin-config.json, with the
   active profile pointed at the eval server (20000+id*100+80) or --endpoint.
 - --seed-project registers each src/data/<e>-v1-sample.json (sample, lock, and
@@ -41,6 +42,11 @@ def main(argv):
 
     for k, v in e.get("files", {}).items():
         if k.startswith("_simulated"):
+            # outside the project: the executor reads the developer's scripted answers here
+            fp = f"{out}/{k}"
+            os.makedirs(os.path.dirname(fp), exist_ok=True)
+            with open(fp, "w") as f:
+                f.write(v if isinstance(v, str) else json.dumps(v, indent=1))
             continue
         v = v if isinstance(v, str) else json.dumps(v, indent=1)
         if "cyoda-plugin-config" in k:
