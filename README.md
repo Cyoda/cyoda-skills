@@ -54,6 +54,8 @@ The plugin keeps its connections in `~/.config/cyoda/cyoda-plugin-config.json`: 
 - `design`, `build`, `compute` and `debug` can offer a spike on a throwaway in-memory cyoda-go.
 - Profiles and project links no longer have `env`, and the production guard (`--confirm-production`) is gone.
 - Skills are trimmed to Cyoda-specific content.
+- `debug` repairs a single entity (a loopback or a fired transition) without a confirmation round, and shows the call it made and the response.
+- `deploy` asks which stage the deployment is for and whether its schema is strict, records a per-stage `changeLevel`, and no longer offers to write a profile for the new instance.
 - Run `/plugin marketplace update cyoda` to pick up this release.
 
 ## Release notes — 0.4.0
