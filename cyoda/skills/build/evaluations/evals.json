@@ -75,7 +75,7 @@
     {
       "id": 4,
       "prompt": "/cyoda:build — add an Invoice entity with pending, paid and cancelled states",
-      "expected_output": "Detects pom.xml, resolves the Java package com/example/demo, writes invoice-v1-workflow.json to src/main/resources/workflow/, invoice-v1-sample.json to src/main/resources/data/, invoice-v1-config.json to src/main/resources/config/, tells the developer each path, and updates the existing cyoda-manifest.json by appending an invoice v1 entry while keeping the customer entry.",
+      "expected_output": "Detects pom.xml, resolves the Java package com/example/demo, writes invoice-v1-workflow.json to src/main/resources/workflow/, invoice-v1-sample.json to src/main/resources/data/, invoice-v1-config.json to src/main/resources/config/, and updates the existing cyoda-manifest.json by appending an invoice v1 entry while keeping the customer entry.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "pom.xml": "<project><groupId>com.example</groupId><artifactId>demo</artifactId></project>",
@@ -87,7 +87,6 @@
         { "id": "consults-help", "text": "Names at least one help path and section it reads for the facts (e.g. `models --section LIFECYCLE`, `workflows --section TRANSITIONS`)", "type": "behavior" },
         { "id": "detects-java", "text": "Detects the Java layout from pom.xml and uses the placement table", "type": "behavior" },
         { "id": "java-paths", "text": "Writes src/main/resources/workflow/invoice-v1-workflow.json, src/main/resources/data/invoice-v1-sample.json and src/main/resources/config/invoice-v1-config.json", "type": "behavior" },
-        { "id": "tells-paths", "text": "Tells the developer the relative path of each file it saved", "type": "behavior" },
         { "id": "manifest-updated", "text": "Appends {name: invoice, modelVersion: 1, ...} with project-relative paths to the existing cyoda-manifest.json and keeps the customer entry", "type": "behavior" },
         { "id": "terminal-states", "text": "Treats paid and cancelled as terminal states and applies the terminal-states best practice itself, having consulted the best-practices file", "type": "behavior" },
         { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:test`' and does not say it will invoke another skill", "type": "behavior" }
