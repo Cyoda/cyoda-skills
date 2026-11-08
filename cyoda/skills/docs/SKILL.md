@@ -74,6 +74,6 @@ End with the source: "From `cyoda help <topic>` § `<SECTION>` (`<SOURCE>`, v`<V
 
 | Question | Answer |
 |---|---|
-| SQL, Trino, analytics, reporting queries | "SQL analytics is not available in cyoda-go `<VERSION>`." (`cyoda help analytics` describes an interface cyoda-go doesn't serve.) Give the grouped statistics or search request from `crud --section ENDPOINTS` / `search --section ENDPOINTS` |
+| SQL, Trino, analytics, reporting queries | "SQL analytics is not available in cyoda-go `<VERSION>`." (`cyoda help analytics` describes an interface cyoda-go doesn't serve.) Write the concrete request for the developer's report (method, path and JSON body): grouped statistics from `crud --section ENDPOINTS`, or search from `search --section ENDPOINTS` with the condition from `search --section "CONDITION DSL"` |
 | Notifications, alerts, webhooks on state entry | "Notifications are coming soon — check `cyoda help` for availability." |
 | Any other feature that help doesn't document | "Not available in cyoda-go `<VERSION>` — check `cyoda help`." |
