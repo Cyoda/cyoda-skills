@@ -12,6 +12,7 @@ The skills help design, build and test cyoda-go applications. The agent gets pla
 
 - `SKILL.md` stays compact and to the point: instructions only. No rationale, no design discussion, no remarks about how a developer should work or about environments outside development.
 - No access checks or restrictions in skills or scripts.
+- **Cyoda-specific content only.** Test for every line: would a frontier model (Opus/Sonnet 5.5 and peers) do this right without it, given `cyoda help`? If yes, cut it.
 
 ## Changes
 
@@ -37,7 +38,7 @@ The skills help design, build and test cyoda-go applications. The agent gets pla
 - `build`, `test`: unchanged. They already need a running instance and hand off to `/cyoda:setup` without one.
 - `design`: when the binary is missing, recommend installing it once ("next, type `/cyoda:setup`") and carry on. Drop "so it works without an instance and without the binary".
 - `docs`: when the answer comes from the web mirror, say so once and recommend installing cyoda-go.
-- `setup`, local and link mode: if the repo shows how the project runs its own stack (Compose file, `make` target, README), use that: start it if it isn't running, then link it.
+- `setup`, link mode: a project's own cyoda-go container that isn't running may be started (its Compose project), then linked.
 
 ### Web help mirror
 
@@ -54,6 +55,27 @@ Artifacts unchanged. The "Is this instance production?" question becomes "Which 
 ### `auth`
 
 Unchanged apart from the removals above.
+
+### Trim every skill to Cyoda-specific content
+
+Applies to all 11 `SKILL.md` files and their resources, together with the changes above.
+
+**Keep:**
+- cyoda-go behaviour and gotchas a model can't infer: the canonical registration order, the version decision (`MODEL_HAS_ENTITIES` once entities exist), export reshaping (#684-I), tag overlap routing (#684-B), schedules on automated transitions, an automated exit from an error state needs a criterion, notifications "coming soon", the `/api/health` vs admin `/readyz` split, the install formula.
+- Which `cyoda help` topic and section answers what.
+- The plugin's own contract: script names, exit codes, the config shape, file layout and naming, the manifest, skill hand-offs.
+- Cyoda modelling guidance: the best practices, the anti-patterns, the developer-says → model-it-as table.
+- `#684` workarounds with their item letter.
+
+**Cut:**
+- Interaction choreography: one question at a time, skip answered questions, show-and-confirm rounds, "revise until yes", "tell the developer which file you saved".
+- General engineering: shell quoting rules, `pipefail` explanations, the language-detection script, the `jq` manifest upsert (the schema stays), retry and reconnect patterns, the gRPC single-writer queue, how to write a token client or a CI script, secret hygiene a model already practises.
+- Process policing: "never guess a path", "don't diagnose Homebrew", "don't sudo", the write-denied message, "a request to register is not the confirmation".
+- Rationale sentences and common-mistakes rows that restate any of the above.
+
+**Expected effect:** `SKILL.md` text roughly halves (18,400 words today). `compute/resources/grpc-patterns.md` shrinks to the cyoda-specific lifecycle (join, greet, keep-alive ack, the three request types, `cyodatxtoken`). `design/resources/design-guidelines.md` keeps only what the best practices and anti-patterns don't already cover. Within the local-first changes above, the same rule applies: `setup` keeps its Docker discovery but doesn't get a "read the README" instruction; the spike sentence names only the cyoda-specific part (in-memory storage and mock auth from `cyoda help run`, or the stack in Docker) and that the agent asks first.
+
+The evals are the safety net: a trim that makes a case fail puts back only what that case needs.
 
 ## Evals
 
