@@ -1,7 +1,7 @@
 ---
 name: setup
 description: Use when the developer types /cyoda:setup to install and start a local cyoda-go, to connect the plugin to an existing self-hosted cyoda-go instance, to link or unlink the current project to its own instance (e.g. its Docker Compose stack), or to switch away from an unreachable or outdated connection profile.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*cyoda-config-write.sh *) Bash(brew *) Bash(cyoda *) Bash(command -v *) Bash(curl *) Bash(mkdir *) Bash(jq *) Bash(mv *) Bash(cat *) Bash(sleep *) Bash(git rev-parse *) Bash(pwd *) Bash(ls *) Bash(chmod *) Bash(docker compose *)
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*cyoda-config-write.sh *) Bash(brew *) Bash(cyoda *) Bash(command -v *) Bash(curl *) Bash(jq *) Bash(sleep *) Bash(git rev-parse *) Bash(pwd *) Bash(ls *) Bash(docker compose *)
 disable-model-invocation: true
 ---
 
@@ -61,13 +61,13 @@ Binds one project directory (and everything below it) to one instance; other dir
 1. **Project root:** propose `git rev-parse --show-toplevel`, else the working directory; the developer confirms or changes it. `$HOME` can't be linked: offer connect mode. `<NAME>` is its basename; the key is its real path, `cd '<ROOT>' && pwd -P`. Re-linking a root that Step 0 showed as `PROJECT`: use that value as the key, so the entry is replaced.
 2. **Legacy file:** if `<ROOT>/.cyoda/config` or `<ROOT>/.cyoda/instance.json` exists, read only `jq -r .endpoint <file>` (never its `token` or `tokenCommand`) and offer once to import that endpoint (still probed below). After the write, say the file is no longer read and give `rm <ROOT>/.cyoda/<file>` for the developer to run.
 3. **Pick the instance:** if `command -v docker` succeeds, run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh`: one line `CONTAINER=… COMPOSE_PROJECT=… ENDPOINT=… IMAGE=…` per running cyoda-go container, `ENDPOINT` being the host side of its REST port (`cyoda help run --section "PORT LAYOUT"`).
-   - No line has `COMPOSE_PROJECT=<NAME>` and `<ROOT>` has a [cyoda Compose stack](#a-projects-compose-stack): start it, then run `cyoda-docker-instances.sh` again.
-   - List the lines numbered as `<COMPOSE_PROJECT> (<CONTAINER>) — <ENDPOINT>`, suggest the one whose compose project is `<NAME>`, and let the developer pick one or type a URL. A line with `ENDPOINT=none` (REST port not published) can't be picked.
+   - Before listing: if no line's `COMPOSE_PROJECT` equals `<NAME>` ignoring case and `<ROOT>` has a [cyoda Compose stack](#a-projects-compose-stack), start it and run `cyoda-docker-instances.sh` again.
+   - List the lines numbered as `<COMPOSE_PROJECT> (<CONTAINER>) — <ENDPOINT>`, suggest the one whose `COMPOSE_PROJECT` equals `<NAME>` ignoring case, and let the developer pick one or type a URL. A line with `ENDPOINT=none` (REST port not published) can't be picked.
    - Exit 4, no lines, or no docker: ask for a URL, normalised as in connect step 1.
 4. **Probe:** `curl -sS --max-time 5 "<ENDPOINT>/api/health"` must return `{"status":"UP"}` (right after a start, poll every second for up to 15 s); the version is `curl -s --max-time 5 "<ENDPOINT>/api/help" | jq -r .version`. Not UP: show what came back and stop without writing.
 5. **Tokens:** `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<ENDPOINT>/api/model/"` without a token.
    - `200`: mock auth, no `tokenCommand`.
-   - `401` / `403`: from `cyoda-help.sh auth --section "WHICH PATH DO I NEED?"`, ask how the project gets tokens: a script in the project (e.g. `scripts/auth.sh token`), or none yet. When re-linking, offer the entry's current `tokenCommand`. The plugin runs it from `<ROOT>` with `CYODA_ENDPOINT` set, so a project-relative path works. A secret enters it through the `*_CMD` form (e.g. `CYODA_CLIENT_SECRET_CMD='security find-generic-password -s shop-cyoda -w' scripts/get-token.sh`), not as a literal value. Run it that way once without showing the token; it becomes `tokenCommand` only if it prints a 3-part JWT. None yet: no `tokenCommand`, and the hand-off is `/cyoda:auth`.
+   - `401` / `403`: from `cyoda-help.sh auth --section "WHICH PATH DO I NEED?"`, ask how the project gets tokens: a script in the project (e.g. `scripts/auth.sh token`), or none yet. When re-linking, offer the entry's current `tokenCommand`. The plugin runs it from `<ROOT>` with `CYODA_ENDPOINT` set, so a project-relative path works. A secret enters it through the `*_CMD` form (e.g. `CYODA_CLIENT_SECRET_CMD='security find-generic-password -s shop-cyoda -w' scripts/get-token.sh`), not as a literal value. Run it that way once without showing the token; it becomes `tokenCommand` only if it exits 0 and prints three dot-separated parts. None yet: no `tokenCommand`, and the hand-off is `/cyoda:auth`.
 6. **Write** `projects[<KEY>]`, replacing an entry with that key (`<CMD>` empty for no `tokenCommand`):
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh \
@@ -79,7 +79,7 @@ Binds one project directory (and everything below it) to one instance; other dir
 
 ## A project's Compose stack
 
-A directory `<DIR>` (the link root, or Step 0's `PROJECT`) has a cyoda Compose stack when its `compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml` has a service whose image is `ghcr.io/cyoda/cyoda` (any tag). Start it with `docker compose -f '<DIR>/<file>' up -d`. If that fails, show its output and stop.
+A directory `<DIR>` (the link root, or Step 0's `PROJECT`) has a cyoda Compose stack when its `compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml` has a service whose image is `ghcr.io/cyoda/cyoda` (any tag). Start it with `docker compose -f '<DIR>/<file>' up -d`, `<file>` being the file with that service. If that fails, show its output and stop.
 
 ## Unlink
 
@@ -119,8 +119,6 @@ End with one hand-off and a one-line reason:
 | Mistake | Fix |
 |---|---|
 | `brew tap cyoda-platform/...` or another formula name | Exactly `brew install cyoda/cyoda-go/cyoda` |
-| Checking `/readyz` on port 8080 | `/api/health` on the API port; `/readyz` is on the admin port |
-| Storing `.../api` as the endpoint | Store the base URL; scripts add `/api` |
 | Writing a link into the project (a `.cyoda/` file, `.gitignore`) | Link mode writes only `projects[<KEY>]` in the plugin config |
 | A second entry for a re-linked project | Reuse the `PROJECT` key from Step 0 |
 | Deleting an old profile or stored token unasked | Show the warning; change it only on a yes |
