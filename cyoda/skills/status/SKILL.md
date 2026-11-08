@@ -6,12 +6,10 @@ allowed-tools: Bash(*cyoda-status.sh*)
 
 # Cyoda connection status
 
-Read-only. One script call, one status line, then the warnings.
-
 ## Steps
 
-1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Don't read the config or curl the instance yourself, and don't run the profile's `tokenCommand`: the script probes the public `/api/help` only. If it exits non-zero (an invalid config file or `projects` entry, or `CYODA_PROFILE` naming a profile that doesn't exist), show its stderr as it is and stop.
-2. Its first line is `STATUS=<s> PROFILE=<P> ENDPOINT=<E> ENV=<env> VERSION=<V> BINARY_VERSION=<B> SOURCE=<src>`, plus ` PROJECT=<dir>` when `SOURCE=project`. `PROFILE` is in double quotes when it holds a space or a quote (`PROFILE="my shop"`; report it without the quotes, `\"` as `"`). `PROJECT` is always last and runs to the end of the line. Report exactly one line:
+1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. It probes the public `/api/help`, so no token is needed. If it exits non-zero (an invalid config file or `projects` entry, or `CYODA_PROFILE` naming a profile that doesn't exist), show its stderr as it is and stop.
+2. Its first line is `STATUS=<s> PROFILE=<P> ENDPOINT=<E> VERSION=<V> BINARY_VERSION=<B> SOURCE=<src>`, plus ` PROJECT=<dir>` when `SOURCE=project`. `PROFILE` is in double quotes when it holds a space or a quote (`PROFILE="my shop"`; report it without the quotes, `\"` as `"`). `PROJECT` is always last and runs to the end of the line. Report exactly one line:
 
 | `STATUS` | Report |
 |---|---|
@@ -19,26 +17,13 @@ Read-only. One script call, one status line, then the warnings.
 | `unreachable` | `cyoda-go unreachable — <E> <TAG>` |
 | `not_configured` | `Not connected — type /cyoda:setup` |
 
-   - `<TAG>` comes from `SOURCE`: `project` → `[project: <P>]` (this project's entry in the plugin config's `projects` map; `<P>` is the project dir's name); `profile` or `default` → `[profile: <P>]`.
-   - Append ` [PRODUCTION]` to a `connected` or `unreachable` line when `ENV=production`.
+   - `<TAG>` comes from `SOURCE`: `project` → `[project: <P>]`, also when an active profile is set (this project's entry in the plugin config's `projects` map; `<P>` is the project dir's name); `profile` or `default` → `[profile: <P>]`.
    - `VERSION=unknown`: write `version unknown` in place of `v<V>`.
-   - `<V>` is the instance's version. `BINARY_VERSION` is the local `cyoda` binary; don't report it as the instance version.
-3. Print **every** `WARN=` line after the status line, as it is, one per line, prefixed `Warning: `. Don't drop, merge or reword them. The texts the script emits:
-   - `active profile <P> is unreachable; type /cyoda:setup to switch to default`
-   - `project <P> is bound to <E>, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one`
-   - `projects key <K> is not an absolute path; skipped`, `a projects key contains a newline; skipped`, `projects entry <K> skipped: the directory is not owned by you` (a link that can't apply; `/cyoda:setup` re-links)
-   - `no saved profile; using the default local instance <E> — type /cyoda:setup to save it` (no active profile and no linked project here: `PROFILE=default` is implicit)
-   - `no cyoda-go is answering at <E> — type /cyoda:setup to install or start one` (the implicit default is unreachable)
-   - `local cyoda <B> differs from instance <V>; help is read from the instance`
-   - `profile <P> contains a stored token, which this plugin no longer reads; you can remove it`
-
-Nothing else: don't switch profiles, edit the config, install or upgrade anything. When a fix needs a side effect, say which command to type: "type `/cyoda:setup`" (connection, profile switch) or "type `/cyoda:auth`" (token). Never say you'll invoke them.
+   - `<V>` is the instance's version; `BINARY_VERSION` is the local `cyoda` binary.
+3. After the status line, print every `WARN=` line as it is, one per line, prefixed `Warning: `.
+4. When a warning or the status calls for a fix, end with the command to type: "next, type `/cyoda:setup`" (connection, profile, project link) or "next, type `/cyoda:auth`" (token).
 
 ## Examples
-
-```
-Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]
-```
 
 ```
 Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]
@@ -48,19 +33,3 @@ Warning: no saved profile; using the default local instance http://localhost:808
 ```
 Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]
 ```
-
-```
-Connected to cyoda-go v0.8.4 — https://cyoda.example.com [profile: prod] [PRODUCTION]
-Warning: local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance
-```
-
-## Common mistakes
-
-| Mistake | Fix |
-|---|---|
-| Labels such as "Local cyoda-go" | Every instance is `cyoda-go`; production is the `[PRODUCTION]` tag only |
-| `[profile: <P>]` for `SOURCE=project` | `[project: <P>]`: the project's entry wins over the machine-wide active profile |
-| Reporting `BINARY_VERSION` as the version | Report `VERSION` (from the instance) |
-| Showing only the first warning | Print every `WARN=` line |
-| Running the tokenCommand or an authenticated call | Not needed: `/api/help` is public |
-| A Cloud or migration question | Reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it |
