@@ -24,7 +24,7 @@ The greet always arrives before any request. Keep reading at all times: a member
 
 ## Idempotency
 
-A duplicate `requestId` gets the same response. Processors in `COMMIT_BEFORE_DISPATCH` mode can be re-dispatched with a new request after a conflict or crash, so their external side effects also need a natural key (an external id written once).
+A duplicate `requestId` gets the same response. A `COMMIT_BEFORE_DISPATCH` processor is re-dispatched when the caller retries after a CAS conflict or an engine crash, and the engine can't deduplicate replays (`workflows` PROCESSORS), so key its side effects on a natural id (a write-once external id), not only `requestId`.
 
 ## Errors
 

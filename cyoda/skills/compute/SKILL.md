@@ -93,7 +93,7 @@ A processor may read or write other entities over REST (`CYODA_COMPUTE_HTTP_BASE
 
 ## Production checklist
 
-- Idempotent on `requestId`, and on replays for `COMMIT_BEFORE_DISPATCH` (a replay arrives as a new request).
+- Idempotent on `requestId`. A `COMMIT_BEFORE_DISPATCH` replay is a re-dispatch after a CAS conflict or engine crash that the engine can't deduplicate, so key its side effects on a natural id (a write-once external id), not only `requestId`.
 - After a reconnect, join again; the member id changes.
 - Keep answering within `CYODA_KEEPALIVE_TIMEOUT`, even while work is in progress.
 - The server's `cyoda_dispatch_*` metrics are on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
