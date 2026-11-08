@@ -42,7 +42,7 @@ For OIDC and trusted keys, help the developer write a command that prints one JW
 
 **No client yet (M2M)?** Creating a client needs an admin credential the developer already holds (a `ROLE_ADMIN` token, e.g. from the bootstrap client: read `auth clients --section PREREQUISITES`). Without one, the operator sets a bootstrap client in the server config (`config auth --section OPTIONS`, "Bootstrap M2M client"), and that is the client.
 
-With one: the create response carries `client_secret` (`auth clients --section "REQUEST FLOW"`). Give the developer this command to run in their own terminal; it saves the response to a 0600 file outside the project and prints only `client_id`:
+With one: the create response carries `client_secret` (`auth clients --section "REQUEST FLOW"`), so the developer runs this command in their own terminal, keeping the secret out of the conversation; it saves the response to a 0600 file outside the project and prints only `client_id`:
 
 ```bash
 ( umask 077; mkdir -p ~/.secrets; R=~/.secrets/cyoda-<PROFILE>-client.json
@@ -64,7 +64,7 @@ The script reads:
 | `CYODA_CLIENT_SECRET_CMD` | a command that prints the secret, e.g. `security find-generic-password -s cyoda-<profile> -w` (macOS Keychain), `secret-tool lookup service cyoda-<profile>` (Linux), `pass show cyoda/<profile>`. Takes precedence |
 | `CYODA_ENDPOINT` | set automatically from the profile by the plugin's scripts |
 
-Ask whether they're already set. If not, the developer sets them in the shell they start Claude Code from (shell profile, or `.envrc` with direnv), then restarts the session: the plugin's scripts inherit that environment.
+The agent never receives the secret, and writes neither the secret nor a token to any file: the developer sets `CYODA_CLIENT_SECRET` or `CYODA_CLIENT_SECRET_CMD` in their own shell. Ask whether the variables are already set. If not, the developer sets them in the shell they start Claude Code from (shell profile, or `.envrc` with direnv), then restarts the session: the plugin's scripts inherit that environment. Then continue at Step 4.
 
 ## Step 4 — Write the script into the project
 
@@ -79,11 +79,11 @@ Run it once without showing the token:
 ( set -o pipefail; CYODA_ENDPOINT="<ENDPOINT>" "<ABS_PATH>" | awk -F. '{print NF " parts, " length($0) " chars"}' ); echo "exit=$?"
 ```
 
-`exit=0` and `3 parts`: it works, go to Step 6. `exit=1`: show the `get-token:` line from stderr, explain it from the table in a line or two, and test again once the developer says it's fixed. Step 6 runs only after a passing test.
+`exit=0` and `3 parts`: it works, go to Step 6. `exit=1`: show the `get-token:` line from stderr, explain it from the table in a line or two, then stop and wait; test again when the developer says it's fixed. Step 6 runs only after a passing test.
 
 | stderr says | Meaning |
 |---|---|
-| `HTTP 401 … invalid_client` | id or secret rejected: check the env or keychain values; the client may be deleted or its secret rotated (`auth clients` REQUEST FLOW) |
+| `HTTP 401 … invalid_client` | id or secret rejected (or the client was deleted or its secret rotated, `auth clients` REQUEST FLOW): the developer corrects the env or keychain value in their shell, then restarts the session |
 | `HTTP 400` | malformed request or grant (`auth tokens --section ERRORS`) |
 | `HTTP 404` | wrong endpoint, or the instance has no token endpoint (check the profile's endpoint) |
 | `… is not set` / `CYODA_CLIENT_SECRET_CMD failed` | the variable isn't in the session's environment: see Step 3 |
