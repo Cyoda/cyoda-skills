@@ -29,11 +29,11 @@ test_config_write_tightens_mode_and_preserves() {
 
 test_config_write_creates_private_dir() {
   CFG="$T/new/sub/cfg.json"
-  local rc; W '.profiles.default = {endpoint: "http://localhost:8080", env: "development"} | .active = "default"'; rc=$?
+  local rc; W '.profiles.default = {endpoint: "http://localhost:8080"} | .active = "default"'; rc=$?
   assert_status 0 "$rc" "creates a missing config"
   assert_eq "$(mode "$T/new/sub")" 700 "missing config dir created 0700"
   assert_eq "$(mode "$CFG")" 600 "new config 600"
-  assert_eq "$(jq -c . "$CFG")" '{"profiles":{"default":{"endpoint":"http://localhost:8080","env":"development"}},"active":"default"}' "starts from {}"
+  assert_eq "$(jq -c . "$CFG")" '{"profiles":{"default":{"endpoint":"http://localhost:8080"}},"active":"default"}' "starts from {}"
 }
 
 test_config_write_rejects_bad_filter_or_result() {

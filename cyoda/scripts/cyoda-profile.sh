@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Resolve the Cyoda connection for this directory and print it as one JSON object:
-# {profile, endpoint, env, tokenCommand, warnings, source, projectDir?}.
+# {profile, endpoint, tokenCommand, warnings, source, projectDir?}.
 # Everything comes from CYODA_PLUGIN_CONFIG (default ~/.config/cyoda/cyoda-plugin-config.json):
 #   1. CYODA_PROFILE=<name>: that profile, over everything (unknown: exit 1).
 #   2. A "projects" entry whose key (a project dir) is $PWD or its nearest ancestor,
@@ -22,7 +22,7 @@ WANT="${CYODA_PROFILE:-}"
 
 default_json() {
   jq -cn --arg ep "${CYODA_DEFAULT_ENDPOINT:-http://localhost:8080}" '{
-    profile: "default", endpoint: $ep, env: "development", tokenCommand: null,
+    profile: "default", endpoint: $ep, tokenCommand: null,
     warnings: ["no saved profile; using the default local instance \($ep) — type /cyoda:setup to save it"],
     source: "default"
   }'
@@ -34,7 +34,6 @@ profile_json() { # name
     | {
         profile: $p,
         endpoint: ($prof.endpoint // null),
-        env: ($prof.env // "development"),
         tokenCommand: ($prof.tokenCommand // null),
         warnings: (if ($prof | has("token")) then
           ["profile \($p) contains a stored token, which this plugin no longer reads; you can remove it"]
@@ -49,7 +48,6 @@ project_json() { # key
     | {
         profile: $name,
         endpoint: ($e.endpoint // null),
-        env: ($e.env // "development"),
         tokenCommand: ($e.tokenCommand // null),
         warnings: [],
         source: "project",

@@ -51,7 +51,7 @@ test_status_no_config_local_up() {
   start_server || return
   local ep="http://localhost:${SMOKE_HTTP_PORT}" out
   out="$(CYODA_DEFAULT_ENDPOINT="$ep" CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=default ENDPOINT=$ep ENV=development VERSION=0.8.4" "implicit default connected"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=default ENDPOINT=$ep VERSION=0.8.4" "implicit default connected"
   assert_contains "$(echo "$out" | head -n1)" "SOURCE=default" "implicit default source"
   assert_contains "$out" "WARN=no saved profile; using the default local instance $ep — type /cyoda:setup to save it" "implicit default warn"
   stop_server
@@ -105,7 +105,7 @@ test_status_project_binding() {
   pd="$(mkdir -p "$HOME/work/shop/src" && cd "$HOME/work/shop" && pwd -P)"
   pcfg "$T/g.json" "$pd" "$ep" production
   out="$(cd "$pd/src" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=shop ENDPOINT=$ep ENV=production VERSION=0.8.4" "project entry connected"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=shop ENDPOINT=$ep VERSION=0.8.4" "project entry connected"
   assert_contains "$(echo "$out" | head -n1)" "SOURCE=project PROJECT=$pd" "project source and dir"
   pcfg "$T/g.json" "$pd" "http://localhost:1"
   out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
@@ -113,6 +113,15 @@ test_status_project_binding() {
   assert_contains "$out" "WARN=project shop is bound to http://localhost:1, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one" "project unreachable warn"
   if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for a project entry"; else _ok; fi
   stop_server
+}
+
+test_status_no_env_field() {
+  local pd out
+  pd="$(mkdir -p "$HOME/work/envless" && cd "$HOME/work/envless" && pwd -P)"
+  pcfg "$T/ne.json" "$pd" "http://localhost:1" production
+  out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/ne.json" bash "$S/cyoda-status.sh")"
+  if [[ "$(echo "$out" | head -n1)" == *"ENV="* ]]; then _bad "status line has no ENV="; else _ok; fi
+  rm -rf "$HOME/work/envless"
 }
 
 test_status_project_name_with_spaces() {
@@ -135,6 +144,7 @@ test_status_unknown_env_profile() {
 }
 
 test_status_connected
+test_status_no_env_field
 test_status_project_binding
 test_status_project_name_with_spaces
 test_status_unknown_env_profile

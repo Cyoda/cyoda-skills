@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Print one STATUS line for the bound instance (cyoda-profile.sh), then WARN= lines.
-# STATUS=… PROFILE=… ENDPOINT=… ENV=… VERSION=… BINARY_VERSION=… SOURCE=project|profile|default [PROJECT=<dir>]
+# STATUS=… PROFILE=… ENDPOINT=… VERSION=… BINARY_VERSION=… SOURCE=project|profile|default [PROJECT=<dir>]
 # PROFILE is double-quoted when it contains whitespace or a quote ("my shop", \" inside).
 # PROJECT, when present, is last and runs to the end of the line (it may hold spaces).
 set -uo pipefail
@@ -10,7 +10,6 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROFILE_JSON="$("$HERE/cyoda-profile.sh")" || exit 1
 PROFILE="$(jq -r '.profile' <<<"$PROFILE_JSON")"
 ENDPOINT="$(jq -r '.endpoint // empty' <<<"$PROFILE_JSON")"
-ENVNAME="$(jq -r '.env' <<<"$PROFILE_JSON")"
 SOURCE="$(jq -r '.source // "profile"' <<<"$PROFILE_JSON")"
 PROJECT="$(jq -r '.projectDir // empty' <<<"$PROFILE_JSON")"
 
@@ -55,6 +54,6 @@ qval() { # value -> value, or "value" with \" when it has whitespace or a quote
   esac
 }
 
-echo "STATUS=$STATUS PROFILE=$(qval "$PROFILE") ENDPOINT=${ENDPOINT:-none} ENV=$ENVNAME VERSION=$VERSION BINARY_VERSION=$BINVER SOURCE=$SOURCE${PROJECT:+ PROJECT=$PROJECT}"
+echo "STATUS=$STATUS PROFILE=$(qval "$PROFILE") ENDPOINT=${ENDPOINT:-none} VERSION=$VERSION BINARY_VERSION=$BINVER SOURCE=$SOURCE${PROJECT:+ PROJECT=$PROJECT}"
 for w in "${WARNS[@]:-}"; do [ -n "$w" ] && echo "WARN=$w"; done
 exit 0

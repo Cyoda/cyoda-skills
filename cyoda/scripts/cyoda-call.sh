@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 # Authenticated call to the bound instance's API (cyoda-profile.sh resolves it).
-# Usage: cyoda-call.sh [--confirm-production] <METHOD> <PATH> [curl args...]
+# Usage: cyoda-call.sh <METHOD> <PATH> [curl args...]
 # PATH is relative to <endpoint>/api. Body to stdout, HTTP_STATUS=<code> to stderr.
-# Exit: 0 2xx, 22 >=400, 3 production refusal, 4 token command failed, 5 no endpoint,
+# Exit: 0 2xx, 22 >=400, 4 token command failed, 5 no endpoint,
 # 1 invalid config or unknown CYODA_PROFILE (from cyoda-profile.sh).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-CONFIRM=0
-if [ "${1:-}" = "--confirm-production" ]; then CONFIRM=1; shift; fi
+case "${1:-}" in -*) echo "usage: cyoda-call.sh <METHOD> <PATH> [curl args...]" >&2; exit 64 ;; esac
 if [ $# -lt 2 ]; then
-  echo "usage: cyoda-call.sh [--confirm-production] <METHOD> <PATH> [curl args...]" >&2
+  echo "usage: cyoda-call.sh <METHOD> <PATH> [curl args...]" >&2
   exit 64
 fi
 METHOD="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')"
@@ -20,7 +19,6 @@ shift 2
 
 PROFILE_JSON="$("$HERE/cyoda-profile.sh")"
 ENDPOINT="$(jq -r '.endpoint // empty' <<<"$PROFILE_JSON")"
-ENVNAME="$(jq -r '.env' <<<"$PROFILE_JSON")"
 TOKEN_CMD="$(jq -r '.tokenCommand // empty' <<<"$PROFILE_JSON")"
 # A project binding's tokenCommand (often relative) runs from the project root.
 TOKEN_DIR="$(jq -r 'if .source == "project" then .projectDir // empty else empty end' <<<"$PROFILE_JSON")"
@@ -28,13 +26,6 @@ TOKEN_DIR="$(jq -r 'if .source == "project" then .projectDir // empty else empty
 if [ -z "$ENDPOINT" ]; then
   echo "no endpoint configured; type /cyoda:setup" >&2
   exit 5
-fi
-
-if [ "$ENVNAME" = "production" ] && [ "$CONFIRM" -eq 0 ]; then
-  case "$METHOD" in
-    GET|HEAD) ;;
-    *) echo "PRODUCTION: ask the user to confirm, then re-run with --confirm-production" >&2; exit 3 ;;
-  esac
 fi
 
 # The token never goes into curl's argv (visible in ps): it is written to a

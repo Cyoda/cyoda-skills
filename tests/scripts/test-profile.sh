@@ -21,7 +21,7 @@ test_profile_default_when_no_config() {
   local out
   out="$(unset CYODA_DEFAULT_ENDPOINT; CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-profile.sh")"; local rc=$?
   assert_status 0 "$rc" "exit 0 with no config"
-  assert_eq "$(echo "$out" | jq -c .)" '{"profile":"default","endpoint":"http://localhost:8080","env":"development","tokenCommand":null,"warnings":["no saved profile; using the default local instance http://localhost:8080 — type /cyoda:setup to save it"],"source":"default"}' "implicit default profile"
+  assert_eq "$(echo "$out" | jq -c .)" '{"profile":"default","endpoint":"http://localhost:8080","tokenCommand":null,"warnings":["no saved profile; using the default local instance http://localhost:8080 — type /cyoda:setup to save it"],"source":"default"}' "implicit default profile"
 }
 
 test_profile_existing_config_without_endpoint() {
@@ -55,14 +55,14 @@ J
   local out; out="$(CYODA_PLUGIN_CONFIG="$T/c.json" bash "$S/cyoda-profile.sh")"
   assert_eq "$(echo "$out" | jq -r .profile)" stg "active name"
   assert_eq "$(echo "$out" | jq -r .endpoint)" http://b "active endpoint"
-  assert_eq "$(echo "$out" | jq -r .env)" production "active env"
+  assert_eq "$(echo "$out" | jq 'has("env")')" false "no env key"
   assert_eq "$(echo "$out" | jq -r .tokenCommand)" /x/tok.sh "active tokenCommand"
   assert_eq "$(echo "$out" | jq -c '[.source, has("projectDir")]')" '["profile",false]' "profile source, no projectDir"
   cat >"$T/d.json" <<'J'
 {"profiles":{"default":{"endpoint":"http://a"}}}
 J
   out="$(CYODA_PLUGIN_CONFIG="$T/d.json" bash "$S/cyoda-profile.sh")"
-  assert_eq "$(echo "$out" | jq -r '.endpoint + "/" + .env')" "http://a/development" "env defaults to development"
+  assert_eq "$(echo "$out" | jq -r '.endpoint')" "http://a" "endpoint only"
 }
 
 test_profile_stale_token() {
@@ -93,13 +93,13 @@ cfg() {
 }
 # prof <cwd> [VAR=VAL ...]: cyoda-profile.sh from <cwd> with that config
 prof() { local d="$1"; shift; (cd "$d" && env CYODA_PLUGIN_CONFIG="$T/p.json" "$@" bash "$S/cyoda-profile.sh"); }
-fields() { jq -c '[.source, .profile, .endpoint, .env, .tokenCommand, .projectDir]'; }
+fields() { jq -c '[.source, .profile, .endpoint, .tokenCommand, .projectDir]'; }
 
 test_project_wins_over_active() {
   local pd out; pd="$(real "$W/shop")"
   cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://localhost:8082", tokenCommand: "scripts/auth.sh token"}}')"
   out="$(prof "$pd")"
-  assert_eq "$(echo "$out" | fields)" "[\"project\",\"shop\",\"http://localhost:8082\",\"development\",\"scripts/auth.sh token\",\"$pd\"]" "project entry wins over the active profile; env defaults to development"
+  assert_eq "$(echo "$out" | fields)" "[\"project\",\"shop\",\"http://localhost:8082\",\"scripts/auth.sh token\",\"$pd\"]" "project entry wins over the active profile"
   assert_eq "$(echo "$out" | jq -c .warnings)" '[]' "no warnings"
 }
 
@@ -107,7 +107,7 @@ test_project_subdirectory_matches() {
   local pd out; pd="$(real "$W/sub")"; mkdir -p "$pd/src/deep"
   cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://localhost:8084", env: "production"}}')"
   out="$(prof "$pd/src/deep")"
-  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .env, .projectDir]')" "[\"project\",\"http://localhost:8084\",\"production\",\"$pd\"]" "a subdirectory of a project matches"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .projectDir]')" "[\"project\",\"http://localhost:8084\",\"$pd\"]" "a subdirectory of a project matches"
 }
 
 test_project_nested_nearest_wins() {
@@ -151,8 +151,8 @@ test_project_env_override() {
   local pd out; pd="$(real "$W/ovr")"
   cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://localhost:8082"}}')"
   out="$(prof "$pd" CYODA_PROFILE=stg)"
-  assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .env, .tokenCommand, .source, has("projectDir")]')" \
-    '["stg","http://stg","production","/x/stg.sh","profile",false]' "CYODA_PROFILE wins over the project entry and the active profile"
+  assert_eq "$(echo "$out" | jq -c '[.profile, .endpoint, .tokenCommand, .source, has("projectDir")]')" \
+    '["stg","http://stg","/x/stg.sh","profile",false]' "CYODA_PROFILE wins over the project entry and the active profile"
 }
 
 test_project_env_override_unknown() {

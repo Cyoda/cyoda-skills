@@ -31,17 +31,15 @@ test_call_get_model_list_mock() {
   assert_contains "$(cat "$T/err")" "HTTP_STATUS=200" "status on stderr"
 }
 
-test_call_production_guard() {
+test_call_ignores_env() {   # env: production in an old config changes nothing
   cfg "{\"endpoint\":\"$EP\",\"env\":\"production\"}"
-  local err rc
-  err="$(bash "$S/cyoda-call.sh" POST /model/x/1/lock 2>&1 >/dev/null)"; rc=$?
-  assert_status 3 "$rc" "non-GET refused on production"
-  assert_contains "$err" "PRODUCTION: ask the user to confirm, then re-run with --confirm-production" "refusal text"
-  if grep -q "/model/x/1/lock" "$T/server.log" 2>/dev/null; then _bad "server saw guarded request"; else _ok; fi
-  bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>&1; rc=$?
-  assert_status 0 "$rc" "GET allowed on production"
-  bash "$S/cyoda-call.sh" --confirm-production PUT /model/x/1/lock >/dev/null 2>&1; rc=$?
-  assert_status 22 "$rc" "confirmed call reaches server (404 -> 22)"
+  bash "$S/cyoda-call.sh" PUT /model/x/1/lock >/dev/null 2>&1; rc=$?
+  [ "$rc" -ne 3 ]; assert_status 0 "$?" "no production refusal"
+}
+test_call_confirm_flag_removed() {
+  cfg "{\"endpoint\":\"$EP\"}"
+  bash "$S/cyoda-call.sh" --confirm-production GET /model/ >/dev/null 2>&1
+  assert_status 64 "$?" "flag is a usage error"
 }
 
 test_call_token_command_failure() {
@@ -128,13 +126,10 @@ echo "\$PWD|\$CYODA_ENDPOINT|\$1" >"$T/seen-project"
 echo tok
 SH
   chmod +x "$pd/scripts/tok.sh"
-  pcfg "$(jq -n --arg k "$pd" --arg ep "$EP" '{($k): {endpoint: $ep, env: "development", tokenCommand: "scripts/tok.sh token"}}')"
+  pcfg "$(jq -n --arg k "$pd" --arg ep "$EP" '{($k): {endpoint: $ep, tokenCommand: "scripts/tok.sh token"}}')"
   (cd "$pd/src" && bash "$S/cyoda-call.sh" GET /model/ >/dev/null 2>"$T/err"); rc=$?
   assert_status 0 "$rc" "project entry: GET /model/ ok"
   assert_eq "$(cat "$T/seen-project" 2>/dev/null)" "$pd|$EP|token" "relative tokenCommand runs from projectDir and sees CYODA_ENDPOINT"
-  pcfg "$(jq -n --arg k "$pd" --arg ep "$EP" '{($k): {endpoint: $ep, env: "production"}}')"
-  (cd "$pd/src" && bash "$S/cyoda-call.sh" POST /model/x/1/lock >/dev/null 2>&1); rc=$?
-  assert_status 3 "$rc" "production guard applies to a project entry"
 }
 
 test_call_project_token_command_quoting() {
@@ -188,7 +183,8 @@ SH
 }
 
 test_call_get_model_list_mock
-test_call_production_guard
+test_call_ignores_env
+test_call_confirm_flag_removed
 test_call_token_command_failure
 test_call_no_endpoint
 test_call_no_config_uses_default_endpoint
