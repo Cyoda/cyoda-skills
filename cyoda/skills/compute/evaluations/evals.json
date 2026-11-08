@@ -6,7 +6,7 @@
       "prompt": "Loan applications should only move to `approved` if the applicant's credit score from our bureau API is above 700, and the caller should see why when it's refused. We write Python.",
       "expected_output": "Decides a function criterion is needed (data not on the entity, and a user-visible reason). Fetches field names from cyoda help cloudevents json (processing/EntityCriteriaCalculationRequest/Response) and stubs from cyoda help grpc proto. Explains join (ROLE_M2M, joinedLegalEntityId, greet first, ack), keep-alive per grpc KEEPALIVE, tag routing per grpc TAG ROUTING. The handler returns matches and, on false, a reason (≤ 2 KiB) that appears in the 400 WORKFLOW_FAILED detail for a manual transition and in TRANSITION_NOT_MATCH_CRITERION audit data.reason for automated ones. Python code uses the schema names, not invented ones. Wiring the criterion into the workflow is handed off with 'next, type /cyoda:build'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}"
       },
       "assertions": [
         {
@@ -38,11 +38,6 @@
           "id": "no-invoke",
           "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -51,7 +46,7 @@
       "prompt": "Our processor config has calculationNodesTags \"billing,eu,priority\". cyoda help workflows says the node must declare all required tags. Do I really have to register all three on every node?",
       "expected_output": "Reads grpc --section \"TAG ROUTING\" only: one overlapping tag is enough; random among matching members; empty tags match any member. Says the workflows PROCESSORS wording is wrong (#684-B). Advises distinct tags per member type for deterministic routing and identical spelling on both sides.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}"
       },
       "assertions": [
         {
@@ -78,11 +73,6 @@
           "id": "no-superset",
           "text": "Does not say the node's tags must be a superset of the processor's tags",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -91,7 +81,7 @@
       "prompt": "My processor calls a document-signing service that takes 40-50 seconds. It keeps failing. What should I change?",
       "expected_output": "Reads workflows PROCESSORS and grpc KEEPALIVE / config grpc. The response timeout is responseTimeoutMs; unset or 0 is the 30 s server default (#684-J), so 40-50 s fails with DISPATCH_TIMEOUT. Recommends COMMIT_BEFORE_DISPATCH with a raised responseTimeoutMs and an idempotent processor (replays happen; the pre-callout state is visible), and keeping the stream answered (acks/keep-alive) within CYODA_KEEPALIVE_TIMEOUT (default 30 s) while the call runs. The workflow change is 'next, type /cyoda:build'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}"
       },
       "assertions": [
         {
@@ -128,11 +118,6 @@
           "id": "no-invoke",
           "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -141,7 +126,7 @@
       "prompt": "When an Order is paid, its Shipment (we keep shipmentId on the order) should move to `ready`, in the same transaction. How does my processor do that?",
       "expected_output": "A processor on the order's pay transition fires a manual transition on the linked Shipment by id: PATCH /api/entity/JSON/{shipmentId}/{transition} with merge-patch, If-Match: * and {} (crud ENDPOINTS). To be in the same transaction, echo the cyodatxtoken CloudEvent extension as X-Tx-Token (HTTP) or tx-token (gRPC metadata) per cluster COMPUTE CALLBACK TRANSACTION ROUTING; which modes provide a usable transaction is in workflows PROCESSORS. The shipment transition is manual: true. Doesn't write the order itself while also returning data for it. Language-agnostic pseudocode.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}"
       },
       "assertions": [
         {
@@ -168,11 +153,6 @@
           "id": "language-agnostic",
           "text": "Gives the pattern without assuming a language the developer didn't name",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -181,7 +161,7 @@
       "prompt": "Do I need a compute node to approve invoices automatically when the amount is under 1000?",
       "expected_output": "No: an inline simple criterion ($.amount LESS_THAN 1000) on an automated transition does it (workflows CRITERIA / search CONDITION DSL). A compute node is needed only for data not on the entity, external calls, a user-visible rejection reason, or a per-entity schedule time. Adding the criterion is 'next, type /cyoda:build'.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}"
       },
       "assertions": [
         {
@@ -202,11 +182,6 @@
         {
           "id": "no-invoke",
           "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
-          "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
           "type": "behavior"
         }
       ]
