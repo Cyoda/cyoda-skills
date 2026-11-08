@@ -68,6 +68,10 @@ Unchanged apart from the removals above.
 - `README.md`, `cyoda/README.md`: config without `env`, no production guard.
 - Release `0.5.0`.
 
+## Process
+
+Every skill edit follows `superpowers:writing-skills`, with the evals as the tests: write or change the eval case first, run it against the current skill and see it fail, edit the skill, re-run it and see it pass. Match the guidance form to the failure (a recipe or exact text for wrong-shaped output, a conditional on an observable predicate, no prohibition lists). Also covers rewording three edits made without it on 2026-11-07: `debug` Path E ("never assume…" becomes a positive instruction), and the rationale in `deploy`'s quoted question (that question is reworded here anyway); `app`'s Cloud line is removed.
+
 ## Left to the builder
 
 Exact wording within the rules above; which eval cases are rewritten versus replaced.
