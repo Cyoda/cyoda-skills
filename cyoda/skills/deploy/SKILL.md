@@ -56,7 +56,7 @@ A team, CI or any host other than the developer's own machine needs **shared** o
 
 ## Step 3 — Stages and schema settings
 
-Ask: "Which stage is this for, and is its schema strict?" The developer may name several stages. Each stage name is its `seed.sh --env <stage>`.
+Ask: "Which stage is this for, and is its schema strict?" The developer may name several stages. Each stage name is its `seed.sh --env <stage>`. Compose shared: ask for each stage's host the developer hasn't given.
 
 For each strict stage, read `models --section LIFECYCLE` and `models --section ENDPOINTS` (changeLevel), then ask per entity, word for word:
 > Does any processor write fields to `<entity>` that aren't in its sample? A strict schema rejects them.
@@ -100,15 +100,16 @@ Fill the checklist placeholders:
 - `<NAMESPACE>` (Helm): the namespace.
 - `<DEPLOY_DIR>`: the output dir.
 - `<APP>`: the project name.
-- `<API_URL>`: `http://localhost:18080` for single-user. For shared, `http://<host>:18080` for each stage's host. For Helm, from Step 2.
+- `<API_URL>`: `http://localhost:18080` for single-user. For shared, `http://<host>:18080` with the stage's host. For Helm, from Step 2.
 - `<GRPC_ENDPOINT>`: Compose, the same host with port `19090`, as `host:19090`. For Helm, from Step 2.
+- Several stages: in the Compute nodes table, write the `<GRPC_ENDPOINT>` and `<API_URL>` values once per stage, each prefixed with its stage (e.g. `uat: uat.shop.example.com:19090`).
 - `<TOKEN_COMMAND>`: the absolute path of the project's token script (e.g. `get-token.sh`). Shared or Helm and none exists: copy `${CLAUDE_PLUGIN_ROOT}/skills/auth/templates/get-token.sh` to `scripts/get-token.sh` if the project has a `scripts/` dir, else to the project root, `chmod +x` it, and use that path.
 
 Both compose files publish host ports 18080 (API), 19090 (gRPC) and 19091 (admin), not 8080/9090/9091: the developer's local cyoda-go holds those, so `up` would fail or health, seed and verify would hit the local instance (`CYODA_HOST_*_PORT` overrides them).
 
 ## Step 6 — Hand over
 
-List what was written, one line per file, then what the pipeline runs, per stage: the commands below in this order, with the real paths, namespace, hosts and `VERSION` filled in (from the project root). For several stages, write the commands out in full for each stage, each with that stage's `<API_URL>` and `--env <stage>`.
+List what was written, one line per file (a `get-token.sh` copied in Step 5: its path, marked as new), then what the pipeline runs, per stage: the commands below in this order, with the real paths, namespace, hosts and `VERSION` filled in (from the project root). For several stages, write the commands out in full for each stage, each with that stage's `<API_URL>` and `--env <stage>`.
 
 **Compose** (for single-user, skip 1 and leave out every `CYODA_TOKEN_COMMAND` and `CYODA_CLIENT_*`):
 
