@@ -131,7 +131,7 @@
     {
       "id": 4,
       "prompt": "/cyoda:test",
-      "expected_output": "cyoda-call.sh GET /model/ exits 22 with HTTP_STATUS=401 after the script's own token retry. The skill shows the error and says 'next, type /cyoda:auth'. It doesn't re-run the tokenCommand, doesn't build an auth header or curl by hand, and runs no further calls.",
+      "expected_output": "cyoda-call.sh GET /model/ exits 22 with HTTP_STATUS=401 after the script's own token retry. The skill shows the error and says 'next, type /cyoda:auth'. It doesn't re-run the tokenCommand and runs no further calls.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
         "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev VERSION=0.8.4. cyoda-call.sh GET /model/ exits 22, stderr HTTP_STATUS=401, body {\"error\":\"invalid_token\"} (already retried once with a fresh token)."
@@ -154,7 +154,7 @@
         },
         {
           "id": "no-manual-retry",
-          "text": "Does not re-run the tokenCommand, build an Authorization header, or call curl directly",
+          "text": "Does not re-run the tokenCommand (the script already retried once with a fresh token)",
           "type": "behavior"
         },
         {
@@ -167,7 +167,7 @@
     {
       "id": 5,
       "prompt": "/cyoda:test — guided, for orders, against our ci profile",
-      "expected_output": "Guided mode. Copies ${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh to smoke-test.sh at the project root (no scripts/ dir). The profile's tokenCommand contains spaces and single quotes; the run command quotes it so bash hands the script exactly the stored string, e.g. CYODA_TOKEN_COMMAND='CYODA_CLIENT_ID=ci CYODA_CLIENT_SECRET_CMD='\\''security find-generic-password -s cyoda-ci -w'\\'' /home/dev/shop/scripts/get-token.sh'. The endpoint is quoted too.",
+      "expected_output": "Guided mode. Copies ${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh to smoke-test.sh at the project root (no scripts/ dir). The profile's tokenCommand contains spaces and single quotes; the run command sets CYODA_TOKEN_COMMAND so that bash hands the script exactly the stored tokenCommand string. The endpoint is quoted too.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"ci\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"ci\":{\"endpoint\":\"https://cyoda-ci.internal.example.com\",\"tokenCommand\":\"CYODA_CLIENT_ID=ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-ci -w' /home/dev/shop/scripts/get-token.sh\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
@@ -180,13 +180,8 @@
           "type": "behavior"
         },
         {
-          "id": "token-command-quoted",
-          "text": "The run command sets CYODA_TOKEN_COMMAND inside single quotes, with each single quote of the stored tokenCommand written as '\\'' (or other quoting that gives the exact stored string in bash)",
-          "type": "behavior"
-        },
-        {
           "id": "token-command-verbatim",
-          "text": "The quoted value is the stored tokenCommand character for character: both env prefixes and the `security find-generic-password -s cyoda-ci -w` part are kept",
+          "text": "Pasted into bash, the run command's CYODA_TOKEN_COMMAND value is the stored tokenCommand character for character: both env prefixes and the `security find-generic-password -s cyoda-ci -w` part, with its single quotes, reach the script unchanged",
           "type": "behavior"
         },
         {
