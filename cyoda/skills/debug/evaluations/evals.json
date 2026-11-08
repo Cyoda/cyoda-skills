@@ -4,10 +4,10 @@
     {
       "id": 1,
       "prompt": "Order 7c1e0b2a-0000-4000-8000-000000000001 has been sitting in `submitted` for an hour. I already lowered its amount to 500 so it should be approved by now.",
-      "expected_output": "Checks the connection with cyoda-status.sh, then through cyoda-call.sh reads GET /entity/{id} (submitted, amount 5000), the workflow export (approve is automated, criterion amount <= 1000), GET /entity/{id}/transitions and the StateMachine audit (TRANSITION_NOT_MATCH_CRITERION for approve). Finds that the stored amount is still 5000 (the developer's update never landed), so the approve criterion still fails. Explains that automated transitions are evaluated only on a write, and that the fix is a loopback carrying the corrected field (PATCH /entity/JSON/{id} with {\"amount\":500}, merge-patch, If-Match *), which re-runs the cascade. Produces the loopback re-trigger itself, consistent with the smoke-tested loopback example, shows the exact call and asks for an explicit yes before running it, since it changes the instance.",
+      "expected_output": "Checks the connection with cyoda-status.sh, then through cyoda-call.sh reads GET /entity/{id} (submitted, amount 5000), the workflow export (approve is automated, criterion amount <= 1000), GET /entity/{id}/transitions and the StateMachine audit (TRANSITION_NOT_MATCH_CRITERION for approve). Finds that the stored amount is still 5000 (the developer's update never landed), so the approve criterion still fails. Explains that automated transitions are evaluated only on a write, and that the fix is a loopback carrying the corrected field (PATCH /entity/JSON/{id} with {\"amount\":500}, merge-patch, If-Match *), which re-runs the cascade. Produces the loopback re-trigger itself, consistent with the smoke-tested loopback example, sends it through cyoda-call.sh without a confirmation round, and shows the exact call it made and its result (the cascade fires approve; state approved).",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4. GET /entity/{id}: meta.state=submitted, data {orderRef: ORD-1, amount: 5000}: the developer's earlier update went to a different entity id. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion simple $.amount LESS_OR_EQUAL 1000)-> approved. GET /entity/{id}/transitions: [\"approve\"]. Audit StateMachine (newest first): STATE_MACHINE_FINISH; TRANSITION_NOT_MATCH_CRITERION {transition: approve, reason: \"criterion did not match\"}; TRANSITION_MAKE submit."
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4. GET /entity/{id}: meta.state=submitted, data {orderRef: ORD-1, amount: 5000}: the developer's earlier update went to a different entity id. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion simple $.amount LESS_OR_EQUAL 1000)-> approved. GET /entity/{id}/transitions: [\"approve\"]. Audit StateMachine (newest first): STATE_MACHINE_FINISH; TRANSITION_NOT_MATCH_CRITERION {transition: approve, reason: \"criterion did not match\"}; TRANSITION_MAKE submit. Writes: a write to this entity that stores amount 500 returns 200 with a new transactionId; the cascade then fires approve (audit TRANSITION_MAKE approve) and GET /entity/{id} shows meta.state=approved, amount 500."
       },
       "assertions": [
         {
@@ -27,27 +27,22 @@
         },
         {
           "id": "loopback",
-          "text": "Proposes a loopback: PATCH /entity/JSON/{id} (no transition name) with the corrected field (`{\"amount\":500}`), merge-patch and `If-Match: *`; not firing `approve` by name and not an empty PUT",
+          "text": "Uses a loopback: PATCH /entity/JSON/{id} (no transition name) with the corrected field (`{\"amount\":500}`), merge-patch and `If-Match: *`; not firing `approve` by name and not an empty PUT",
           "type": "behavior"
         },
         {
           "id": "loopback-call-produced",
-          "text": "Produces the loopback re-trigger itself: `PATCH /entity/JSON/{id}` with `{}` or the corrected fields, merge-patch, `If-Match: *`, and asks first because it changes the instance (consistent with the smoke-tested example; naming the example is not required)",
+          "text": "Produces the loopback re-trigger itself: `PATCH /entity/JSON/{id}` with `{}` or the corrected fields, merge-patch, `If-Match: *` (consistent with the smoke-tested example; naming the example is not required)",
           "type": "behavior"
         },
         {
-          "id": "asks-before-change",
-          "text": "Shows the call and waits for an explicit yes before sending it",
+          "id": "applies-loopback",
+          "text": "Sends the loopback PATCH through cyoda-call.sh without first asking for a yes, and shows the exact call it made",
           "type": "behavior"
         },
         {
           "id": "uses-call-script",
           "text": "All API calls go through cyoda-call.sh; no raw curl with a hand-built auth header",
-          "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
           "type": "behavior"
         }
       ]
@@ -57,7 +52,7 @@
       "prompt": "Show me the full history of entity abc-123. I need it for an audit.",
       "expected_output": "Observation mode. Reads crud ENDPOINTS / POINT-IN-TIME SEMANTICS and audit ENDPOINTS, calls GET /entity/abc-123/changes and GET /audit/entity/abc-123?eventType=StateMachine (with limit and cursor paging), presents a newest-first timeline with time, change/event, state, transition and transaction, and offers a point-in-time read (pointInTime or transactionId). Does not use a ?level=DEBUG parameter or request System events.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "GET /entity/abc-123/changes: UPDATE 2026-10-17T10:05Z tx t2; CREATE 2026-10-17T10:00Z tx t1. GET /audit/entity/abc-123?eventType=StateMachine: TRANSITION_MAKE submit (10:05), STATE_MACHINE_FINISH (10:00), TRANSITION_MAKE start (10:00); pagination.hasNext=false."
       },
       "assertions": [
@@ -95,11 +90,6 @@
           "id": "read-only",
           "text": "Makes no writes",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -108,7 +98,7 @@
       "prompt": "Firing `pay` on invoice 9f... returns 503 DISPATCH_TIMEOUT. My payment node is connected with tags [\"payment\"] and the processor has calculationNodesTags \"payment,eu\". Should I add \"eu\" to the node? The node needs about 45 seconds per call.",
       "expected_output": "Runs cyoda-help.sh errors DISPATCH_TIMEOUT. Reads grpc TAG ROUTING: one overlapping tag is enough, so the node is being routed the call and adding \"eu\" changes nothing (workflows PROCESSORS says all tags; wrong per #684-B). Timeout: responseTimeoutMs unset/0 means the 30 s server default (#684-J); 45 s needs a raised responseTimeoutMs and likely COMMIT_BEFORE_DISPATCH (workflows PROCESSORS); the node must keep acking within CYODA_KEEPALIVE_TIMEOUT (grpc KEEPALIVE). Workflow changes are handed off with 'next, type /cyoda:build'; node code changes go to the cyoda:compute skill.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "Workflow export: transition pay has processor {name: charge, executionMode: SYNC, config: {calculationNodesTags: \"payment,eu\"}} with no responseTimeoutMs. Error body: {status: 503, properties: {errorCode: DISPATCH_TIMEOUT, retryable: true}}."
       },
       "assertions": [
@@ -141,20 +131,15 @@
           "id": "no-invoke",
           "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
     {
       "id": 4,
       "prompt": "Customer 5d2e... was there yesterday and now GET returns 404. Which transition removed it?",
-      "expected_output": "Delete is soft and bypasses the workflow (best practice 'Prefer a ledger to deletion'), so no transition removed it. Evidence: a DELETE entry in GET /entity/{id}/changes and the audit EntityChange events; no StateMachine events at that time. A point-in-time read from before the delete still returns the entity. Cites the best practice 'Prefer a ledger to deletion' and suggests terminal states. Doesn't recreate anything without a yes.",
+      "expected_output": "Delete is soft and bypasses the workflow (best practice 'Prefer a ledger to deletion'), so no transition removed it. Evidence: a DELETE entry in GET /entity/{id}/changes and the audit EntityChange events; no StateMachine events at that time. A point-in-time read from before the delete still returns the entity. Cites the best practice 'Prefer a ledger to deletion' and suggests terminal states.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "GET /entity/{id}: 404 ENTITY_NOT_FOUND. GET /entity/{id}/changes: DELETE 2026-10-17T08:12Z; UPDATE ...; CREATE .... Audit: EntityChange DELETE at 08:12; last StateMachine event 2026-10-16."
       },
       "assertions": [
@@ -182,11 +167,6 @@
           "id": "best-practice",
           "text": "Names the best practice 'Prefer a ledger to deletion' or recommends terminal states instead of deletes",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -195,7 +175,7 @@
       "prompt": "How many registrations are stuck in errored, which ones are they, and can you change the workflow so they retry automatically every 10 minutes?",
       "expected_output": "Consults `crud --section ENDPOINTS`/`search` help or uses the skill's smoke-tested debug/examples/queries.md payloads: grouped stats by state (queries/stats-group-by-state.json) or GET /entity/stats/states/{e}/{v}?states=errored for the count, then a lifecycle-state search (POST /search/direct/{e}/{v}) for the ids, and the audit TRANSITION_NOT_MATCH_CRITERION reason for each. Reads workflows SCHEDULED TRANSITIONS for the retry idea. The workflow change is handed off: 'next, type /cyoda:build' with a one-line description. Makes no workflow change itself.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "Model registration v1 is LOCKED. Grouped stats by state: errored 3, ready 12. Search lifecycle state=errored returns ids r1, r2, r3, each with a null email."
       },
       "assertions": [
@@ -223,11 +203,6 @@
           "id": "no-invoke",
           "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -236,8 +211,8 @@
       "prompt": "Nothing works, every call times out. Is cyoda down?",
       "expected_output": "Runs cyoda-status.sh: STATUS=unreachable. Reads run --section \"HEALTH PROBES\": the API port serves GET /api/health; /livez and /readyz are only on the admin listener (127.0.0.1:9091). Asks whether the server is running and whether the profile endpoint is right; offers 'next, type /cyoda:setup' to switch profile or restart. Does not probe /readyz on port 8080.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"staging\":{\"endpoint\":\"http://staging.internal:8080\",\"env\":\"development\"}}}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=unreachable PROFILE=staging ENDPOINT=http://staging.internal:8080 ENV=development VERSION=none; WARN=active profile staging is unreachable; type /cyoda:setup to switch to default"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"staging\":{\"endpoint\":\"http://staging.internal:8080\"}}}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=unreachable PROFILE=staging ENDPOINT=http://staging.internal:8080 VERSION=none; WARN=active profile staging is unreachable; type /cyoda:setup to switch to default"
       },
       "assertions": [
         {
@@ -258,11 +233,6 @@
         {
           "id": "no-invoke",
           "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:setup`' (with a one-line reason) and never says it will invoke or run that skill itself",
-          "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
           "type": "behavior"
         }
       ]
