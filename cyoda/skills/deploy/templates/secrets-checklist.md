@@ -84,7 +84,7 @@ JWT, and send no auth header when it's unset.
 - Single-user: leave `CYODA_TOKEN_COMMAND` unset.
 - Shared and Helm: `CYODA_TOKEN_COMMAND=<TOKEN_COMMAND>`, with `CYODA_CLIENT_ID` and
   `CYODA_CLIENT_SECRET` (or `CYODA_CLIENT_SECRET_CMD`) set to the bootstrap client from
-  2 and 3. Type `/cyoda:auth` in Claude Code to create the token script if you don't have one.
+  2 and 3.
 
 ## Compute nodes
 

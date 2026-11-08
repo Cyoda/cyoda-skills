@@ -31,7 +31,7 @@
         },
         {
           "id": "output-dir",
-          "text": "Writes the files under deploy/cyoda/ because there is no existing deploy/ or ops/ dir",
+          "text": "Writes the files under deploy/cyoda/ (there is no existing deploy/ or ops/ dir)",
           "type": "behavior"
         },
         {
@@ -335,7 +335,7 @@
         },
         {
           "id": "output-dir-existing",
-          "text": "Writes the files under deploy/cyoda/ because a deploy/ dir already exists",
+          "text": "Writes the files under deploy/cyoda/ (a deploy/ dir already exists)",
           "type": "behavior"
         },
         {
