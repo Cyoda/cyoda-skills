@@ -4,12 +4,12 @@
     {
       "id": 1,
       "prompt": "/cyoda:test",
-      "expected_output": "Runs cyoda-status.sh (connected, development). Asks automated or guided; the developer says automated. Discovers models with cyoda-call.sh GET /model/ (orders v1 LOCKED), reads the workflow export, reads crud --section ENDPOINTS, creates an entity from the manifest's sample, reports the state after create (draft), lists GET /entity/{id}/transitions, fires submit with PATCH {} (merge-patch, If-Match: *), checks the state (submitted; approve held by its criterion at amount 5000), prints the summary table, then offers to delete only the entity it created and to show its audit trail.",
+      "expected_output": "Runs cyoda-status.sh (connected). Asks automated or guided; the developer says automated. Discovers models with cyoda-call.sh GET /model/ (orders v1 LOCKED), reads the workflow export, reads crud --section ENDPOINTS, creates an entity from the manifest's sample, reports the state after create (draft), lists GET /entity/{id}/transitions, fires submit with PATCH {} (merge-patch, If-Match: *), checks the state (submitted; approve held by its criterion at amount 5000), prints the summary table, then offers to delete only the entity it created and to show its audit trail.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
         "src/data/orders-v1-sample.json": "{\"orderRef\":\"ORD-1\",\"amount\":5000}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 ENV=development VERSION=0.8.4. GET /model/: [{modelName: orders, modelVersion: 1, currentState: LOCKED}]. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion $.amount LESS_OR_EQUAL 1000)-> approved. Create returns [{entityIds:[e1]}]; GET e1: draft; transitions: [submit]; PATCH submit 200; GET e1: submitted; transitions then: []. The developer chooses automated."
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4. GET /model/: [{modelName: orders, modelVersion: 1, currentState: LOCKED}]. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion $.amount LESS_OR_EQUAL 1000)-> approved. Create returns [{entityIds:[e1]}]; GET e1: draft; transitions: [submit]; PATCH submit 200; GET e1: submitted; transitions then: []. The developer chooses automated."
       },
       "assertions": [
         {
@@ -51,11 +51,6 @@
           "id": "uses-call-script",
           "text": "Every API call goes through cyoda-call.sh",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
@@ -64,10 +59,10 @@
       "prompt": "/cyoda:test — give me a script I can re-run in CI for orders",
       "expected_output": "Guided mode. Discovers orders v1 and its manual transition submit. Copies templates/smoke-test.sh unchanged to scripts/smoke-test.sh (scripts/ exists), and gives the run command with ENTITY_NAME=orders MODEL_VERSION=1 TRANSITION_NAME=submit EXPECTED_STATE=submitted CYODA_ENDPOINT=<endpoint> and CYODA_TOKEN_COMMAND set to the profile's tokenCommand. Explains the script checks the model is LOCKED, creates from the manifest sample, fires the transition with PATCH {}, and ends === PASS === / === FAIL ===. No .cyoda/config, no stored token.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"env\":\"development\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
         "scripts/get-token.sh": "#!/usr/bin/env bash\n# prints a JWT",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev ENDPOINT=https://cyoda-dev.internal.example.com ENV=development VERSION=0.8.4. GET /model/ lists orders v1 LOCKED; the workflow is as in the loopback example (draft -submit-> submitted). cyoda-profile.sh prints tokenCommand /home/dev/shop/scripts/get-token.sh."
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.8.4. GET /model/ lists orders v1 LOCKED; the workflow is as in the loopback example (draft -submit-> submitted). cyoda-profile.sh prints tokenCommand /home/dev/shop/scripts/get-token.sh."
       },
       "assertions": [
         {
@@ -94,21 +89,21 @@
           "id": "explains-pass-fail",
           "text": "Says the script ends with `=== PASS ===` (exit 0) or `=== FAIL ===` (exit 1)",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
     {
       "id": 3,
       "prompt": "/cyoda:test",
-      "expected_output": "Runs cyoda-status.sh: ENV=production on profile prod. Before any create, asks 'This test creates real entities and fires real transitions. Proceed? (yes/no)'. The developer says no: stops without any POST/PATCH. Also, from GET /model/ (allowed on production), notes invoice v2 is UNLOCKED and says 'not locked yet; next, type /cyoda:build to finish registering it'.",
+      "expected_output": "Setup: real server, --seed-project (registers and locks orders v1 with its workflow), then import src/data/invoice-v2-sample.json as invoice v2 with POST /api/model/import/JSON/SAMPLE_DATA/invoice/2, not locked. Runs cyoda-status.sh (connected, profile default). Asks automated or guided; the developer says automated. Lists models with cyoda-call.sh GET /model/: orders v1 LOCKED, invoice v2 UNLOCKED. Reads models --section LIFECYCLE and lists invoice v2 as skipped: not locked yet, so it can't hold entities; next, type /cyoda:build to finish registering it. Tests orders v1: reads its workflow export, creates an entity from the manifest's sample, reports the state after create (draft), fires submit with PATCH {} (merge-patch, If-Match: *), checks the state (submitted), and prints the summary table with orders v1 PASS. Creates no invoice entity.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"prod\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"prod\":{\"endpoint\":\"https://cyoda.example.com\",\"env\":\"production\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=prod ENDPOINT=https://cyoda.example.com ENV=production VERSION=0.8.4. GET /model/: orders v1 LOCKED, invoice v2 UNLOCKED. The developer answers 'no' to the production question."
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
+        "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"},{\"name\":\"invoice\",\"modelVersion\":2,\"sample\":\"src/data/invoice-v2-sample.json\",\"workflow\":\"src/workflows/invoice-v2-workflow.json\",\"config\":\"src/config/invoice-v2-config.json\"}]}",
+        "src/data/orders-v1-sample.json": "{\"orderRef\":\"ORD-1\",\"amount\":5000}",
+        "src/workflows/orders-v1-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"orders\",\"initialState\":\"draft\",\"active\":true,\"states\":{\"draft\":{\"transitions\":[{\"name\":\"submit\",\"next\":\"submitted\",\"manual\":true}]},\"submitted\":{}}}]}",
+        "src/data/invoice-v2-sample.json": "{\"invoiceNo\":\"INV-1\",\"total\":120,\"currency\":\"EUR\"}",
+        "src/workflows/invoice-v2-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"invoice\",\"initialState\":\"open\",\"active\":true,\"states\":{\"open\":{\"transitions\":[{\"name\":\"pay\",\"next\":\"paid\",\"manual\":true}]},\"paid\":{}}}]}",
+        "_simulated/developer.md": "Asked whether to run the smoke test now (automated) or get a script (guided), the developer says: \"automated\". Asked about clean-up or the audit trail afterwards, the developer says: \"no\"."
       },
       "assertions": [
         {
@@ -117,28 +112,18 @@
           "type": "behavior"
         },
         {
-          "id": "production-confirm",
-          "text": "Asks for explicit confirmation before creating entities on the production profile",
+          "id": "tests-orders",
+          "text": "Tests orders v1 through cyoda-call.sh: creates an entity from src/data/orders-v1-sample.json, fires `submit`, and reports the resulting state (submitted) against the workflow, with real successful responses in the transcript",
           "type": "behavior"
         },
         {
-          "id": "stops-on-no",
-          "text": "After 'no', sends no POST, PATCH or DELETE and does not pass --confirm-production",
-          "type": "behavior"
-        },
-        {
-          "id": "unlocked-skipped",
-          "text": "Lists invoice v2 as not testable because it is UNLOCKED",
+          "id": "unlocked-not-testable",
+          "text": "Reports invoice v2 as not testable until it is locked (it is UNLOCKED), and creates no invoice entity",
           "type": "behavior"
         },
         {
           "id": "no-invoke",
           "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
-          "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
           "type": "behavior"
         }
       ]
@@ -148,8 +133,8 @@
       "prompt": "/cyoda:test",
       "expected_output": "cyoda-call.sh GET /model/ exits 22 with HTTP_STATUS=401 after the script's own token retry. The skill shows the error and says 'next, type /cyoda:auth'. It doesn't re-run the tokenCommand, doesn't build an auth header or curl by hand, and runs no further calls.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"env\":\"development\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev ENV=development VERSION=0.8.4. cyoda-call.sh GET /model/ exits 22, stderr HTTP_STATUS=401, body {\"error\":\"invalid_token\"} (already retried once with a fresh token)."
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev VERSION=0.8.4. cyoda-call.sh GET /model/ exits 22, stderr HTTP_STATUS=401, body {\"error\":\"invalid_token\"} (already retried once with a fresh token)."
       },
       "assertions": [
         {
@@ -176,22 +161,17 @@
           "id": "stops",
           "text": "Runs no further API calls after the 401",
           "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
-          "type": "behavior"
         }
       ]
     },
     {
       "id": 5,
-      "prompt": "/cyoda:test — guided, for orders, against our prod-ci profile",
-      "expected_output": "Guided mode. Copies ${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh to smoke-test.sh at the project root (no scripts/ dir). The profile's tokenCommand contains spaces and single quotes, so the run command wraps it in single quotes with each inner ' written as '\\'': CYODA_TOKEN_COMMAND='CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='\\''security find-generic-password -s cyoda-prod -w'\\'' /home/dev/shop/scripts/get-token.sh'. The endpoint is quoted too. Pasted into bash, the command hands the script exactly the stored tokenCommand.",
+      "prompt": "/cyoda:test — guided, for orders, against our ci profile",
+      "expected_output": "Guided mode. Copies ${CLAUDE_PLUGIN_ROOT}/skills/test/templates/smoke-test.sh to smoke-test.sh at the project root (no scripts/ dir). The profile's tokenCommand contains spaces and single quotes; the run command quotes it so bash hands the script exactly the stored string, e.g. CYODA_TOKEN_COMMAND='CYODA_CLIENT_ID=ci CYODA_CLIENT_SECRET_CMD='\\''security find-generic-password -s cyoda-ci -w'\\'' /home/dev/shop/scripts/get-token.sh'. The endpoint is quoted too.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"prod-ci\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\"},\"prod-ci\":{\"endpoint\":\"https://cyoda-ci.internal.example.com\",\"env\":\"development\",\"tokenCommand\":\"CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-prod -w' /home/dev/shop/scripts/get-token.sh\"}}}",
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"ci\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"ci\":{\"endpoint\":\"https://cyoda-ci.internal.example.com\",\"tokenCommand\":\"CYODA_CLIENT_ID=ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-ci -w' /home/dev/shop/scripts/get-token.sh\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=prod-ci ENDPOINT=https://cyoda-ci.internal.example.com ENV=development VERSION=0.8.4. GET /model/ lists orders v1 LOCKED (draft -submit(manual)-> submitted). cyoda-profile.sh prints the tokenCommand exactly as stored in the config. There is no scripts/ directory."
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=ci ENDPOINT=https://cyoda-ci.internal.example.com VERSION=0.8.4. GET /model/ lists orders v1 LOCKED (draft -submit(manual)-> submitted). cyoda-profile.sh prints the tokenCommand exactly as stored in the config. There is no scripts/ directory."
       },
       "assertions": [
         {
@@ -206,7 +186,7 @@
         },
         {
           "id": "token-command-verbatim",
-          "text": "The quoted value is the stored tokenCommand character for character: both env prefixes and the `security find-generic-password -s cyoda-prod -w` part are kept",
+          "text": "The quoted value is the stored tokenCommand character for character: both env prefixes and the `security find-generic-password -s cyoda-ci -w` part are kept",
           "type": "behavior"
         },
         {
@@ -217,11 +197,6 @@
         {
           "id": "no-secret",
           "text": "Puts no token or secret value in the command or the script",
-          "type": "behavior"
-        },
-        {
-          "id": "no-cloud",
-          "text": "Does not mention Cyoda Cloud in its own wording or recommendations",
           "type": "behavior"
         }
       ]
