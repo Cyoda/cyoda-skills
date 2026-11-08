@@ -1,7 +1,7 @@
 ---
 name: design
 description: Use when the developer describes an application idea for cyoda-go, asks how to model their domain as Cyoda entities and workflows, or wants a proposed entity or workflow design reviewed before building it.
-allowed-tools: Bash(*cyoda-help.sh *) Read Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
+allowed-tools: Bash(*cyoda-help.sh *) Read Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(mktemp *) Bash(rm *)
 ---
 
 # Cyoda application design

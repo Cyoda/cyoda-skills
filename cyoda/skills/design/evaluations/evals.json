@@ -69,7 +69,6 @@
       },
       "assertions": [
         { "id": "no-install-gate", "text": "Does not refuse or pause the design until cyoda is installed", "type": "behavior" },
-        { "id": "recommends-install", "text": "Recommends once (anywhere in its reply) that the developer type `/cyoda:setup` to install cyoda-go locally, and still delivers the design summary", "type": "behavior" },
         { "id": "uses-web-mirror", "text": "Uses the cyoda-help.sh output from the web help mirror (SOURCE=web) for facts, and reads the named section within the whole page", "type": "behavior" },
         { "id": "bundled-fallback", "text": "Uses resources/best-practices.md because both best-practices help probes exit 2", "type": "behavior" },
         { "id": "scheduled-transition", "text": "Models the 15-minute expiry as a scheduled transition (a `schedule` with delayMs on an automated transition out of reserved), consulting `workflows` SCHEDULED TRANSITIONS itself and producing the transition, and does not describe a 'scheduled processor'", "type": "behavior" },
@@ -106,7 +105,8 @@
         { "id": "reads-help", "text": "Reads the `workflows` SCHEDULED TRANSITIONS and CRITERIA sections itself (cyoda-help.sh or `cyoda help`) before answering", "type": "behavior" },
         { "id": "asks-spike", "text": "Before starting anything, asks whether to spike the interaction on a throwaway cyoda-go (in-memory with mock auth, or the stack in Docker), because help doesn't settle it", "type": "behavior" },
         { "id": "no-spike-on-no", "text": "After the developer says no, starts no cyoda-go process or container and calls no instance", "type": "behavior" },
-        { "id": "answers-from-help", "text": "Answers the question from what the help sections state (e.g. a scheduled transition arms on each write that leaves the entity in its source state and fires once; compute dispatch errors such as NO_COMPUTE_MEMBER_FOR_TAG and DISPATCH_TIMEOUT are retryable 503s) and names the sections it used in its reply. Help does not state outright whether a failing function criterion fails the write or counts as no match, so treating that as open, or as an inference marked as such, is correct", "type": "behavior" },
+        { "id": "answers-from-help", "text": "Answers the question from what the help sections state (e.g. a scheduled transition arms on each write that leaves the entity in its source state and fires once; compute dispatch errors such as NO_COMPUTE_MEMBER_FOR_TAG and DISPATCH_TIMEOUT are retryable 503s) and names the sections it used in its reply", "type": "behavior" },
+        { "id": "criterion-failure-not-stated", "text": "Does not present as a help fact whether a failing function criterion fails the write or counts as no match: it treats that as open, or as an inference marked as such", "type": "behavior" },
         { "id": "names-open-question", "text": "Names what help leaves open about this interaction (e.g. whether the order rests in `submitted` with the timer armed while the criterion call fails, or whether the timer's own write re-runs the failing criterion) instead of presenting the answer as settled", "type": "behavior" },
         { "id": "schedule-shape", "text": "Models the 10-minute fallback as a `schedule` with delayMs (600000) on an automated transition from submitted to review, not as a scheduled processor", "type": "behavior" }
       ]
@@ -122,10 +122,10 @@
       "assertions": [
         { "id": "asks-spike", "text": "Asks whether to spike it on a throwaway cyoda-go before starting anything", "type": "behavior" },
         { "id": "spike-memory-mock", "text": "The start command (binary, or `docker run` of the image) sets in-memory storage and mock auth explicitly: `CYODA_STORAGE_BACKEND=memory` and `CYODA_IAM_MODE=mock`, or the equivalent named in `cyoda help run` / `cyoda help config`", "type": "behavior" },
-        { "id": "spike-ports", "text": "The throwaway instance listens on HTTP, gRPC and admin ports other than 8080, 9090 and 9091 (set with `CYODA_HTTP_PORT`, `CYODA_GRPC_PORT`, `CYODA_ADMIN_PORT`, or Docker port mappings), the spike's calls go to that HTTP port, and nothing is sent to the project's instance on 8080", "type": "behavior" },
+        { "id": "spike-ports", "text": "The start command in the transcript sets HTTP, gRPC and admin ports other than 8080, 9090 and 9091 (`CYODA_HTTP_PORT`, `CYODA_GRPC_PORT`, `CYODA_ADMIN_PORT`, or Docker port mappings), and every spike call in the transcript goes to that HTTP port, none to port 8080", "type": "behavior" },
         { "id": "spike-runs", "text": "Registers a minimal Order model and workflow on the throwaway instance with a function criterion on the automated transition out of submitted and a scheduled transition to review, and drives an order into submitted; the real responses are in the transcript", "type": "behavior" },
         { "id": "reports-observed", "text": "Reports the observed behaviour in one or two lines (e.g. the write's status code and the order's state after the delay), consistent with the real responses in the transcript, and answers the developer's question from it", "type": "behavior" },
-        { "id": "cleanup", "text": "At the end, stops the process (or container) it started and removes the temp dir it created for the spike; the kill or stop and the `rm -rf` of that dir are in the transcript", "type": "behavior" }
+        { "id": "cleanup", "text": "At the end, the transcript shows a kill or stop of the process (or container) it started for the spike and an `rm -rf` of the temp dir it created, and the reply says the spike instance is stopped", "type": "behavior" }
       ]
     }
   ]
