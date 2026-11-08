@@ -19,6 +19,7 @@ Two modes: **debugging** (something failed or looks wrong) and **observation** (
 | 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error and say "next, type `/cyoda:auth`". Otherwise the error is evidence: read it (Path A) |
 | 4 | the profile's tokenCommand failed | show stderr and say "next, type `/cyoda:auth`" |
 | 5 | no endpoint configured | "next, type `/cyoda:setup`" |
+| 64 | usage error (a leading `-` or a missing method/path) | fix the call form |
 
 Diagnose with GETs and query POSTs, then repair:
 - A model or workflow change (new state, criterion, transition, changeLevel, new model version): "Next, type `/cyoda:build` to make this change: <one line>."

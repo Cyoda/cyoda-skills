@@ -42,7 +42,7 @@
         },
         {
           "id": "uses-call-script",
-          "text": "All API calls go through cyoda-call.sh; no raw curl with a hand-built auth header",
+          "text": "All API calls go through cyoda-call.sh",
           "type": "behavior"
         }
       ]
