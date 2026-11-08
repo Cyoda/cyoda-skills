@@ -33,15 +33,16 @@
     {
       "id": 3,
       "prompt": "/cyoda:status",
-      "expected_output": "cyoda-status.sh prints STATUS=connected PROFILE=staging ENDPOINT=https://cyoda-staging.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile. The skill reports 'Connected to cyoda-go v0.8.4 — https://cyoda-staging.example.com [profile: staging]', with no [PRODUCTION] tag.",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=none BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop and WARN=project shop is bound to http://localhost:8082, which is unreachable; type /cyoda:setup to start it or re-link this project. The skill reports 'cyoda-go unreachable — http://localhost:8082 [project: shop]', then 'Warning: project shop is bound to http://localhost:8082, which is unreachable; type /cyoda:setup to start it or re-link this project', and adds no second setup hand-off because the warning already names /cyoda:setup.",
       "files": {
-        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"staging\":{\"endpoint\":\"https://cyoda-staging.example.com\",\"tokenCommand\":\"/work/shop/scripts/get-token.sh\"}}}",
-        "_simulated/status.txt": "STATUS=connected PROFILE=staging ENDPOINT=https://cyoda-staging.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile"
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}},\"projects\":{\"/Users/dev/work/shop\":{\"endpoint\":\"http://localhost:8082\"}}}",
+        "_simulated/status.txt": "STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=none BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop\nWARN=project shop is bound to http://localhost:8082, which is unreachable; type /cyoda:setup to start it or re-link this project"
       },
       "assertions": [
-        { "id": "connected-line", "text": "Reports 'Connected to cyoda-go v0.8.4 — https://cyoda-staging.example.com [profile: staging]'", "type": "format" },
-        { "id": "no-production-tag", "text": "Does not add a [PRODUCTION] tag", "type": "format" },
-        { "id": "no-mutation", "text": "Makes no API call other than what cyoda-status.sh does", "type": "behavior" }
+        { "id": "unreachable-project-line", "text": "Reports 'cyoda-go unreachable — http://localhost:8082 [project: shop]'", "type": "format" },
+        { "id": "warning-line", "text": "Prints 'Warning: project shop is bound to http://localhost:8082, which is unreachable; type /cyoda:setup to start it or re-link this project'", "type": "format" },
+        { "id": "no-duplicate-handoff", "text": "Does not add a separate 'next, type `/cyoda:setup`' line after the warning that already names /cyoda:setup", "type": "behavior" },
+        { "id": "no-start", "text": "Does not start cyoda-go, edit the plugin config or re-link the project itself", "type": "behavior" }
       ]
     },
     {

@@ -17,11 +17,11 @@ allowed-tools: Bash(*cyoda-status.sh*)
 | `unreachable` | `cyoda-go unreachable — <E> <TAG>` |
 | `not_configured` | `Not connected — type /cyoda:setup` |
 
-   - `<TAG>` comes from `SOURCE`: `project` → `[project: <P>]`, also when an active profile is set (this project's entry in the plugin config's `projects` map; `<P>` is the project dir's name); `profile` or `default` → `[profile: <P>]`.
+   - `<TAG>` comes from `SOURCE`: `project` → `[project: <P>]`; `profile` or `default` → `[profile: <P>]`.
    - `VERSION=unknown`: write `version unknown` in place of `v<V>`.
    - `<V>` is the instance's version; `BINARY_VERSION` is the local `cyoda` binary.
-3. After the status line, print every `WARN=` line as it is, one per line, prefixed `Warning: `.
-4. When a warning or the status calls for a fix, end with the command to type: "next, type `/cyoda:setup`" (connection, profile, project link) or "next, type `/cyoda:auth`" (token).
+3. After the status line, print each `WARN=<text>` line as `Warning: <text>`.
+4. If `STATUS` is `unreachable` or `not_configured`, or a `WARN=` line is present, and no printed line names `/cyoda:setup`, end with "next, type `/cyoda:setup`".
 
 ## Examples
 
