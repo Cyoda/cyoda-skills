@@ -1,7 +1,7 @@
 ---
 name: build
 description: Use when the developer types /cyoda:build to add or change a cyoda-go entity model or workflow (new entity, state, transition, criterion, processor, schedule, unique key, changeLevel, new model version) and keep it as versioned project files.
-allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(find *) Bash(grep *) Bash(ls *) Bash(mkdir *) Bash(cat *)
+allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(find *) Bash(grep *) Bash(ls *) Bash(mkdir *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
 disable-model-invocation: true
 ---
 
@@ -9,16 +9,15 @@ disable-model-invocation: true
 
 One increment per loop: inspect the instance, agree the change, write the project files, register them in the canonical order, verify, and hand off.
 
-**Facts come from `cyoda help`, not from this file.** Each step names the help section to read. Read the section, not the whole topic: run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` (stderr shows `SOURCE=instance|binary|web`). Exit 2 means unknown topic and exit 6 means unknown section (the stderr lists the sections that exist). Tell the developer which section you used.
+**Facts come from `cyoda help`, not from this file.** Each step names the help section to read. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` (stderr shows `SOURCE=instance|binary|web`). Exit 2 means unknown topic and exit 6 means unknown section (the stderr lists the sections that exist). In your reply, name the section each fact comes from, e.g. "`DISPATCH_TIMEOUT` is a retryable 503 (`errors DISPATCH_TIMEOUT`)".
 
-**Every API call** goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh [--confirm-production] <METHOD> <PATH> [curl args...]`. PATH is relative to `<endpoint>/api` (e.g. `/model/`). The body goes to stdout and `HTTP_STATUS=<code>` to stderr. Never build a URL or auth header yourself, and never guess a path that the named help section doesn't list.
+**Every API call** goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh <METHOD> <PATH> [curl args...]`. PATH is relative to `<endpoint>/api` (e.g. `/model/`), as the named help section gives it. The body goes to stdout and `HTTP_STATUS=<code>` to stderr.
 
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | 2xx | continue |
 | 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr, stop, and say "next, type `/cyoda:setup`" |
 | 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error, stop, and say "next, type `/cyoda:auth`". Anything else: see [When a call fails](#when-a-call-fails) |
-| 3 | production refusal | see [Production guard](#production-guard) |
 | 4 | the profile's tokenCommand failed | show stderr, stop, and say "next, type `/cyoda:auth`" |
 | 5 | no endpoint configured | stop and say "next, type `/cyoda:setup`" |
 
@@ -29,7 +28,6 @@ Request bodies are files: pass `--data-binary @<file>`, never stdin (a token ret
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`.
 - `STATUS=not_configured`: say "No cyoda-go instance is configured. Next, type `/cyoda:setup`." Stop.
 - `STATUS=unreachable`: show the `WARN=` line and stop.
-- `ENV=production`: tell the developer up front: "Profile `<PROFILE>` (`<ENDPOINT>`) is a **production** instance. I'll ask before every change."
 - Show any other `WARN=` lines as they are.
 
 ## Step 1 — Inspect
@@ -42,7 +40,7 @@ Fresh instance and empty project: suggest the hello-world increment ([examples/h
 
 ## Step 2 — Agree the increment
 
-Ask what to add or change: a new entity with a workflow, a state, a transition, a criterion, a processor, a scheduled transition, unique keys, or the changeLevel. Ask the minimum questions, one at a time. Skip questions the request already answers.
+Ask what to add or change: a new entity with a workflow, a state, a transition, a criterion, a processor, a scheduled transition, unique keys, or the changeLevel.
 
 Judgment calls (read the named section before proposing):
 
@@ -51,8 +49,11 @@ Judgment calls (read the named section before proposing):
 | States and transitions | `workflows --section TRANSITIONS` | Keep to the states the developer named, plus at least one terminal state. Use `manual: true` only for user-triggered actions |
 | Criteria | `workflows --section CRITERIA`, `search --section "CONDITION DSL"` | Prefer a built-in `simple`/`group` criterion. Use a function criterion only when it needs data that isn't on the entity |
 | Processors | `workflows --section PROCESSORS` | Tags match by **overlap** (any one shared tag). Use `grpc --section "TAG ROUTING"` for routing, not PROCESSORS (#684-B). The processor code itself is a compute node: see the `cyoda:compute` skill |
+| A function criterion or processor that fails or times out | `workflows --section CRITERIA`, `workflows --section PROCESSORS`, `errors DISPATCH_TIMEOUT` | Answer from these three, naming each next to the fact it gives |
 | Time-based moves | `workflows --section "SCHEDULED TRANSITIONS"` | A `schedule` object on an automated transition, not a separate processor |
 | Loop limits | `workflows --section "ENGINE EXECUTION"` | Mind the per-state visit limit when a cycle is intentional |
+
+When help doesn't settle how the behaviour you're building plays out (e.g. what a timed-out function criterion does to its transition), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker) before writing files; `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly. On no, carry on with the increment from help.
 
 For **error states, terminal states, loopback, validation cycles and rejection reasons**, follow the shared best practices. Probe the help topic first: `cyoda-help.sh workflows best-practices`, then `cyoda-help.sh design` (both exit 2 until #684-L ships). Fall back to `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md` and name the bullets you applied.
 
@@ -94,43 +95,23 @@ Build the three files from [templates/](templates/) and the closest example:
 - `-workflow.json`: `{"workflows":[...]}` only, shaped per `workflows --section "WORKFLOW SCHEMA"`. Keep `"version": "${SCHEMA_VERSION}"` in the file. The value is substituted at import time.
 - `-config.json`: the Step 4 answers.
 
-Show all three, plus the list of API calls you'll make, and ask: "Does this look right? (yes to proceed, or describe changes)". Wait for yes.
-
-Developer-supplied files (exports, hand-written workflows) go through the same show-and-confirm. Show the exact body you will send (after any reshape) and the calls, then wait for yes. "Register this" is a request to start, not the confirmation.
+Show all three, plus the list of API calls you'll make, and ask: "Does this look right? (yes to proceed, or describe changes)". Wait for yes. Developer-supplied files (exports, hand-written workflows) get the same: show the exact body you will send (after any reshape) and the calls.
 
 ## Step 6 — Save the files
 
-**Detect the layout** (scan first, then fall back):
-```bash
-if [ -f pom.xml ] || [ -f build.gradle ] || [ -f build.gradle.kts ]; then echo java
-elif [ -f package.json ] && [ -f tsconfig.json ]; then echo typescript
-elif [ -f package.json ]; then echo javascript
-elif [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f setup.py ]; then echo python
-else find . -maxdepth 4 -type d \( -name workflow -o -name workflows \) -not -path '*/node_modules/*' | head -1; fi
-```
+**Layout** (detect from the project's build files):
 
 | Detected | Workflow | Sample | Config | Model class (only if asked) |
 |---|---|---|---|---|
-| Java | `src/main/resources/workflow/` | `src/main/resources/data/` | `src/main/resources/config/` | `src/main/java/{pkg}/model/` |
-| TypeScript/JS | `src/workflows/` | `src/data/` | `src/config/` | `src/models/` |
-| Python | `{package}/workflows/` | `resources/data/` | `resources/config/` | `{package}/models/` |
+| Java (`pom.xml`, `build.gradle*`) | `src/main/resources/workflow/` | `src/main/resources/data/` | `src/main/resources/config/` | `src/main/java/{pkg}/model/` |
+| TypeScript/JS (`package.json`) | `src/workflows/` | `src/data/` | `src/config/` | `src/models/` |
+| Python (`pyproject.toml`, `requirements.txt`, `setup.py`) | `{package}/workflows/` | `resources/data/` | `resources/config/` | `{package}/models/` |
 | Existing `workflow/` or `workflows/` dir | mirror it; sibling `data/` and `config/` | | | |
 | Nothing found | TypeScript defaults | | | |
 
-Java `{pkg}`: `grep -rh "^package " src/main/java/ | head -1 | sed 's/^package //; s/;.*//' | tr . /` (fallback `src/main/java/model/`).
+**Naming — `{entity}-v{version}-{type}.json`** with the entity in kebab-case: `order-v1-sample.json`, `order-v1-workflow.json`, `order-v1-config.json`. Code classes follow language casing (`OrderV1.java`, `OrderV1.ts`, `order_v1_model.py`). A same-version change updates that version's files in place. A new version is written next to the old files; the old version's files stay unchanged.
 
-**Naming — `{entity}-v{version}-{type}.json`** with the entity in kebab-case: `order-v1-sample.json`, `order-v1-workflow.json`, `order-v1-config.json`. Code classes follow language casing (`OrderV1.java`, `OrderV1.ts`, `order_v1_model.py`). A same-version change updates that version's files in place. A new version is written next to the old files; never edit or delete the old version's files.
-
-**Manifest** (`cyoda-manifest.json` at the project root; schema: [templates/cyoda-manifest.json](templates/cyoda-manifest.json)). Create it if it's missing: `{"manifestVersion":1,"entities":[]}`. Then upsert the entry for this entity version, keyed by `name` + `modelVersion` (an integer). Paths are relative to the project root:
-```bash
-jq --arg n order --argjson v 1 --arg s src/data/order-v1-sample.json \
-   --arg w src/workflows/order-v1-workflow.json --arg c src/config/order-v1-config.json \
-   '.entities = ([.entities[] | select(.name != $n or .modelVersion != $v)]
-                 + [{name:$n, modelVersion:$v, sample:$s, workflow:$w, config:$c}])' \
-   cyoda-manifest.json > cyoda-manifest.json.tmp && mv cyoda-manifest.json.tmp cyoda-manifest.json
-```
-
-Tell the developer each relative path saved.
+**Manifest**: `cyoda-manifest.json` at the project root, `{"manifestVersion":1,"entities":[{name, modelVersion, sample, workflow, config}]}` ([templates/cyoda-manifest.json](templates/cyoda-manifest.json)). `modelVersion` is an integer and the paths are relative to the project root. Create it if it's missing, then upsert this entity version's entry, keyed by `name` + `modelVersion`.
 
 **Reshaping an export.** An export is `{entityName, modelVersion, workflows}`, and the import rejects unknown fields (#684-I). Save only `jq '{workflows}'` of it.
 
@@ -150,18 +131,11 @@ Read `models --section ENDPOINTS` and `workflows --section "IMPORT REQUEST"`. Th
 
 Entities are created only after the workflow is imported. Creating them is `/cyoda:test`'s job, not this skill's.
 
-### Production guard
-
-Exit 3 means the profile has `env: production` and the call mutates. Don't add `--confirm-production` before you've asked. On exit 3, list the remaining calls of this increment (method and path) and ask: "This changes production instance `<ENDPOINT>`. Proceed? (yes/no)". Only after an explicit yes, re-run those calls with `--confirm-production`. The next increment needs a new yes. GET calls never need it.
-
 ### When a call fails
 
-Exit 22 with a status other than 401/403:
-1. Read `errorCode` from the body (`.properties.errorCode`) and run `cyoda-help.sh errors <errorCode>`. For model calls, also check `models --section ERRORS`. The full index is `errors --section "ERROR CODE INDEX"`, and codes missing from the index are still reachable as subtopics: `errors <CODE>` resolves any code (`cyoda help errors --format=json` lists them all under `children`).
-2. Explain the cause using the help text and the response `detail`. Fix the **payload**. The path stays as the help section gives it: don't try alternate URLs.
-3. Common causes: `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED` (version not substituted); `BAD_REQUEST` "unknown field" (export posted verbatim: reshape, #684-I); `VALIDATION_FAILED` (the `detail` names the workflow, state or transition); `MODEL_ALREADY_LOCKED` (go back to Step 3).
-4. Show the corrected file, update the saved project file to match, and re-run from the failed step after a yes.
-5. If it still fails, offer the `cyoda:debug` skill with the call, status and body.
+Exit 22 with a status other than 401/403: read `errorCode` from the body (`.properties.errorCode`) and run `cyoda-help.sh errors <errorCode>`. For model calls, also check `models --section ERRORS`. The full index is `errors --section "ERROR CODE INDEX"`, and codes missing from the index are still reachable as subtopics: `errors <CODE>` resolves any code (`cyoda help errors --format=json` lists them all under `children`). Fix the payload, update the saved project file to match, and re-run from the failed step on the same path.
+
+Common causes: `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED` (version not substituted); `BAD_REQUEST` "unknown field" (export posted verbatim: reshape, #684-I); `VALIDATION_FAILED` (the `detail` names the workflow, state or transition); `MODEL_ALREADY_LOCKED` (go back to Step 3).
 
 ## Step 8 — Verify and hand off
 
@@ -177,6 +151,4 @@ Close with: "Registered `{e}` v{v}. Files: `<paths>`, manifest updated. Next, ty
 | Hard-coding the workflow `version` | `${SCHEMA_VERSION}` in the file, substituted from `workflows schema-version versions` |
 | Re-importing a sample into a LOCKED model with entities | New model version (Step 3) |
 | Posting a workflow export as is | `{importMode, workflows}` only (#684-I) |
-| Retrying a 4xx with a guessed path | `cyoda-help.sh errors <code>`, fix the payload |
-| Passing `--confirm-production` pre-emptively | Only after exit 3 and an explicit yes |
 | Handling 401 by re-running the token command | The script already did. Say "next, type `/cyoda:auth`" |
