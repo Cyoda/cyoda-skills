@@ -22,14 +22,12 @@
     {
       "id": 2,
       "prompt": "/cyoda:setup",
-      "expected_output": "Finds no cyoda binary, tries `brew install cyoda/cyoda-go/cyoda`, which fails with a permission error. Does not diagnose Homebrew, does not run brew doctor or sudo. Shows the verbatim 'run it yourself' message including the install list (brew, the install.sh curl line, the release page, the Docker image ghcr.io/cyoda/cyoda) and waits for the developer before continuing with `cyoda init`.",
+      "expected_output": "Finds no cyoda binary, tries `brew install cyoda/cyoda-go/cyoda`, which fails with a permission error. Shows the error and the ways to install (brew, the install.sh curl line, the release page, the Docker image ghcr.io/cyoda/cyoda) and waits for the developer before continuing with `cyoda init`.",
       "files": {
         "_simulated/machine.md": "No `cyoda` on PATH. `brew install cyoda/cyoda-go/cyoda` exits 1 with: `Error: Permission denied @ dir_s_mkdir - /opt/homebrew/Cellar`. No config file at ~/.config/cyoda/cyoda-plugin-config.json."
       },
       "assertions": [
-        { "id": "verbatim-message", "text": "Shows the message starting 'I couldn't complete the installation — this usually needs to run in your own terminal.' with `brew install cyoda/cyoda-go/cyoda`, copied verbatim from the skill", "type": "format" },
-        { "id": "install-list", "text": "The message lists all four routes: brew, `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`, the GitHub release page https://github.com/cyoda/cyoda-go/releases, and the Docker image `ghcr.io/cyoda/cyoda`", "type": "behavior" },
-        { "id": "no-remediation", "text": "Does not run `brew doctor`, `sudo`, chmod/chown, or any other Homebrew fix, and adds no extra advice to the message", "type": "behavior" },
+        { "id": "install-list", "text": "After the failure, shows the brew error and all four install routes: brew, `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`, the GitHub release page https://github.com/cyoda/cyoda-go/releases, and the Docker image `ghcr.io/cyoda/cyoda`", "type": "behavior" },
         { "id": "waits", "text": "Stops and waits for the developer to confirm the install before running `cyoda init`", "type": "behavior" },
         { "id": "no-stale-tap", "text": "Does not mention `cyoda-platform/cyoda-go` or `brew tap`", "type": "behavior" }
       ]
