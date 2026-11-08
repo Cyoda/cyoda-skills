@@ -1,7 +1,7 @@
 # cyoda-go secrets checklist — <MODE>
 
-Deployment files: `<DEPLOY_DIR>/`. Create everything below **before** the first
-`docker compose up` or `helm install`. This file names each secret and where cyoda-go
+Deployment files: `<DEPLOY_DIR>/`. Create everything below **before** the instance
+first starts. This file names each secret and where cyoda-go
 reads it. It holds no secret values: keep it that way.
 
 Facts: `cyoda help config auth` (OPTIONS), `cyoda help quickstart` (PRODUCTION CHECKLIST,
@@ -88,8 +88,7 @@ JWT, and send no auth header when it's unset.
 
 ## Compute nodes
 
-Compute nodes connect to the gRPC port (Compose: host port 19090; Helm: the gRPC route or
-Ingress host, or `cyoda.<NAMESPACE>.svc:9090` in the cluster), not the REST port. Give each node:
+Compute nodes connect to the gRPC endpoint, not the REST port. Give each node:
 
 | Variable | Value | Notes |
 |---|---|---|

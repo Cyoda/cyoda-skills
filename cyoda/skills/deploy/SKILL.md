@@ -13,7 +13,7 @@ Writes the files that deploy and seed a cyoda-go instance into the developer's p
 
 **Scope: cyoda-go only.** The developer's own services and compute-node images aren't deployed here. The instance is made reachable for compute nodes (gRPC port, `CYODA_COMPUTE_GRPC_ENDPOINT`).
 
-**Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` and say which one you used. Templates are under `${CLAUDE_PLUGIN_ROOT}/skills/deploy/templates/`.
+**Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"`. In your reply, name the sections your facts come from. Templates are under `${CLAUDE_PLUGIN_ROOT}/skills/deploy/templates/`.
 
 ## Step 0 — Connection
 
@@ -96,7 +96,7 @@ Fill `values.yaml` (Helm), keeping its comments:
 - Check: `grep -n '<[A-Z_]*>' <DIR>/values.yaml` prints nothing.
 
 Fill the checklist placeholders:
-- `<MODE>`: single-user, shared or helm. Keep that mode's section and delete the others with their comment lines.
+- `<MODE>`: single-user, shared or helm. Keep that mode's section and delete the others with their comment lines. In "Tokens for seed.sh, verify.sh and your app" and "Compute nodes", keep only the lines and table values for that mode.
 - `<NAMESPACE>` (Helm): the namespace.
 - `<DEPLOY_DIR>`: the output dir.
 - `<APP>`: the project name.
