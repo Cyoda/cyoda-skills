@@ -46,7 +46,15 @@ Point your agent to this repository and ask it to read the skill files before bu
 
 ## Connection config
 
-The plugin keeps its connections in `~/.config/cyoda/cyoda-plugin-config.json`: machine-wide profiles (no tokens; a `tokenCommand` fetches a fresh one per call) and, under `projects`, per-project links. `/cyoda:setup` can link a project directory to its own instance; inside it that link wins over the active profile, so several projects with their own cyoda-go stacks can be worked on at once. Nothing is written into the project. `CYODA_PROFILE=<name>` picks a machine-wide profile over both. Details: [cyoda/README.md](cyoda/README.md#connection-config).
+The plugin keeps its connections in `~/.config/cyoda/cyoda-plugin-config.json`: machine-wide profiles (no tokens; a `tokenCommand` fetches a fresh one per call) and, under `projects`, per-project links. A local cyoda-go is the expected setup; the spike skills can use a throwaway in-memory one. `/cyoda:setup` can link a project directory to its own instance; inside it that link wins over the active profile, so several projects with their own cyoda-go stacks can be worked on at once. Nothing is written into the project. `CYODA_PROFILE=<name>` picks a machine-wide profile over both. Details: [cyoda/README.md](cyoda/README.md#connection-config).
+
+## Release notes — 0.5.0
+
+- A local cyoda-go is the expected setup; `/cyoda:setup` starts and links a project's own Compose stack.
+- `design`, `build`, `compute` and `debug` can offer a spike on a throwaway in-memory cyoda-go.
+- Profiles and project links no longer have `env`, and the production guard (`--confirm-production`) is gone.
+- Skills are trimmed to Cyoda-specific content.
+- Run `/plugin marketplace update cyoda` to pick up this release.
 
 ## Release notes — 0.4.0
 

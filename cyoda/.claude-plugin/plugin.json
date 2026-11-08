@@ -1,7 +1,7 @@
 {
   "name": "cyoda",
   "description": "Build, test, and run applications on cyoda-go: entity and workflow design, compute nodes, testing, debugging, and self-hosted deployment.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": {
     "name": "Cyoda Platform"
   },

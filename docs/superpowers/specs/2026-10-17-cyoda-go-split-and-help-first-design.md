@@ -2,6 +2,7 @@
 
 **Date:** 2026-10-17
 **Status:** Draft, awaiting approval
+**Note:** Parts superseded by `2026-11-07-dev-package-local-first-design.md`.
 **Supersedes:** cloud-related parts of `2026-04-24-cyoda-plugin-design.md`. That doc stays as history; this one is the source of truth for the plugin's shape from here on.
 
 ## Intent

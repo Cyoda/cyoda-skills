@@ -35,10 +35,10 @@ test_marketplace_single_plugin() {
 
 test_plugin_version() {
   local p="$ROOT/cyoda/.claude-plugin/plugin.json"
-  assert_eq "$(jq -r .version "$p")" 0.4.0 "plugin version"
+  assert_eq "$(jq -r .version "$p")" 0.5.0 "plugin version"
   assert_eq "$(jq -r .repository "$p")" https://github.com/Cyoda/cyoda-skills "plugin repository"
   jq -r .description "$p" | grep -q Cloud; assert_status 1 $? "description has no Cloud"
-  assert_eq "$(jq -r .version "$ROOT/cyoda/gemini-extension.json")" 0.4.0 "gemini version"
+  assert_eq "$(jq -r .version "$ROOT/cyoda/gemini-extension.json")" 0.5.0 "gemini version"
 }
 
 test_lint_cloud_clean() {
