@@ -64,7 +64,7 @@ The script reads:
 | `CYODA_CLIENT_SECRET_CMD` | a command that prints the secret, e.g. `security find-generic-password -s cyoda-<profile> -w` (macOS Keychain), `secret-tool lookup service cyoda-<profile>` (Linux), `pass show cyoda/<profile>`. Takes precedence |
 | `CYODA_ENDPOINT` | set automatically from the profile by the plugin's scripts |
 
-The agent never receives the secret, and writes neither the secret nor a token to any file: the developer sets `CYODA_CLIENT_SECRET` or `CYODA_CLIENT_SECRET_CMD` in their own shell. Ask whether the variables are already set. If not, the developer sets them in the shell they start Claude Code from (shell profile, or `.envrc` with direnv), then restarts the session: the plugin's scripts inherit that environment. Then continue at Step 4.
+The agent never receives the secret, and writes neither the secret nor a token to any file: the developer sets `CYODA_CLIENT_SECRET` or `CYODA_CLIENT_SECRET_CMD` in their own shell. Ask whether the variables are already set. If not, the developer sets them in the shell they start Claude Code from (shell profile, or `.envrc` with direnv), then restarts the session: the plugin's scripts inherit that environment.
 
 ## Step 4 — Write the script into the project
 
