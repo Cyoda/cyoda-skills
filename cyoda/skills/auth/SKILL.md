@@ -9,11 +9,9 @@ disable-model-invocation: true
 
 Sets up a **token script** in the developer's project and points the current binding's `tokenCommand` at it (this project's entry in the plugin config's `projects` map, or else the active profile). The plugin's scripts run it before each API call, so every call gets a fresh JWT.
 
-**The plugin stores no tokens or secrets.** The script reads the client credentials from the developer's own environment or keychain. A profile or project entry holds only `endpoint`, `env` and `tokenCommand`. Never ask the developer to paste a secret into the conversation, and never print a token.
+The plugin stores no tokens or secrets: a profile or project entry holds only `endpoint` and `tokenCommand`, and the script reads the client credentials from the developer's environment or keychain.
 
 **Facts come from `cyoda help`.** Read sections with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` and say which one you used.
-
-A Cloud or migration question: reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it.
 
 ## Step 0 — Connection
 
@@ -44,7 +42,7 @@ For OIDC and trusted keys, help the developer write a command that prints one JW
 
 **No client yet (M2M)?** Creating a client needs an admin credential the developer already holds (a `ROLE_ADMIN` token, e.g. from the bootstrap client: read `auth clients --section PREREQUISITES`). Without one, the operator sets a bootstrap client in the server config (`config auth --section OPTIONS`, "Bootstrap M2M client"), and that is the client.
 
-With one: the create response carries `client_secret`, so that response never passes through you (no `cyoda-call.sh`, no curl of your own). Read `auth clients --section "REQUEST FLOW"`, then write a command for the developer to run **in their own terminal**: the admin token goes in through `-H @<(…)` (not argv), the whole response lands in a 0600 file outside the project, and only `client_id` is printed:
+With one: the create response carries `client_secret` (`auth clients --section "REQUEST FLOW"`). Give the developer this command to run in their own terminal; it saves the response to a 0600 file outside the project and prints only `client_id`:
 
 ```bash
 ( umask 077; mkdir -p ~/.secrets; R=~/.secrets/cyoda-<PROFILE>-client.json
@@ -66,13 +64,12 @@ The script reads:
 | `CYODA_CLIENT_SECRET_CMD` | a command that prints the secret, e.g. `security find-generic-password -s cyoda-<profile> -w` (macOS Keychain), `secret-tool lookup service cyoda-<profile>` (Linux), `pass show cyoda/<profile>`. Takes precedence |
 | `CYODA_ENDPOINT` | set automatically from the profile by the plugin's scripts |
 
-Ask whether they're already set; don't echo their values to check. If not, tell the developer to set them **in the shell they start Claude Code from** (shell profile, or a gitignored `.envrc` with direnv), then restart the session. The plugin's shell inherits that environment, and an `export` run inside the session doesn't carry between calls. Prefer `CYODA_CLIENT_SECRET_CMD` with a keychain over a plain secret in a file.
+Ask whether they're already set. If not, the developer sets them in the shell they start Claude Code from (shell profile, or `.envrc` with direnv), then restarts the session: the plugin's scripts inherit that environment.
 
 ## Step 4 — Write the script into the project
 
 1. **Where:** if the project root has a `scripts/` dir (`ls -d scripts`), use `scripts/get-token.sh`; otherwise `get-token.sh` at the project root.
-2. **Copy** `${CLAUDE_PLUGIN_ROOT}/skills/auth/templates/get-token.sh` there and `chmod +x` it. If a file with that name exists and differs (`cmp`), show the difference and ask before replacing it.
-3. Tell the developer it holds no secret and can be committed. Their seed, verify and CI scripts can call it too.
+2. **Copy** `${CLAUDE_PLUGIN_ROOT}/skills/auth/templates/get-token.sh` there and `chmod +x` it. If a file with that name exists and differs (`cmp`), ask before replacing it.
 
 ## Step 5 — Test before saving
 
@@ -82,7 +79,7 @@ Run it once without showing the token:
 ( set -o pipefail; CYODA_ENDPOINT="<ENDPOINT>" "<ABS_PATH>" | awk -F. '{print NF " parts, " length($0) " chars"}' ); echo "exit=$?"
 ```
 
-`pipefail` keeps the script's exit status (a bare pipe reports `awk`'s). `exit=0` and `3 parts`: it works. On `exit=1`, show the `get-token:` line from stderr and explain it in a line or two. **Don't save the `tokenCommand` and don't retry in a loop.** Wait for the developer to fix it, then test again.
+`exit=0` and `3 parts`: it works, go to Step 6. `exit=1`: show the `get-token:` line from stderr, explain it from the table in a line or two, and test again once the developer says it's fixed. Step 6 runs only after a passing test.
 
 | stderr says | Meaning |
 |---|---|
@@ -106,9 +103,9 @@ Otherwise set `tokenCommand` to the script's **absolute** path, on the profile f
 ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh '.profiles[$p].tokenCommand = $tc' --arg p '<PROFILE>' --arg tc '<ABS_PATH>'
 ```
 
-The script is the only way to change the config: it keeps the other sections and leaves the file 0600. Each placeholder sits in single quotes, copied character for character, with each `'` in it written as `'\''`. Exit 1: show its stderr; exit 3: the config isn't writable (don't try `sudo`, `chmod` or `chown`).
+`cyoda-config-write.sh` is the only way to change the config. Exit 1: show its stderr; exit 3: the config isn't writable, say so.
 
-If another profile needs other credentials, its `tokenCommand` can set them in front of the same script, for example `CYODA_CLIENT_ID=prod-ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-prod -w' /abs/path/get-token.sh`. That keeps a staging secret away from prod, and still stores no secret.
+If another profile needs other credentials, its `tokenCommand` sets them in front of the same script, for example `CYODA_CLIENT_ID=ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-staging -w' /abs/path/get-token.sh`.
 
 Then verify with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh GET /model/`. Exit 0: done. Exit 4: the token command failed in the plugin's shell (back to Step 3). Exit 22 with 403: the client lacks a role (`auth tokens --section ERRORS`).
 
@@ -117,7 +114,6 @@ Then verify with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh GET /model/`. Exit
 Read `cyoda-help.sh auth tokens --section "REQUEST FLOW"` and `--section TOKEN`, then explain:
 - **cyoda-go issues no refresh token** (`cyoda help auth tokens`, REQUEST FLOW). The app mints a new token with the same grant before the current one expires (`expires_in` in the response), and on a 401 it mints a new one once and retries.
 - It sends the token as `Authorization: Bearer <token>` on REST. A compute node sends it in gRPC metadata (`cyoda help grpc --section CONNECTION`).
-- The app reads the credentials from its own runtime config or secret store, not from this script.
 
 ## Finish
 
@@ -127,9 +123,6 @@ Report: the script's path, the profile (or project entry) and its `tokenCommand`
 
 | Mistake | Fix |
 |---|---|
-| Asking for the secret in chat, or writing it to a file | Env var or `CYODA_CLIENT_SECRET_CMD` in the developer's shell |
-| Creating a client through `cyoda-call.sh` (its response, with `client_secret`, lands in the conversation) | A command the developer runs in their own terminal, secret straight to a 0600 file |
-| Printing the token to check it | Count its parts with `awk` |
 | Relative `tokenCommand` in a machine-wide profile | Absolute path there; only a `projects` entry may use a path relative to the project root |
 | Saving `tokenCommand` before the test passes | Test first (Step 5) |
 | Writing a token script for a mock instance | Mock: "no token needed", stop |
