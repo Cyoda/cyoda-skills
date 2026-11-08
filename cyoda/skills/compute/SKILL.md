@@ -81,7 +81,7 @@ Read `workflows --section PROCESSORS`. `executionMode` is set per processor in t
 
 **Timeout.** `responseTimeoutMs` on the processor's config. Unset or `0` means the server default of 30 s, not a node default (#684-J). A miss is `DISPATCH_TIMEOUT` (503). Prefer raising `responseTimeoutMs` with `COMMIT_BEFORE_DISPATCH` over long `SYNC` calls.
 
-When help doesn't settle how the execution mode, timeout and callbacks combine (e.g. what a `COMMIT_BEFORE_DISPATCH` replay re-runs), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
+**Behaviour help doesn't settle.** When help doesn't settle how the execution mode, timeout and callbacks combine (e.g. what a `COMMIT_BEFORE_DISPATCH` replay re-runs), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
 
 ## Step 7 — Calling back into Cyoda
 
@@ -98,6 +98,6 @@ A processor may read or write other entities over REST (`CYODA_COMPUTE_HTTP_BASE
 - Keep answering within `CYODA_KEEPALIVE_TIMEOUT`, even while work is in progress.
 - The server's `cyoda_dispatch_*` metrics are on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
 
-**Not available in cyoda-go 0.8.4** (accepted for parity, but not implemented; `workflows` PROCESSORS): processor `type: "internalized"` (fails at dispatch), `asyncResult: true` and `crossoverToAsyncMs` (rejected at import), and `retryPolicy` retries (dispatch is single-shot).
+**Not available in cyoda-go 0.8.4** (`workflows` PROCESSORS; they can't be relied on at runtime): processor `type: "internalized"` (fails at dispatch), `asyncResult: true` and `crossoverToAsyncMs` (rejected at import), and `retryPolicy` retries (dispatch is single-shot).
 
 For a failing node, use the `cyoda:debug` skill (Path C).
