@@ -20,6 +20,7 @@ One increment per loop: inspect the instance, agree the change, write the projec
 | 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error, stop, and say "next, type `/cyoda:auth`". Anything else: see [When a call fails](#when-a-call-fails) |
 | 4 | the profile's tokenCommand failed | show stderr, stop, and say "next, type `/cyoda:auth`" |
 | 5 | no endpoint configured | stop and say "next, type `/cyoda:setup`" |
+| 64 | usage error (a leading `-` or a missing method/path) | fix the call form |
 
 Request bodies are files: pass `--data-binary @<file>`, never stdin (a token retry would resend an empty body).
 
@@ -40,7 +41,7 @@ Fresh instance and empty project: suggest the hello-world increment ([examples/h
 
 ## Step 2 — Agree the increment
 
-Ask what to add or change: a new entity with a workflow, a state, a transition, a criterion, a processor, a scheduled transition, unique keys, or the changeLevel.
+Ask what to add or change.
 
 Judgment calls (read the named section before proposing):
 
@@ -86,7 +87,7 @@ Ask, and record the answers in the entity's `-config.json` (schema: [templates/e
 
 1. **Unique keys**: any field or field combination that must be unique? Shape and limits: `models --section ENDPOINTS` (unique-keys). Record them in `uniqueKeys` (`[]` for none).
 2. **changeLevel**: read the values from `models --section ENDPOINTS` (changeLevel) and `models --section LIFECYCLE`. Then ask: "Which changeLevel do you want? None keeps the schema strict: entities and processor output may only use the sample's fields. Or one of the values listed there, from least to most permissive." Ask whether any processor writes fields that aren't in the sample, because a strict schema rejects them. Record the choice in `changeLevel`, or `null` for none.
-3. Leave `env` as `{}`. Per-environment overrides are recorded when the developer deploys.
+3. Leave `env` as `{}`.
 
 ## Step 5 — Generate and confirm
 
@@ -141,7 +142,7 @@ Common causes: `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED` (version not substituted); 
 
 Run `cyoda-call.sh GET /model/` and `cyoda-call.sh GET /model/{e}/{v}/workflow/export`. Show that the model is LOCKED and that the workflow has the expected states.
 
-Close with: "Registered `{e}` v{v}. Files: `<paths>`, manifest updated. Next, type `/cyoda:test` to smoke-test this increment, or tell me the next change." For the next change, start again at Step 1.
+Close with: "Registered `{e}` v{v}. Files: `<paths>`, manifest updated. Next, type `/cyoda:test` to smoke-test this increment, or tell me the next change."
 
 ## Common mistakes
 
