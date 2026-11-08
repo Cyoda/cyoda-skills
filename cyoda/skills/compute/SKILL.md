@@ -1,12 +1,12 @@
 ---
 name: compute
 description: Use when a cyoda-go workflow needs the developer's own code (a processor, a function criterion, or a schedule function served by a compute node over gRPC), when deciding whether a compute node is needed at all, or when a compute node won't connect, isn't routed requests, is evicted, or times out.
-allowed-tools: Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *)
+allowed-tools: Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
 ---
 
 # Cyoda compute nodes
 
-A compute node is the developer's own process. It holds a gRPC stream open to cyoda-go and answers the processor, criteria and function requests that workflows send it. This skill is language-agnostic: give the protocol, the decisions and pseudocode, and write real code only in the language the developer uses.
+A compute node is the developer's own process: it holds a gRPC stream open to cyoda-go and answers the processor, criteria and function requests that workflows send it. Write real code in the language the developer uses; if they haven't named one, give pseudocode.
 
 **Facts come from `cyoda help`, not from this file or memory.** Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> --section "<NAME>"` (stderr shows `SOURCE=instance|binary|web`). Exit 2: unknown topic; exit 6: unknown section (stderr lists the sections). Name the section you used.
 
@@ -38,7 +38,7 @@ Read `grpc --section CONNECTION` and `grpc --section "COMPUTE MEMBER PROTOCOL"`,
 1. Open `CloudEventsService.startStreaming` on the gRPC port (`localhost:9090` by default, plaintext; TLS ends at an ingress). Metadata `authorization: Bearer <token>`. The token needs `ROLE_M2M`; mock mode grants it by default (`config auth --section OPTIONS`). For a JWT instance, the node mints its own token the way the `auth` skill's `get-token.sh` does, from credentials in its environment.
 2. Send `CalculationMemberJoinEvent` first, with the node's tags and `joinedLegalEntityId` equal to the token's tenant.
 3. The first event back is `CalculationMemberGreetEvent`. Keep its `memberId` and acknowledge it with `EventAckResponse`.
-4. Read the stream continuously, and write to it from one place only (one goroutine, thread or task at a time). See [resources/grpc-patterns.md](resources/grpc-patterns.md) for the single-writer queue and reconnection.
+4. The full lifecycle and event envelope: [resources/grpc-patterns.md](resources/grpc-patterns.md).
 
 Client settings, by the convention in `cyoda help config grpc`: `CYODA_COMPUTE_GRPC_ENDPOINT`, `CYODA_COMPUTE_TOKEN`, and `CYODA_COMPUTE_HTTP_BASE` for REST callbacks. The node reads them; the server doesn't.
 
@@ -81,34 +81,23 @@ Read `workflows --section PROCESSORS`. `executionMode` is set per processor in t
 
 **Timeout.** `responseTimeoutMs` on the processor's config. Unset or `0` means the server default of 30 s, not a node default (#684-J). A miss is `DISPATCH_TIMEOUT` (503). Prefer raising `responseTimeoutMs` with `COMMIT_BEFORE_DISPATCH` over long `SYNC` calls.
 
+When help doesn't settle how the execution mode, timeout and callbacks combine (e.g. what a `COMMIT_BEFORE_DISPATCH` replay re-runs), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
+
 ## Step 7 — Calling back into Cyoda
 
 A processor may read or write other entities over REST (`CYODA_COMPUTE_HTTP_BASE`) or the gRPC entity services.
 - **Joining the transaction.** Each dispatched request carries a signed token in the CloudEvent extension `cyodatxtoken`. Echo it as the `X-Tx-Token` HTTP header or `tx-token` gRPC metadata, and the callback runs inside the originating transaction: it sees the cascade's uncommitted writes and commits or rolls back with it (`cluster --section "COMPUTE CALLBACK TRANSACTION ROUTING"`). Without the echo, the callback is a standalone transaction. Which modes supply a usable transaction is in `workflows` PROCESSORS (`startNewTxOnDispatch`).
 - **Don't write the entity you're processing** and also return data for it: the returned data overwrites your write (`workflows` PROCESSORS, best-practice note). Pick one.
 - **Moving a linked entity (event cascade).** Keep the linked entity's id in this entity's data. The processor fires a transition on it: `PATCH <http-base>/api/entity/JSON/{linkedId}/{transition}` with `Content-Type: application/merge-patch+json`, `If-Match: *` and body `{}` (`crud --section ENDPOINTS`). Mark that transition `manual: true` in the linked workflow. With the tx-token the two moves commit together; without it they commit separately. Best practice *Use manual transitions for external triggers*.
-- **Worked cascade:** [examples/cascade/](examples/cascade/) holds the workflow side only. An `order`'s manual `confirm` carries the function criterion `has-address` and the processor `create-shipment`, tagged `smoke-compute`. The processor creates a `shipment` linked by `$.orderId`, stores its id in `$.shipmentId` and fires the shipment's manual `dispatch`. Adapt the names, tags and samples. The files keep `"version": "${SCHEMA_VERSION}"`; importing them is a workflow change: "next, type `/cyoda:build`". No node code is included; write it in the developer's language from Steps 1–7. The order sample declares `shipmentId`, so the processor's returned data passes the locked (strict) model.
+- **Worked cascade:** [examples/cascade/](examples/cascade/) holds the workflow side only. An `order`'s manual `confirm` carries the function criterion `has-address` and the processor `create-shipment`, tagged `smoke-compute`. The processor creates a `shipment` linked by `$.orderId`, stores its id in `$.shipmentId` and fires the shipment's manual `dispatch`. The files keep `"version": "${SCHEMA_VERSION}"`; importing them is a workflow change: "next, type `/cyoda:build`". No node code is included; write it in the developer's language from Steps 1–7. The order sample declares `shipmentId`, so the processor's returned data passes the locked (strict) model.
 
 ## Production checklist
 
-- Idempotent on `requestId`, and on replays for `COMMIT_BEFORE_DISPATCH`.
-- One writer per stream.
-- Reconnect with exponential backoff, a fresh token and a new join; the member id changes.
+- Idempotent on `requestId`, and on replays for `COMMIT_BEFORE_DISPATCH` (a replay arrives as a new request).
+- After a reconnect, join again; the member id changes.
 - Keep answering within `CYODA_KEEPALIVE_TIMEOUT`, even while work is in progress.
-- Track request latency, timeouts, evictions and reconnects. The server's `cyoda_dispatch_*` metrics are on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
+- The server's `cyoda_dispatch_*` metrics are on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
 
-**Not available in cyoda-go 0.8.4** (accepted for parity, but not implemented; `workflows` PROCESSORS): processor `type: "internalized"` (fails at dispatch), `asyncResult: true` and `crossoverToAsyncMs` (rejected at import), and `retryPolicy` retries (dispatch is single-shot). Don't design around them.
+**Not available in cyoda-go 0.8.4** (accepted for parity, but not implemented; `workflows` PROCESSORS): processor `type: "internalized"` (fails at dispatch), `asyncResult: true` and `crossoverToAsyncMs` (rejected at import), and `retryPolicy` retries (dispatch is single-shot).
 
-For a failing node, use the `cyoda:debug` skill (Path C). Cloud or migration questions: reply only "That's not covered by this plugin." Don't name or describe the product or offer alternatives for it.
-
-## Common mistakes
-
-| Mistake | Instead |
-|---|---|
-| Field names from these examples or memory | `cloudevents json` and `grpc proto` |
-| "Register all of the processor's tags" | Overlap, per `grpc` TAG ROUTING (#684-B) |
-| A 60-second response budget | `responseTimeoutMs`; unset is 30 s (#684-J) |
-| Not answering keep-alives while busy | Ack within `CYODA_KEEPALIVE_TIMEOUT` |
-| Two threads writing to the stream | One writer, a send queue |
-| A compute node for a plain field check or a fixed delay | Inline criterion, or `schedule.delayMs` |
-| Callbacks that can't see the cascade's writes | Echo `cyodatxtoken` as `X-Tx-Token` / `tx-token` |
+For a failing node, use the `cyoda:debug` skill (Path C).

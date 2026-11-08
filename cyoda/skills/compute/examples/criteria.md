@@ -4,7 +4,7 @@ Pseudocode for a criteria handler. Field names are placeholders: take the real o
 
 ## Workflow side
 
-A `function` criterion must be the whole criterion on a transition (or a workflow's selection criterion), not nested in a `group`. Its `function.name` arrives as the request's criteria id/name, and `function.config.calculationNodesTags` routes it by tag overlap. Use one only when the check needs data that isn't on the entity, or when the user should see why it failed. A field check on the entity is an inline `simple` criterion and needs no compute node.
+A `function` criterion must be the whole criterion on a transition (or a workflow's selection criterion), not nested in a `group`. Its `function.name` arrives as the request's criteria id/name, and `function.config.calculationNodesTags` routes it by tag overlap.
 
 ## Handler
 
