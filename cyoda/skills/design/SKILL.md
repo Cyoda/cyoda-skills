@@ -6,11 +6,11 @@ allowed-tools: Bash(*cyoda-help.sh *) Read Bash(cyoda *) Bash(docker *) Bash(kil
 
 # Cyoda application design
 
-Turn an app idea into entities and workflows, review them against the Cyoda best practices, and hand a summary to `/cyoda:build`. This skill writes no project files and calls no project instance. The first time `cyoda-help.sh` reports `SOURCE=web`, tell the developer in that reply "Next, type `/cyoda:setup` to install cyoda-go locally" and continue the design.
+Turn an app idea into entities and workflows, review them against the Cyoda best practices, and hand a summary to `/cyoda:build`. This skill writes no project files and calls no project instance.
 
 **Facts come from `cyoda help`, not from this file or from memory.** Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> [--section "<NAME>"]`. It prints the topic or section body, and stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2 means unknown topic; exit 6 means unknown section (stderr lists the sections that exist). With no binary installed it falls back to the web help mirror by itself. The mirror ignores `--section` and prints the whole page, so find the section by its heading there. If a topic you know exists still exits 2 (offline), carry on with the design and tell the developer which facts you couldn't check.
 
-**You read help; the developer gets the result.** Before you propose a query or any pattern whose shape depends on the API or the workflow schema (a stats query, a search, a schedule, a criterion), read the named section yourself. Then write the concrete example for the developer's own entity and fields in the shape that section gives, e.g. the grouped stats request for their Order data. Never copy endpoint or field text from best-practices.md or this file, and never tell the developer to go read help.
+**You read help; the developer gets the result.** Before you propose a query or any pattern whose shape depends on the API or the workflow schema (a stats query, a search, a schedule, a criterion), read the named section yourself. Then write the concrete example for the developer's own entity and fields in the shape that section gives, e.g. the grouped stats request for their Order data. Never copy endpoint or field text from best-practices.md or this file, and never tell the developer to go read help. In your reply, name the sections your facts come from.
 
 ## Step 0 — Load the best practices
 
