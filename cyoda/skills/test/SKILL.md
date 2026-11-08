@@ -20,6 +20,7 @@ Create one entity per model, walk its manual transitions on the happy path, and 
 | 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): a call problem, not a test result. Fix the call and re-run it. 401/403: the script already retried once with a fresh token. Show the error, stop, and say "next, type `/cyoda:auth`". Anything else: record ✗ for the step (Step 3) |
 | 4 | the profile's tokenCommand failed | show stderr, stop, and say "next, type `/cyoda:auth`" |
 | 5 | no endpoint configured | stop and say "next, type `/cyoda:setup`" |
+| 64 | usage error (a leading `-` or a missing method/path) | fix the call form |
 
 Request bodies are files (`--data-binary @<file>`) or a short inline literal (`-d '{}'`), never stdin: a token retry would resend an empty body.
 
@@ -86,4 +87,3 @@ The template [templates/smoke-test.sh](templates/smoke-test.sh) reads everything
 | Mistake | Instead |
 |---|---|
 | Firing a transition with an empty PUT | PATCH `{}` with `If-Match: *` and merge-patch (#684-C) |
-| Handling 401 by re-running the token command | The script already did. Say "next, type `/cyoda:auth`" |

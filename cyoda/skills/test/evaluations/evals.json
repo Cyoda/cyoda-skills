@@ -95,7 +95,7 @@
     {
       "id": 3,
       "prompt": "/cyoda:test",
-      "expected_output": "Setup: real server, --seed-project (registers and locks orders v1 with its workflow), then import src/data/invoice-v2-sample.json as invoice v2 with POST /api/model/import/JSON/SAMPLE_DATA/invoice/2, not locked. Runs cyoda-status.sh (connected, profile default). Asks automated or guided; the developer says automated. Lists models with cyoda-call.sh GET /model/: orders v1 LOCKED, invoice v2 UNLOCKED. Reads models --section LIFECYCLE and lists invoice v2 as skipped: not locked yet, so it can't hold entities; next, type /cyoda:build to finish registering it. Tests orders v1: reads its workflow export, creates an entity from the manifest's sample, reports the state after create (draft), fires submit with PATCH {} (merge-patch, If-Match: *), checks the state (submitted), and prints the summary table with orders v1 PASS. Creates no invoice entity.",
+      "expected_output": "Runs cyoda-status.sh (connected, profile default). Asks automated or guided; the developer says automated. Lists models with cyoda-call.sh GET /model/: orders v1 LOCKED, invoice v2 UNLOCKED. Reads models --section LIFECYCLE and lists invoice v2 as skipped: not locked yet, so it can't hold entities; next, type /cyoda:build to finish registering it. Tests orders v1: reads its workflow export, creates an entity from the manifest's sample, reports the state after create (draft), fires submit with PATCH {} (merge-patch, If-Match: *), checks the state (submitted), and prints the summary table with orders v1 PASS. Creates no invoice entity.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"},{\"name\":\"invoice\",\"modelVersion\":2,\"sample\":\"src/data/invoice-v2-sample.json\",\"workflow\":\"src/workflows/invoice-v2-workflow.json\",\"config\":\"src/config/invoice-v2-config.json\"}]}",
@@ -103,7 +103,8 @@
         "src/workflows/orders-v1-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"orders\",\"initialState\":\"draft\",\"active\":true,\"states\":{\"draft\":{\"transitions\":[{\"name\":\"submit\",\"next\":\"submitted\",\"manual\":true}]},\"submitted\":{}}}]}",
         "src/data/invoice-v2-sample.json": "{\"invoiceNo\":\"INV-1\",\"total\":120,\"currency\":\"EUR\"}",
         "src/workflows/invoice-v2-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"invoice\",\"initialState\":\"open\",\"active\":true,\"states\":{\"open\":{\"transitions\":[{\"name\":\"pay\",\"next\":\"paid\",\"manual\":true}]},\"paid\":{}}}]}",
-        "_simulated/developer.md": "Asked whether to run the smoke test now (automated) or get a script (guided), the developer says: \"automated\". Asked about clean-up or the audit trail afterwards, the developer says: \"no\"."
+        "_simulated/developer.md": "Asked whether to run the smoke test now (automated) or get a script (guided), the developer says: \"automated\". Asked about clean-up or the audit trail afterwards, the developer says: \"no\".",
+        "_simulated/instance.md": "Starting state, made by the eval setup (real server, setup.py --seed-project, then POST /api/model/import/JSON/SAMPLE_DATA/invoice/2 with src/data/invoice-v2-sample.json, not locked): the instance has orders v1 registered and LOCKED with its workflow, and invoice v2 imported but UNLOCKED."
       },
       "assertions": [
         {
