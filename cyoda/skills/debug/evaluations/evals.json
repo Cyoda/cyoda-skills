@@ -118,11 +118,6 @@
           "type": "behavior"
         },
         {
-          "id": "no-60s",
-          "text": "Does not mention a 60-second timeout",
-          "type": "behavior"
-        },
-        {
           "id": "slow-work-mode",
           "text": "Suggests COMMIT_BEFORE_DISPATCH (with idempotency) or another execution mode from workflows PROCESSORS for slow work",
           "type": "behavior"

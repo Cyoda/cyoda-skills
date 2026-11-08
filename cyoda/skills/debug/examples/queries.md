@@ -2,8 +2,6 @@
 
 A walkthrough of the payloads in [queries/](queries/). Smoke scenario `05-queries` posts exactly these two files against v0.8.4, so they're known to work. Endpoint facts: `cyoda help crud` ENDPOINTS (statistics) and `cyoda help search` ENDPOINTS and CONDITION DSL. Each call goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh`. Pass the payload files by their full path under `${CLAUDE_PLUGIN_ROOT}`, as below: a path relative to this file doesn't resolve from the developer's project, curl fails before sending, and the call script reports `HTTP_STATUS=000`.
 
-These are reads, but search and grouped statistics are POSTs. On a `production` profile the call script refuses them (exit 3) until the developer says yes; then re-run with `--confirm-production`.
-
 ## How many entities are in each state
 
 [queries/stats-group-by-state.json](queries/stats-group-by-state.json) is `{"groupBy": ["state"]}`.
