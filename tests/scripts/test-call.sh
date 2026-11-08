@@ -33,8 +33,9 @@ test_call_get_model_list_mock() {
 
 test_call_ignores_env() {   # env: production in an old config changes nothing
   cfg "{\"endpoint\":\"$EP\",\"env\":\"production\"}"
-  bash "$S/cyoda-call.sh" PUT /model/x/1/lock >/dev/null 2>&1; rc=$?
-  [ "$rc" -ne 3 ]; assert_status 0 "$?" "no production refusal"
+  bash "$S/cyoda-call.sh" PUT /model/x/1/lock >/dev/null 2>"$T/err"; rc=$?
+  assert_status 22 "$rc" "no production refusal: the call reaches the server"
+  assert_contains "$(cat "$T/err")" "HTTP_STATUS=404" "unknown model answered 404"
 }
 test_call_confirm_flag_removed() {
   cfg "{\"endpoint\":\"$EP\"}"
@@ -148,6 +149,17 @@ SH
   assert_eq "$(cat "$T/seen-quoted" 2>/dev/null)" "two words|it's \$HOME" "tokenCommand with spaces and quotes runs as written"
 }
 
+test_call_project_env_production_mutates() {   # env: production on a project entry changes nothing
+  local pd rc; pd="$(mkdir -p "$HOME/prodproj" && cd "$HOME/prodproj" && pwd -P)"
+  pcfg "$(jq -n --arg k "$pd" --arg ep "$EP" '{($k): {endpoint: $ep, env: "production"}}')"
+  echo '{"name":"a","n":1}' >"$T/envtest-sample.json"
+  (cd "$pd" && bash "$S/cyoda-call.sh" POST /model/import/JSON/SAMPLE_DATA/envtest/1 \
+    -H 'Content-Type: application/json' --data-binary @"$T/envtest-sample.json" >/dev/null 2>"$T/err"); rc=$?
+  assert_status 0 "$rc" "project env production: mutating call runs"
+  assert_contains "$(cat "$T/err")" "HTTP_STATUS=200" "sample import answered 200"
+  rm -rf "$pd"
+}
+
 test_call_planted_project_file_never_run() {
   # Regression: a .cyoda/ file in the project tree is never read, so its
   # tokenCommand never runs and its endpoint is never called.
@@ -192,6 +204,7 @@ test_call_header_quoting
 test_call_token_command_sees_endpoint
 test_call_project_relative_token_command
 test_call_project_token_command_quoting
+test_call_project_env_production_mutates
 test_call_planted_project_file_never_run
 test_call_retries_once_on_401
 report
