@@ -110,7 +110,7 @@ test_status_project_binding() {
   pcfg "$T/g.json" "$pd" "http://localhost:1"
   out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable PROFILE=shop" "project entry unreachable"
-  assert_contains "$out" "WARN=project shop is bound to http://localhost:1, which is unreachable; start that instance, or type /cyoda:setup to link this project to another one" "project unreachable warn"
+  assert_contains "$out" "WARN=project shop is bound to http://localhost:1, which is unreachable; type /cyoda:setup to start it or re-link this project" "project unreachable warn"
   if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for a project entry"; else _ok; fi
   stop_server
 }
