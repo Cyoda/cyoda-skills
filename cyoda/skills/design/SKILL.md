@@ -51,7 +51,7 @@ Edge messages (`cyoda help messages`) never fire a transition, so a "message-tri
 
 **Q5:** *"Must any field, or combination of fields, be unique across all [entity]s, such as an order number or an email?"* These are unique keys, set before the model is locked (`models --section ENDPOINTS`, unique-keys).
 
-**Q6:** Read `models --section LIFECYCLE` first. Explain from it: the schema is taken from sample data, and the model is locked before any entity exists. The choice is how much the schema may still grow on writes: none (strict, only the sample's fields), or one of the changeLevel values listed there, from least to most permissive. Ask: *"Do you expect to add fields while you build, and will any processor write fields that aren't in your sample?"* Prototype: a permissive level. Production: none or a narrow one. It can be changed later.
+**Q6:** Read `models --section LIFECYCLE` first. Explain from it: the schema is taken from sample data, and the model is locked before any entity exists. The choice is how much the schema may still grow on writes: none (strict, only the sample's fields), or one of the changeLevel values listed there, from least to most permissive. Ask: *"Do you expect to add fields while you build, and will any processor write fields that aren't in your sample?"* Prototype: a permissive level. It can be changed later.
 
 ## Phase 3 — Design review
 
@@ -124,7 +124,9 @@ Ask: *"Does this match what you want? (yes, or tell me what to change)"*
 
 Then hand off:
 - If `cyoda-help.sh` reported `SOURCE=instance`: "Next, type `/cyoda:build` to turn the first increment into project files and register it on your instance."
-- Otherwise: "Next, type `/cyoda:setup` to install and start cyoda-go, then `/cyoda:build` to register the first increment." (If the developer already has an instance running, `/cyoda:build` alone.)
+- `SOURCE=binary`: "Next, type `/cyoda:setup` to start cyoda-go locally, then `/cyoda:build` to register the first increment."
+- `SOURCE=web`: "Next, type `/cyoda:setup` to install and start cyoda-go, then `/cyoda:build` to register the first increment."
+- If the developer already has an instance running, `/cyoda:build` alone.
 
 ## Common mistakes
 

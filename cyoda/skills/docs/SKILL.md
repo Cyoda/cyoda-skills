@@ -1,7 +1,7 @@
 ---
 name: docs
 description: Use when the developer asks how a cyoda-go API, endpoint, concept, configuration variable, error code, CLI command or gRPC/CloudEvents schema works, or another Cyoda skill needs a fact checked against `cyoda help`.
-allowed-tools: Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(cyoda --version) Bash(jq *) WebFetch
+allowed-tools: Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(cyoda --version) Bash(command -v cyoda) Bash(jq *) WebFetch
 ---
 
 # Cyoda documentation lookup
@@ -22,7 +22,7 @@ stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2: unknown topic
 
 ## SOURCE=web
 
-`cyoda` isn't installed. The first time, say once: "`cyoda` isn't installed, so this is from the web help mirror (v`<VERSION>`). Next, type `/cyoda:setup` to install cyoda-go locally." Then answer from the mirror, which differs from the binary:
+The first time, run `command -v cyoda`. It finds nothing: say once "`cyoda` isn't installed, so this is from the web help mirror (v`<VERSION>`). Next, type `/cyoda:setup` to install cyoda-go locally." It finds `cyoda`: say once only that the answer is from the web help mirror (v`<VERSION>`). Then answer from the mirror, which differs from the binary:
 
 - It returns the whole page and ignores `--section`: find the section by its heading.
 - It serves no actions (exit 2): `cloudevents json`, `grpc proto`, `openapi …`, `workflows schema-version versions`.

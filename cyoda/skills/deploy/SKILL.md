@@ -1,7 +1,7 @@
 ---
 name: deploy
 description: Use when the developer types /cyoda:deploy to move a working local cyoda-go app to a self-hosted cyoda-go instance (Docker Compose, Helm on Kubernetes, Terraform), or needs a seed script, verify script, compose file or secrets checklist for one.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-call.sh GET *) Bash(jq *) Bash(find *) Bash(ls *) Bash(mkdir *) Bash(cp *) Bash(cmp *) Bash(cat *) Bash(mv *) Bash(grep *)
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-call.sh GET *) Bash(jq *) Bash(find *) Bash(ls *) Bash(mkdir *) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(cat *) Bash(mv *) Bash(grep *)
 disable-model-invocation: true
 ---
 
@@ -68,7 +68,7 @@ Record the answer as `env.<stage>.changeLevel` in that entity's `-config.json`, 
 ```bash
 jq --arg st '<stage>' --argjson cl '<null or "VALUE">' '.env = ((.env // {}) + {($st): ((.env[$st] // {}) + {changeLevel: $cl})})' <config> > <config>.tmp && mv <config>.tmp <config>
 ```
-`seed.sh` applies `env.<stage>` when it's present and the base `changeLevel` otherwise, so a stage that isn't strict needs no entry.
+`seed.sh` applies `env.<stage>` when it's present and the base `changeLevel` otherwise. For a stage that isn't strict, remove any `env.<stage>.changeLevel`: `jq --arg st '<stage>' 'del(.env[$st].changeLevel)'`, written back the same way.
 
 ## Step 4 — Output dir
 
@@ -102,7 +102,7 @@ Fill the checklist placeholders:
 - `<APP>`: the project name.
 - `<API_URL>`: `http://localhost:18080` for single-user. For shared, `http://<host>:18080` for each stage's host. For Helm, from Step 2.
 - `<GRPC_ENDPOINT>`: Compose, the same host with port `19090`, as `host:19090`. For Helm, from Step 2.
-- `<TOKEN_COMMAND>`: the absolute path of the project's token script if one exists (e.g. `get-token.sh`), else `<path to your token script>`.
+- `<TOKEN_COMMAND>`: the absolute path of the project's token script (e.g. `get-token.sh`). Shared or Helm and none exists: copy `${CLAUDE_PLUGIN_ROOT}/skills/auth/templates/get-token.sh` to `scripts/get-token.sh` if the project has a `scripts/` dir, else to the project root, `chmod +x` it, and use that path.
 
 Both compose files publish host ports 18080 (API), 19090 (gRPC) and 19091 (admin), not 8080/9090/9091: the developer's local cyoda-go holds those, so `up` would fail or health, seed and verify would hit the local instance (`CYODA_HOST_*_PORT` overrides them).
 
