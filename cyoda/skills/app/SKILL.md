@@ -41,10 +41,10 @@ Use the `cyoda:design` skill with the developer's idea (`$ARGUMENTS` if given). 
 ## Step 2 — Local cyoda-go
 
 From Step 0's status:
-- `STATUS=connected`: ask "Use `<ENDPOINT>` [profile: `<PROFILE>`] for this app?" (`[project: <PROFILE>]` when `SOURCE=project`), and in the same message: "If yes, " followed by Step 3's build hand-off with its first-increment definition, then "If no, next, type `/cyoda:setup` to start a local cyoda-go or connect to another instance."
+- `STATUS=connected` (`[project: <PROFILE>]` when `SOURCE=project`): "Use `<ENDPOINT>` [profile: `<PROFILE>`] for this app? If yes, next, type `/cyoda:build` to turn the first increment (one entity, its sample data, and a workflow from its initial state to a terminal state) into project files and register it. If no, next, type `/cyoda:setup` to start a local cyoda-go or connect to another instance."
 - `STATUS=not_configured` or `unreachable`: "Next, type `/cyoda:setup` to install and start cyoda-go locally (or connect to an instance you already run)." When the developer is back, re-run `cyoda-status.sh`.
 
-If the instance needs a token: "next, type `/cyoda:auth`".
+If a call returned 401 or 403: "next, type `/cyoda:auth`".
 
 ## Step 3 — Build
 

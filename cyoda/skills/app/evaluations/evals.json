@@ -63,7 +63,7 @@
         },
         {
           "id": "local-step",
-          "text": "Names a local cyoda-go step in the journey, after design and before build",
+          "text": "Names the step between design and build as \"local cyoda-go\" or `/cyoda:setup` in the journey it gives",
           "type": "behavior"
         },
         {
