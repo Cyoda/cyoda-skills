@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "/cyoda:app I want to build a library book-lending app. I've never used Cyoda.",
-      "expected_output": "Runs cyoda-status.sh (not configured). Gives the 2-3 sentence orientation (EDBMS, entities with workflows, immutable versions, compute nodes optional), asks if ready, then uses the cyoda:design skill on the lending idea. After the design, says 'next, type /cyoda:setup' to install and start cyoda-go locally, then later 'next, type /cyoda:build' and 'next, type /cyoda:test', and mentions the optional /cyoda:deploy at the end. Never says it will invoke or run a side-effecting skill.",
+      "expected_output": "Runs cyoda-status.sh (not configured). Gives the 2-3 sentence orientation (EDBMS, entities with workflows, immutable versions, compute nodes optional), then uses the cyoda:design skill on the lending idea. After the design, says 'next, type /cyoda:setup' to install and start cyoda-go locally, then later 'next, type /cyoda:build' and 'next, type /cyoda:test', and mentions the optional /cyoda:deploy at the end. Never says it will invoke or run a side-effecting skill.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{}",
         "_simulated/instance.md": "cyoda-status.sh: STATUS=not_configured PROFILE=default ENDPOINT= VERSION=none BINARY_VERSION=none."
