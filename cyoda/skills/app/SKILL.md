@@ -41,14 +41,14 @@ Use the `cyoda:design` skill with the developer's idea (`$ARGUMENTS` if given). 
 ## Step 2 — Local cyoda-go
 
 From Step 0's status:
-- `STATUS=connected`: ask "Use `<ENDPOINT>` [profile: `<PROFILE>`] for this app?" (`[project: <PROFILE>]` when `SOURCE=project`), and in the same message: "If yes, next, type `/cyoda:build` to turn the first increment into project files and register it. If no, next, type `/cyoda:setup` to start a local cyoda-go or connect to another instance."
+- `STATUS=connected`: ask "Use `<ENDPOINT>` [profile: `<PROFILE>`] for this app?" (`[project: <PROFILE>]` when `SOURCE=project`), and in the same message: "If yes, " followed by Step 3's build hand-off with its first-increment definition, then "If no, next, type `/cyoda:setup` to start a local cyoda-go or connect to another instance."
 - `STATUS=not_configured` or `unreachable`: "Next, type `/cyoda:setup` to install and start cyoda-go locally (or connect to an instance you already run)." When the developer is back, re-run `cyoda-status.sh`.
 
 If the instance needs a token: "next, type `/cyoda:auth`".
 
 ## Step 3 — Build
 
-"Next, type `/cyoda:build` to turn the first increment into project files and register it." The first increment: one entity, its sample data, and a workflow from its initial state to a terminal state. `build` registers it in the canonical order (sample data, lock, workflow) from `cyoda help models` LIFECYCLE; entities come only after that.
+"Next, type `/cyoda:build` to turn the first increment (one entity, its sample data, and a workflow from its initial state to a terminal state) into project files and register it." `build` registers it in the canonical order (sample data, lock, workflow) from `cyoda help models` LIFECYCLE; entities come only after that.
 
 ## Step 4 — Test
 
