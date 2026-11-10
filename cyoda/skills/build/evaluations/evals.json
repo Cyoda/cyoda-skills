@@ -155,6 +155,28 @@
         { "id": "no-old-auth-wording", "text": "Does not say it will invoke cyoda:auth to refresh the token", "type": "behavior" },
         { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:auth`' and does not say it will invoke another skill", "type": "behavior" }
       ]
+    },
+    {
+      "id": 8,
+      "prompt": "/cyoda:build — add a PurchaseRequest entity. An employee drafts a request and submits it. On submit the system checks it (a budget code is present and the amount is positive): a valid request waits for an approver, an invalid one goes to a state where the employee can fix it and submit again. If no approver has acted within 2 days, the request escalates to the department head. Approvers (or the department head, once escalated) approve or reject. The employee can cancel any time before it is approved or rejected. Fields: requestId, requester, budgetCode, amount, description.",
+      "expected_output": "Checks the connection, lists models (empty), reads the help sections and the schema version at run time, asks what is missing (who may do what, unique keys, changeLevel), shows the three files, writes purchaserequest-v1-* in the TypeScript default dirs plus cyoda-manifest.json, and registers in the canonical order on the real instance; the workflow import succeeds. The generated workflow follows the best practices: in each state an automated transition with no criterion comes last; the waiting state that carries the 2-day scheduled escalation has no criterionless automated transition; no function criterion sits inside a group; the error state's automated exits all have criteria (manual resubmit and cancel are fine); element names use only letters, digits, `_` and `-`; every transition has a `roles` list in its annotations (empty for system-only transitions such as the validation routing and the escalation); and cancel is declared once in each state it is legal from. Hands off with 'next, type /cyoda:test'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
+        "package.json": "{\"name\":\"procurement\",\"version\":\"0.1.0\"}",
+        "tsconfig.json": "{\"compilerOptions\":{\"strict\":true}}",
+        "_simulated/developer.md": "The instance is new and empty. Who does what: role `employee` submits, fixes and resubmits, and cancels; role `approver` approves or rejects; role `department-head` approves or rejects escalated requests. The check on submit and the escalation are done by the system, not by a person. No unique keys; changeLevel none (strict). No external code. Shown the files, the developer says: \"yes\"."
+      },
+      "assertions": [
+        { "id": "workflow-imports", "text": "Registers the model and imports the generated purchaserequest workflow through cyoda-call.sh, and the real workflow import response in the transcript is a success", "type": "behavior" },
+        { "id": "scheduled-escalation", "text": "In the generated `-workflow.json`, the state that waits for an approver has a scheduled transition (`schedule` with a delay of 2 days, 172800000 ms) to the escalated state", "type": "format" },
+        { "id": "wf-criterionless-last", "text": "In the generated `-workflow.json`, in every state, an automated (`manual: false`) transition with no criterion is the last automated transition declared in that state", "type": "format" },
+        { "id": "wf-no-criterionless-beside-scheduled", "text": "In the generated `-workflow.json`, no state that has a scheduled transition also has an automated transition with no criterion", "type": "format" },
+        { "id": "wf-no-function-in-group", "text": "In the generated `-workflow.json`, no `function` criterion is nested inside a `group` criterion", "type": "format" },
+        { "id": "wf-error-exits-guarded", "text": "In the generated `-workflow.json`, every automated transition out of the error/invalid state has a criterion (manual or scheduled exits need none)", "type": "format" },
+        { "id": "wf-element-names", "text": "In the generated `-workflow.json`, every workflow, state, transition, criterion and processor name uses only letters, digits, `_` and `-` (no dots or spaces)", "type": "format" },
+        { "id": "wf-roles-annotations", "text": "In the generated `-workflow.json`, every transition carries a `roles` list in its annotations, matching the developer's answers (an empty list for system-only transitions such as the validation routing and the escalation)", "type": "format" },
+        { "id": "wf-cancel-per-state", "text": "In the generated `-workflow.json`, a cancel transition with the same name is declared once in each state the employee can cancel from (draft, the invalid/error state and the waiting states, including the escalated one), each going to the cancelled state", "type": "format" }
+      ]
     }
   ]
 }
