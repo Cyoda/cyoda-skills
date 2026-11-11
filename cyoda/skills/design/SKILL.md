@@ -49,7 +49,7 @@ Edge messages (`cyoda help messages`) never fire a transition, so a "message-tri
 
 **Q4:** *"Do any steps need your own code: calling a third-party API, a calculation, or a check that needs data not on the entity? That's a compute node. Many apps don't need one."* A compute node is also how a criterion returns a rejection reason (best practice *Give a rejection reason when a criterion fails*).
 
-**Q5:** *"Must any field, or combination of fields, be unique across all [entity]s, such as an order number or an email?"* These are unique keys, set before the model is locked (`models --section ENDPOINTS`, unique-keys).
+**Q5:** *"Must any field, or combination of fields, be unique across all [entity]s, such as an order number or an email? May a [parent] have only one live [entity] at a time?"* These are unique keys, set before the model is locked (`models --section ENDPOINTS`, unique-keys; best practices *Enforce uniqueness with a unique key, never a criterion*, *"Exactly one live X per Y" is a unique key with a retirement number*).
 
 **Q6:** Read `models --section LIFECYCLE` first. Explain from it: the schema is taken from sample data, and the model is locked before any entity exists. The choice is how much the schema may still grow on writes: none (strict, only the sample's fields), or one of the changeLevel values listed there, from least to most permissive. Ask: *"Do you expect to add fields while you build, and will any processor write fields that aren't in your sample?"* Prototype: a permissive level. It can be changed later.
 
@@ -57,10 +57,10 @@ Edge messages (`cyoda help messages`) never fire a transition, so a "message-tri
 
 Check the proposed design against two lists, then fix it:
 
-1. **Every bullet of the best-practices list from Step 0**, by its bold name. Show the result as one line per bullet: `- <bullet name>: ok | changed: <what> | n/a`.
+1. **The Review checklist of the best-practices list from Step 0** (no checklist: its bullets, by bold name). Show one line per checklist line: `- <practice name>: ok | changed: <what> | n/a`.
 2. **The anti-patterns below.** List only the ones you found.
 
-For each violation, change the design and say so in one plain sentence that names the bullet or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* Give the reasoning yourself, drawing on [design-guidelines.md](resources/design-guidelines.md) (e.g. § Processors, Async Work & Failure).
+For each violation, change the design and say so in one plain sentence that names the practice or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* Give the reasoning yourself, drawing on [design-guidelines.md](resources/design-guidelines.md) (e.g. § Processors, Async Work & Failure).
 
 **Proposals that map to a best practice:**
 
@@ -69,6 +69,10 @@ For each violation, change the design and say so in one plain sentence that name
 | A running total, counter or summary entity updated on each write | *Compute aggregations; don't maintain them* | The concrete grouped stats query for their entity, on scalar fields (`crud --section ENDPOINTS`) |
 | SQL or reporting queries | *Compute aggregations; don't maintain them* | The concrete stats query or search for their question (`crud` or `search --section ENDPOINTS`). SQL analytics is not available in cyoda-go |
 | A `retry` state, or "re-run the check" | *Add backward transitions for retries and corrections*, *Re-trigger evaluation with a loopback, not by firing an automated transition* | A backward transition, or a loopback |
+| A criterion that searches for a duplicate; "only one active X per Y" | *Enforce uniqueness with a unique key, never a criterion*, *"Exactly one live X per Y" is a unique key with a retirement number* | The unique key, and for "one live" the retirement-number field and the processor that sets it on entry to each terminal state |
+| Kinds or variants of one entity, each with its own lifecycle | *End the list with a catch-all workflow*, *Select on a field that you refuse to change* | One workflow per kind selected on the kind field, then the catch-all workflow (`workflows --section CRITERIA`, workflow-level selection) |
+| Who may do what; a limit that needs a more senior role; "cancel" from several states | *Declare who may fire a transition in its annotations*, *Give a transition name one set of permitted roles*, *Declare a general action once per state it is legal from* | `roles` on each transition, one transition name per role set, the general action declared in each state |
+| Deleting an entity to end it | *End a lifecycle in a terminal state; never delete* | A terminal state |
 
 **Notifications.** If the developer asks for notifications, alerts, webhooks or subscriptions when an entity enters a state, say: "Notifications are coming soon — check `cyoda help` for availability." Then offer today's options:
 1. Find entities needing action by querying the state: give the concrete state-count or search request for their entity (`crud --section ENDPOINTS`, `search --section ENDPOINTS`).
@@ -83,7 +87,7 @@ For each violation, change the design and say so in one plain sentence that name
 
 | Anti-pattern | Signal | Fix |
 |---|---|---|
-| Technical states | `processing`, `calling_*`, `retry`, `queued`, `waiting_for_response` | Remove; a processor on the transition does the work |
+| Technical states | `processing`, `calling_*`, `retry`, `queued`, `waiting_for_response` | Remove, unless best practice *Add a technical state only where the platform needs one* keeps it |
 | Orthogonal dimensions as states | Priority, assignment, ownership, visibility, payment status, SLA as lifecycle states | Attributes or sub-entities |
 | Orthogonal lifecycles collapsed | Independent concerns (different rules, ownership, reporting) in one lifecycle | Separate entities |
 | Parallel workflows on one entity | "a lifecycle workflow AND a compliance workflow" | Separate entities: each call runs one selected workflow (`workflows --section CRITERIA`, workflow-level selection) |
@@ -106,7 +110,7 @@ Best practices: <source from Step 0>
 Entities:
   - <Entity>
       states: initial=<s>; others=[...]; error=[...]; terminal=[...]
-      transitions: <name>: <from> → <to> (manual | automated, criterion: <what> | scheduled: <when>)
+      transitions: <name>: <from> → <to> (manual | automated, criterion: <what> | scheduled: <when>); roles: [...]
       key fields: <tree-shaped fields>; links: <field> → <Entity> id
       unique keys: [...] | none
   - ...
@@ -115,7 +119,7 @@ Compute nodes: none | <entity.transition>: <processor or function criterion>, an
 
 Schema evolution: none (strict) | <changeLevel>, and why
 
-Review: <each bullet changed, one line each; the rest ok or n/a>
+Review: <each checklist line changed, one line each; the rest ok or n/a>
 
 First increment: <Entity> with <minimal workflow>
 ```

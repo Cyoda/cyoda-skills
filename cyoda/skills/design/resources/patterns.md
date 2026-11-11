@@ -15,7 +15,7 @@ Facts: `cyoda help workflows` TRANSITIONS and CRITERIA. Closest smoke-tested sta
 
 After entering a waiting state, the entity moves on by itself after a delay if nothing else has moved it, e.g. `reserved` → `expired` after 15 minutes, or `errored` → `escalated` after 30 minutes.
 
-This is a `schedule` on an automated transition out of the waiting state: a fixed `delayMs`, or a per-entity time from a function. It isn't a processor, and it can't be fired by name. Any write that leaves the entity in the same state re-arms the timer. To retry until a condition holds, use the polling form.
+This is a `schedule` on an automated transition out of the waiting state: a fixed `delayMs`, or a per-entity time from a function. It isn't a processor, and it can't be fired by name. See the best practices *Expect frequent writes to postpone a scheduled transition* and *Poll for a condition that can become true without a write*.
 
 Facts: `cyoda help workflows` SCHEDULED TRANSITIONS (including "One-shot vs. polling"). Smoke-tested start: [build/examples/scheduled/](../../build/examples/scheduled/).
 
