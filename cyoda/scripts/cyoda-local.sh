@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+# Start and stop a project's own cyoda-go instance on a free port block.
+#   cyoda-local.sh start <root> [--run binary|docker] [--storage memory|sqlite]
+#   cyoda-local.sh start-repo <root> <compose-file>
+#   cyoda-local.sh stop <root>
+# start/start-repo print: ENDPOINT=<url> HTTP=<p> GRPC=<p> ADMIN=<p> RUN=<run> STATE=started|ours
+# --run defaults to the project entry's run. Ports come from cyoda-ports.sh pick; the entry
+# (run, instance, dataDir, ports, storage|compose, endpoint) is written through cyoda-config-write.sh
+# before launch, so a concurrent start picks another block. Data lives in
+# ${CYODA_LOCAL_DATA_ROOT:-~/.local/share/cyoda/projects}/<instance>.
+# start-repo: when a published cyoda port (8080/9090/9091 inside) of the repo's compose file is
+# busy and not ours, dataDir/compose.override.yaml remaps them to a free block; the file itself is untouched.
+# stop never touches a process or container it did not start (pid must listen on the recorded HTTP port).
+# Exit: 0 ok (stop: also when nothing runs), 1 invalid plugin config, 3 no free block,
+# 4 did not become healthy (log tail on stderr), 5 docker/lsof unavailable, 64 usage.
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
+DATA_ROOT="${CYODA_LOCAL_DATA_ROOT:-$HOME/.local/share/cyoda/projects}"
+TEMPLATE="$HERE/../skills/deploy/templates/compose.single-user.yaml"
+
+die() { echo "cyoda-local.sh: $2" >&2; exit "$1"; }
+usage() {
+  echo "usage: cyoda-local.sh start <root> [--run binary|docker] [--storage memory|sqlite]" >&2
+  echo "       cyoda-local.sh start-repo <root> <compose-file>" >&2
+  echo "       cyoda-local.sh stop <root>" >&2
+  exit 64
+}
+
+[ $# -ge 2 ] || usage
+CMD="$1"; ROOT_ARG="$2"; shift 2
+ROOT="$(cd "$ROOT_ARG" 2>/dev/null && pwd -P)" || die 64 "no such directory: $ROOT_ARG"
+INSTANCE="$(bash "$HERE/cyoda-ports.sh" name "$ROOT")" || exit 64
+DD="$DATA_ROOT/$INSTANCE"
+
+entry() { # field -> value of this project's entry or ""
+  [ -f "$CONFIG" ] || return 0
+  jq -r --arg k "$ROOT" --arg f "$1" '(.projects // {})[$k][$f] // "" | tostring' "$CONFIG" 2>/dev/null
+}
+rec_port() {
+  [ -f "$CONFIG" ] || return 0
+  jq -r --arg k "$ROOT" --arg f "$1" '(.projects // {})[$k].ports | if type == "object" then (.[$f] // "") | tostring else "" end' "$CONFIG" 2>/dev/null
+}
+
+listening() {
+  lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 && return 0
+  (exec 3>/dev/tcp/127.0.0.1/"$1") >/dev/null 2>&1
+}
+
+need_docker() { docker info >/dev/null 2>&1 || die 5 "docker is not available"; }
+need_lsof() { command -v lsof >/dev/null 2>&1 || die 5 "lsof is required"; }
+
+LOCK="$DATA_ROOT/.lock"
+lock() {
+  mkdir -p "$DATA_ROOT" || die 64 "cannot create $DATA_ROOT"
+  local holder
+  for _ in $(seq 1 120); do
+    if mkdir "$LOCK" 2>/dev/null; then echo $$ >"$LOCK/pid"; return 0; fi
+    holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$LOCK"; continue; fi
+    sleep 0.25
+  done
+  die 4 "could not take $LOCK"
+}
+unlock() { rm -rf "$LOCK"; }
+
+# pick -> sets HTTP GRPC ADMIN PSTATE; exits with pick's code on failure.
+do_pick() {
+  local out rc
+  out="$(bash "$HERE/cyoda-ports.sh" pick "$ROOT")"; rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+  HTTP="$(sed -n 's/.*HTTP=\([0-9]*\).*/\1/p' <<<"$out")"
+  GRPC="$(sed -n 's/.*GRPC=\([0-9]*\).*/\1/p' <<<"$out")"
+  ADMIN="$(sed -n 's/.*ADMIN=\([0-9]*\).*/\1/p' <<<"$out")"
+  PSTATE="$(sed -n 's/.*STATE=\([a-z]*\).*/\1/p' <<<"$out")"
+}
+
+# write_entry run storage compose  (storage/compose may be empty)
+write_entry() {
+  bash "$HERE/cyoda-config-write.sh" '
+    .projects //= {}
+    | .projects[$k] = (((.projects[$k] // {}) | del(.storage, .compose))
+        + {run: $run, instance: $inst, dataDir: $dd,
+           ports: {http: ($h | tonumber), grpc: ($g | tonumber), admin: ($a | tonumber)},
+           endpoint: ("http://localhost:" + $h)}
+        + (if $storage != "" then {storage: $storage} else {} end)
+        + (if $compose != "" then {compose: $compose} else {} end))' \
+    --arg k "$ROOT" --arg run "$1" --arg inst "$INSTANCE" --arg dd "$DD" \
+    --arg h "$HTTP" --arg g "$GRPC" --arg a "$ADMIN" --arg storage "${2:-}" --arg compose "${3:-}" \
+    || die 1 "cannot write the plugin config"
+}
+
+wait_healthy() { # pid-or-empty
+  for _ in $(seq 1 60); do
+    if [ "$(curl -s --max-time 1 "http://localhost:$HTTP/api/health" 2>/dev/null | jq -r '.status // empty' 2>/dev/null)" = UP ]; then return 0; fi
+    if [ -n "${1:-}" ] && ! kill -0 "$1" 2>/dev/null; then break; fi
+    sleep 0.5
+  done
+  echo "cyoda-local.sh: instance on port $HTTP did not become healthy; log tail:" >&2
+  if [ -f "$DD/cyoda.log" ] && [ "$RUN" = binary ]; then tail -n 20 "$DD/cyoda.log" >&2
+  else docker compose -p "$INSTANCE" ps >&2 2>/dev/null || true; fi
+  exit 4
+}
+
+emit() { echo "ENDPOINT=http://localhost:$HTTP HTTP=$HTTP GRPC=$GRPC ADMIN=$ADMIN RUN=$RUN STATE=$1"; }
+
+# reserve a free block (entry written under the lock); sets HTTP GRPC ADMIN PSTATE.
+reserve() { # run storage compose
+  lock
+  do_pick
+  if [ "$PSTATE" = free ]; then write_entry "$@"; fi
+  unlock
+}
+
+render_compose() { # storage
+  mkdir -p "$DD" || die 64 "cannot create $DD"
+  if [ "$1" = memory ]; then
+    sed -e 's/CYODA_STORAGE_BACKEND: sqlite/CYODA_STORAGE_BACKEND: memory/' -e '/CYODA_SQLITE_PATH:/d' "$TEMPLATE" >"$DD/compose.yaml"
+  else
+    cp "$TEMPLATE" "$DD/compose.yaml"
+  fi
+}
+
+launch_binary() { # storage
+  command -v cyoda >/dev/null 2>&1 || die 64 "cyoda is not on PATH"
+  mkdir -p "$DD/home/.config" || die 64 "cannot create $DD"
+  (
+    cd "$DD" || exit 1
+    nohup env HOME="$DD/home" XDG_CONFIG_HOME="$DD/home/.config" CYODA_STORAGE_BACKEND="$1" CYODA_IAM_MODE=mock \
+      CYODA_HTTP_PORT="$HTTP" CYODA_GRPC_PORT="$GRPC" CYODA_ADMIN_PORT="$ADMIN" \
+      cyoda >"$DD/cyoda.log" 2>&1 </dev/null &
+    echo $! >"$DD/cyoda.pid"
+  )
+  wait_healthy "$(cat "$DD/cyoda.pid")"
+}
+
+compose_env() { export CYODA_HOST_HTTP_PORT="$HTTP" CYODA_HOST_GRPC_PORT="$GRPC" CYODA_HOST_ADMIN_PORT="$ADMIN"; }
+
+cmd_start() {
+  local run="" storage="" arg
+  while [ $# -gt 0 ]; do
+    arg="$1"
+    case "$arg" in
+      --run) [ $# -ge 2 ] || usage; run="$2"; shift 2 ;;
+      --storage) [ $# -ge 2 ] || usage; storage="$2"; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  [ -n "$run" ] || run="$(entry run)"
+  case "$run" in binary|docker) ;; repo) die 64 "this project runs its own compose stack: use start-repo" ;; "") die 64 "no --run given and the project has no recorded run" ;; *) die 64 "cannot start run '$run'" ;; esac
+  case "$storage" in ""|memory|sqlite) ;; *) usage ;; esac
+  [ -n "$storage" ] || storage="$(entry storage)"
+  [ -n "$storage" ] || storage=memory
+  RUN="$run"
+  need_lsof
+  [ "$run" != docker ] || need_docker
+
+  local attempt
+  for attempt in 1 2 3; do
+    reserve "$run" "$storage" ""
+    if [ "$PSTATE" = ours ]; then emit ours; exit 0; fi
+    # re-check right before launching: a foreign process may have bound a port since the pick
+    if ! listening "$HTTP" && ! listening "$GRPC" && ! listening "$ADMIN"; then break; fi
+    [ "$attempt" -lt 3 ] || die 3 "ports kept getting taken"
+  done
+
+  if [ "$run" = binary ]; then
+    launch_binary "$storage"
+  else
+    render_compose "$storage"
+    compose_env
+    docker compose -p "$INSTANCE" -f "$DD/compose.yaml" up -d >&2 || die 4 "docker compose up failed"
+    wait_healthy ""
+  fi
+  emit started
+}
+
+# Published host ports of the compose files, from `docker compose config`: "<service> <published> <target>" lines.
+published() { # files...
+  local args=() f
+  for f in "$@"; do args+=(-f "$f"); done
+  docker compose "${args[@]}" config --format json 2>/dev/null \
+    | jq -r '.services | to_entries[] | .key as $s | (.value.ports // [])[] | select(.published != null and .published != "") | "\($s) \(.published) \(.target)"'
+}
+
+cmd_start_repo() {
+  [ $# -eq 1 ] || usage
+  local cf cdir name ov="$DD/compose.override.yaml" files lines
+  cf="$(cd "$(dirname "$1")" 2>/dev/null && pwd -P)/$(basename "$1")"
+  [ -f "$cf" ] || die 64 "no such compose file: $1"
+  cdir="$(dirname "$cf")"
+  RUN=repo
+  need_lsof; need_docker
+
+  name="$(docker compose -f "$cf" config --format json 2>/dev/null | jq -r '.name // empty')"
+  [ -n "$name" ] || die 64 "docker compose cannot read $cf"
+
+  # already running and ours? (project = instance or the repo's own name, working dir = the file's dir or dataDir)
+  files=("$cf"); [ ! -f "$ov" ] || files+=("$ov")
+  local line http="" proj
+  while IFS= read -r line; do
+    proj="$(sed -n 's/.*COMPOSE_PROJECT=\([^ ]*\) .*/\1/p' <<<"$line")"
+    if [ "$proj" = "$INSTANCE" ] || [ "$proj" = "$name" ]; then
+      case "$line" in *" WORKDIR=$cdir "*|*" WORKDIR=$DD "*)
+        http="$(sed -n 's/.*ENDPOINT=http:\/\/[^ ]*:\([0-9]*\) IMAGE=.*/\1/p' <<<"$line")"
+        [ -z "$http" ] || break ;;
+      esac
+    fi
+  done < <(bash "$HERE/cyoda-docker-instances.sh" 2>/dev/null)
+  if [ -n "$http" ]; then
+    lines="$(published "${files[@]}")"
+    HTTP="$http"
+    GRPC="$(awk '$3 == 9090 {print $2; exit}' <<<"$lines")"
+    ADMIN="$(awk '$3 == 9091 {print $2; exit}' <<<"$lines")"
+    if [ -z "$GRPC" ] || [ -z "$ADMIN" ]; then
+      do_pick; [ -n "$GRPC" ] || GRPC="$(rec_port grpc)"; [ -n "$ADMIN" ] || ADMIN="$(rec_port admin)"
+    fi
+    HTTP="$http"
+    [ -n "$GRPC" ] && [ -n "$ADMIN" ] || die 3 "cannot determine the ports of the running stack"
+    lock; write_entry repo "" "$cf"; unlock
+    emit ours; exit 0
+  fi
+
+  # fresh start: the repo file alone, then a free block if a cyoda port clashes
+  rm -f "$ov"
+  lines="$(published "$cf")"
+  local clash="" pub tgt
+  while read -r _ pub tgt; do
+    case "$tgt" in 8080|9090|9091) if listening "$pub"; then clash=1; fi ;; esac
+  done <<<"$lines"
+
+  if [ -z "$clash" ]; then
+    HTTP="$(awk '$3 == 8080 {print $2; exit}' <<<"$lines")"
+    GRPC="$(awk '$3 == 9090 {print $2; exit}' <<<"$lines")"
+    ADMIN="$(awk '$3 == 9091 {print $2; exit}' <<<"$lines")"
+    if [ -z "$HTTP" ] || [ -z "$GRPC" ] || [ -z "$ADMIN" ]; then
+      local h="$HTTP" g="$GRPC" a="$ADMIN"
+      do_pick
+      [ -z "$h" ] || HTTP="$h"; [ -z "$g" ] || GRPC="$g"; [ -z "$a" ] || ADMIN="$a"
+    fi
+    lock; write_entry repo "" "$cf"; unlock
+    docker compose -f "$cf" up -d >&2 || die 4 "docker compose up failed"
+  else
+    local attempt
+    for attempt in 1 2 3; do
+      reserve repo "" "$cf"
+      if ! listening "$HTTP" && ! listening "$GRPC" && ! listening "$ADMIN"; then break; fi
+      [ "$attempt" -lt 3 ] || die 3 "ports kept getting taken"
+    done
+    mkdir -p "$DD" || die 64 "cannot create $DD"
+    docker compose -f "$cf" config --format json | jq -r --arg h "$HTTP" --arg g "$GRPC" --arg a "$ADMIN" '
+      "services:",
+      (.services | to_entries[] | select((.value.ports // []) | map(select(.published != null and .published != "")) | length > 0)
+        | "  \(.key):", "    ports: !override",
+          ((.value.ports // [])[] | select(.published != null and .published != "")
+            | (if .target == 8080 then $h elif .target == 9090 then $g elif .target == 9091 then $a else .published end) as $p
+            | "      - \"\((.host_ip // "") | if . == "" then "" else . + ":" end)\($p):\(.target)/\(.protocol // "tcp")\""))' >"$ov"
+    docker compose -p "$INSTANCE" -f "$cf" -f "$ov" up -d >&2 || die 4 "docker compose up failed"
+  fi
+  wait_healthy ""
+  emit started
+}
+
+cmd_stop() {
+  [ $# -eq 0 ] || usage
+  local run dd http pid cf
+  run="$(entry run)"; dd="$(entry dataDir)"; http="$(rec_port http)"
+  [ -n "$dd" ] || exit 0
+  DD="$dd"
+  case "$run" in
+    binary)
+      [ -f "$DD/cyoda.pid" ] || exit 0
+      pid="$(tr -dc '0-9' <"$DD/cyoda.pid")"
+      [ -n "$pid" ] && [ -n "$http" ] || exit 0
+      if lsof -nP -a -p "$pid" -iTCP:"$http" -sTCP:LISTEN >/dev/null 2>&1; then
+        kill "$pid" 2>/dev/null
+        for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.25; done
+        kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
+      fi
+      rm -f "$DD/cyoda.pid" ;;
+    docker)
+      [ -f "$DD/compose.yaml" ] || exit 0
+      need_docker
+      CYODA_HOST_HTTP_PORT="$http" CYODA_HOST_GRPC_PORT="$(rec_port grpc)" CYODA_HOST_ADMIN_PORT="$(rec_port admin)" \
+        docker compose -p "$INSTANCE" -f "$DD/compose.yaml" down >&2 || die 5 "docker compose down failed" ;;
+    repo)
+      cf="$(entry compose)"
+      [ -f "$cf" ] || exit 0
+      need_docker
+      if [ -f "$DD/compose.override.yaml" ]; then
+        docker compose -p "$INSTANCE" -f "$cf" -f "$DD/compose.override.yaml" down >&2 || die 5 "docker compose down failed"
+      else
+        docker compose -f "$cf" down >&2 || die 5 "docker compose down failed"
+      fi ;;
+  esac
+  exit 0
+}
+
+case "$CMD" in
+  start) cmd_start "$@" ;;
+  start-repo) cmd_start_repo "$@" ;;
+  stop) cmd_stop "$@" ;;
+  *) usage ;;
+esac
