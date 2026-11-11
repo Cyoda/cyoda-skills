@@ -175,6 +175,8 @@ YAML
   assert_eq "$(shasum "$d/compose.yaml")" "$sum" "repo compose file unchanged"
   assert_eq "$(entry "$d" run)" repo "entry run"
   assert_eq "$(entry "$d" compose)" "$d/compose.yaml" "entry compose"
+  assert_eq "$(entry "$d" managed)" true "entry managed"
+  assert_eq "$(entry "$d" composeProject)" "$inst" "entry composeProject"
   assert_eq "$(field "$(bash "$LOCAL" start-repo "$d" "$d/compose.yaml")" STATE)" ours "repo again is ours"
   bash "$LOCAL" stop "$d"
   assert_eq "$(docker ps -q --filter "label=com.docker.compose.project=$inst")" "" "repo stack down"
@@ -182,8 +184,74 @@ YAML
   unlisten "$p"
 }
 
+test_local_unhealthy_cleans_up() {
+  local d rc out pid; d="$(mkproj sick)"; rm -f "$CYODA_PLUGIN_CONFIG"
+  mkdir -p "$T/never"
+  printf '#!/bin/sh\nexec sleep 300\n' >"$T/never/cyoda"; chmod +x "$T/never/cyoda"
+  # no entry before: no entry after
+  out="$(PATH="$T/never:$PATH" CYODA_LOCAL_HEALTH_TIMEOUT=2 bash "$LOCAL" start "$d" --run binary 2>&1)"; rc=$?
+  assert_status 4 "$rc" "never healthy: exit 4"
+  assert_eq "$(jq -c --arg k "$d" '.projects[$k] // null' "$CYODA_PLUGIN_CONFIG")" null "no entry left"
+  # an entry before: restored as it was
+  printf '%s\n' "{\"projects\":{\"$d\":{\"endpoint\":\"http://localhost:1\",\"tokenCommand\":\"x\"}}}" >"$CYODA_PLUGIN_CONFIG"
+  PATH="$T/never:$PATH" CYODA_LOCAL_HEALTH_TIMEOUT=2 bash "$LOCAL" start "$d" --run binary >/dev/null 2>&1; rc=$?
+  assert_status 4 "$rc" "exit 4 again"
+  assert_eq "$(jq -c --arg k "$d" '.projects[$k]' "$CYODA_PLUGIN_CONFIG")" '{"endpoint":"http://localhost:1","tokenCommand":"x"}' "entry restored"
+  pid="$(cat "$T/data/$(bash "$S/cyoda-ports.sh" name "$d")/cyoda.pid" 2>/dev/null)"
+  assert_eq "$pid" "" "pid file removed"
+  assert_contains "$out" "did not become healthy" "message"
+  rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
+test_local_stop_unrelated_pid() {
+  local d inst dd pid; d="$(mkproj stale)"; rm -f "$CYODA_PLUGIN_CONFIG"
+  inst="$(bash "$S/cyoda-ports.sh" name "$d")"; dd="$T/data/$inst"; mkdir -p "$dd"
+  sleep 300 & pid=$!; PIDS+=("$pid")
+  echo "$pid" >"$dd/cyoda.pid"
+  printf '%s\n' "{\"projects\":{\"$d\":{\"run\":\"binary\",\"instance\":\"$inst\",\"dataDir\":\"$dd\",\"ports\":{\"http\":31000,\"grpc\":32010,\"admin\":32011},\"endpoint\":\"http://localhost:31000\"}}}" >"$CYODA_PLUGIN_CONFIG"
+  bash "$LOCAL" stop "$d"
+  if kill -0 "$pid" 2>/dev/null; then _ok; else _bad "unrelated process survives stop"; fi
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
+test_local_docker_unhealthy_cleans_up() {
+  docker_ok || { _ok; echo "  docker unavailable: skipped test_local_docker_unhealthy_cleans_up"; return 0; }
+  local d rc inst; d="$(mkproj dsick)"; STARTED+=("$d"); rm -f "$CYODA_PLUGIN_CONFIG"
+  inst="$(bash "$S/cyoda-ports.sh" name "$d")"
+  CYODA_LOCAL_HEALTH_TIMEOUT=0 bash "$LOCAL" start "$d" --run docker >/dev/null 2>&1; rc=$?
+  assert_status 4 "$rc" "docker not healthy in time: exit 4"
+  assert_eq "$(docker ps -aq --filter "label=com.docker.compose.project=$inst")" "" "no container left"
+  assert_eq "$(jq -c --arg k "$d" '.projects[$k] // null' "$CYODA_PLUGIN_CONFIG")" null "no entry left"
+}
+
+test_local_repo_unmanaged_left_running() {
+  docker_ok || { _ok; echo "  docker unavailable: skipped test_local_repo_unmanaged_left_running"; return 0; }
+  local d out; d="$(mkproj extrepo)"; rm -f "$CYODA_PLUGIN_CONFIG"
+  cat >"$d/compose.yaml" <<'YAML'
+services:
+  cyoda:
+    image: ghcr.io/cyoda/cyoda:0.8.4
+    ports:
+      - "127.0.0.1:31000:8080"
+    environment:
+      CYODA_STORAGE_BACKEND: memory
+      CYODA_IAM_MODE: mock
+YAML
+  docker compose -p extrepo -f "$d/compose.yaml" up -d >/dev/null 2>&1
+  for _ in $(seq 1 60); do [ -n "$(health http://localhost:31000)" ] && break; sleep 0.5; done
+  out="$(bash "$LOCAL" start-repo "$d" "$d/compose.yaml")"
+  assert_eq "$(field "$out" STATE)" ours "running stack is bound"
+  assert_eq "$(entry "$d" managed)" false "managed false"
+  assert_eq "$(entry "$d" composeProject)" extrepo "composeProject recorded"
+  bash "$LOCAL" stop "$d" >/dev/null 2>&1
+  assert_contains "$(health http://localhost:31000)" UP "stack still running after stop"
+  docker compose -p extrepo -f "$d/compose.yaml" down >/dev/null 2>&1
+}
+
 test_local_usage
 test_local_stop_nothing_running
+test_local_unhealthy_cleans_up
+test_local_stop_unrelated_pid
 test_local_start_binary
 test_local_start_again_is_ours
 test_local_restart_same_ports
@@ -193,4 +261,6 @@ test_local_path_with_spaces
 test_local_stop_leaves_others
 test_local_docker
 test_local_repo_override
+test_local_docker_unhealthy_cleans_up
+test_local_repo_unmanaged_left_running
 report

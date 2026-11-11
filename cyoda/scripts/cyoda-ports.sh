@@ -27,8 +27,8 @@ sha256() {
 
 instance_name() {
   local base hash
-  base="$(basename "$ROOT" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')"
-  base="${base%-}" # tr turned the trailing newline into a dash
+  base="$(basename "$ROOT" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed -e 's/^-*//' -e 's/-*$//')"
+  [ -n "$base" ] || base=cyoda
   hash="$(printf '%s' "$ROOT" | sha256 | cut -c1-6)"
   printf '%s-%s\n' "$base" "$hash"
 }

@@ -54,6 +54,14 @@ test_name_sanitised() {
   assert_eq "$(echo "$n" | grep -c '^my-shop-v2-[0-9a-f]\{6\}$')" 1 "sanitised name: $n"
 }
 
+test_name_no_edge_dashes() {
+  local d n
+  d="$(mkproj '.config')"; n="$(bash "$S/cyoda-ports.sh" name "$d")"
+  assert_eq "$(echo "$n" | grep -c '^config-[0-9a-f]\{6\}$')" 1 "leading dot stripped: $n"
+  d="$(mkproj '___')"; n="$(bash "$S/cyoda-ports.sh" name "$d")"
+  assert_eq "$(echo "$n" | grep -c '^cyoda-[0-9a-f]\{6\}$')" 1 "empty base becomes cyoda: $n"
+}
+
 test_pick_free_default() {
   local d; d="$(mkproj free)"; config '{}'
   assert_eq "$(pick "$d")" "HTTP=31000 GRPC=32010 ADMIN=32011 STATE=free" "first block"
@@ -168,6 +176,7 @@ test_pick_malformed_ports_ignored() {
 
 test_name_stable_and_distinct
 test_name_sanitised
+test_name_no_edge_dashes
 test_pick_lsof_missing
 test_pick_connect_probe
 test_pick_invalid_config

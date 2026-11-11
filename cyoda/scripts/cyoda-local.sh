@@ -10,9 +10,16 @@
 # ${CYODA_LOCAL_DATA_ROOT:-~/.local/share/cyoda/projects}/<instance>.
 # start-repo: when a published cyoda port (8080/9090/9091 inside) of the repo's compose file is
 # busy and not ours, dataDir/compose.override.yaml remaps them to a free block; the file itself is untouched.
-# stop never touches a process or container it did not start (pid must listen on the recorded HTTP port).
+#   The override uses `!override`, which needs Docker Compose >= 2.24.
+# The repo entry also records composeProject (the Compose project name used) and managed: true when
+# start-repo launched the stack, false when it was already running and is only bound (STATE=ours).
+# stop never touches a process or container it did not start: binary - the pid must listen on the
+# recorded HTTP port; repo - `down` only when managed is true; docker/binary are always managed.
+# A start that fails (compose up error, or no /api/health UP within ${CYODA_LOCAL_HEALTH_TIMEOUT:-30} s)
+# stops what it launched and restores the entry to what it was before.
 # Exit: 0 ok (stop: also when nothing runs), 1 invalid plugin config, 3 no free block,
-# 4 did not become healthy (log tail on stderr), 5 docker/lsof unavailable, 64 usage.
+# 4 did not become healthy / compose up failed (log tail on stderr), 5 docker, lsof or cyoda unavailable,
+# 64 usage.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,31 +83,66 @@ do_pick() {
   PSTATE="$(sed -n 's/.*STATE=\([a-z]*\).*/\1/p' <<<"$out")"
 }
 
-# write_entry run storage compose  (storage/compose may be empty)
+PRIOR=null          # the project's entry before this start, for restore_entry
+LAUNCH_PID=""       # a process this start launched
+LAUNCH_COMPOSE=()   # docker compose args (-p .. -f ..) of a stack this start launched
+
+snapshot_entry() {
+  PRIOR=null
+  [ -f "$CONFIG" ] || return 0
+  PRIOR="$(jq -c --arg k "$ROOT" '(.projects // {})[$k] // null' "$CONFIG" 2>/dev/null)" || PRIOR=null
+  [ -n "$PRIOR" ] || PRIOR=null
+}
+restore_entry() {
+  bash "$HERE/cyoda-config-write.sh" 'if $prior == null then del(.projects[$k]) else .projects[$k] = $prior end' \
+    --arg k "$ROOT" --argjson prior "$PRIOR" || echo "cyoda-local.sh: could not restore the plugin config entry" >&2
+}
+
+# A launched instance that failed: show logs, stop what we launched, restore the entry, exit 4.
+fail_launch() { # message
+  echo "cyoda-local.sh: $1; log tail:" >&2
+  if [ -n "$LAUNCH_PID" ]; then
+    tail -n 20 "$DD/cyoda.log" >&2 2>/dev/null
+    kill "$LAUNCH_PID" 2>/dev/null
+    for _ in $(seq 1 20); do kill -0 "$LAUNCH_PID" 2>/dev/null || break; sleep 0.25; done
+    kill -9 "$LAUNCH_PID" 2>/dev/null
+    rm -f "$DD/cyoda.pid"
+  fi
+  if [ "${#LAUNCH_COMPOSE[@]}" -gt 0 ]; then
+    docker compose "${LAUNCH_COMPOSE[@]}" logs --tail 20 >&2 2>/dev/null
+    docker compose "${LAUNCH_COMPOSE[@]}" down >&2 2>/dev/null
+  fi
+  restore_entry
+  exit 4
+}
+
+# write_entry run storage compose composeProject managed  (trailing args may be empty)
 write_entry() {
   bash "$HERE/cyoda-config-write.sh" '
     .projects //= {}
-    | .projects[$k] = (((.projects[$k] // {}) | del(.storage, .compose))
+    | .projects[$k] = (((.projects[$k] // {}) | del(.storage, .compose, .composeProject, .managed))
         + {run: $run, instance: $inst, dataDir: $dd,
            ports: {http: ($h | tonumber), grpc: ($g | tonumber), admin: ($a | tonumber)},
            endpoint: ("http://localhost:" + $h)}
         + (if $storage != "" then {storage: $storage} else {} end)
-        + (if $compose != "" then {compose: $compose} else {} end))' \
+        + (if $compose != "" then {compose: $compose} else {} end)
+        + (if $cp != "" then {composeProject: $cp} else {} end)
+        + (if $managed != "" then {managed: ($managed == "true")} else {} end))' \
     --arg k "$ROOT" --arg run "$1" --arg inst "$INSTANCE" --arg dd "$DD" \
     --arg h "$HTTP" --arg g "$GRPC" --arg a "$ADMIN" --arg storage "${2:-}" --arg compose "${3:-}" \
+    --arg cp "${4:-}" --arg managed "${5:-}" \
     || die 1 "cannot write the plugin config"
 }
 
-wait_healthy() { # pid-or-empty
-  for _ in $(seq 1 60); do
+wait_healthy() { # pid-or-empty; returns 1 on timeout or when that pid died
+  local n=$(( ${CYODA_LOCAL_HEALTH_TIMEOUT:-30} * 2 ))
+  [ "$n" -ge 1 ] || n=1 # BSD seq counts down from 1 to 0
+  for _ in $(seq 1 "$n"); do
     if [ "$(curl -s --max-time 1 "http://localhost:$HTTP/api/health" 2>/dev/null | jq -r '.status // empty' 2>/dev/null)" = UP ]; then return 0; fi
     if [ -n "${1:-}" ] && ! kill -0 "$1" 2>/dev/null; then break; fi
     sleep 0.5
   done
-  echo "cyoda-local.sh: instance on port $HTTP did not become healthy; log tail:" >&2
-  if [ -f "$DD/cyoda.log" ] && [ "$RUN" = binary ]; then tail -n 20 "$DD/cyoda.log" >&2
-  else docker compose -p "$INSTANCE" ps >&2 2>/dev/null || true; fi
-  exit 4
+  return 1
 }
 
 emit() { echo "ENDPOINT=http://localhost:$HTTP HTTP=$HTTP GRPC=$GRPC ADMIN=$ADMIN RUN=$RUN STATE=$1"; }
@@ -123,7 +165,7 @@ render_compose() { # storage
 }
 
 launch_binary() { # storage
-  command -v cyoda >/dev/null 2>&1 || die 64 "cyoda is not on PATH"
+  command -v cyoda >/dev/null 2>&1 || die 5 "cyoda is not on PATH"
   mkdir -p "$DD/home/.config" || die 64 "cannot create $DD"
   (
     cd "$DD" || exit 1
@@ -132,7 +174,8 @@ launch_binary() { # storage
       cyoda >"$DD/cyoda.log" 2>&1 </dev/null &
     echo $! >"$DD/cyoda.pid"
   )
-  wait_healthy "$(cat "$DD/cyoda.pid")"
+  LAUNCH_PID="$(cat "$DD/cyoda.pid")"
+  wait_healthy "$LAUNCH_PID" || fail_launch "instance on port $HTTP did not become healthy"
 }
 
 compose_env() { export CYODA_HOST_HTTP_PORT="$HTTP" CYODA_HOST_GRPC_PORT="$GRPC" CYODA_HOST_ADMIN_PORT="$ADMIN"; }
@@ -157,6 +200,7 @@ cmd_start() {
   [ "$run" != docker ] || need_docker
 
   local attempt
+  snapshot_entry
   for attempt in 1 2 3; do
     reserve "$run" "$storage" ""
     if [ "$PSTATE" = ours ]; then emit ours; exit 0; fi
@@ -170,8 +214,9 @@ cmd_start() {
   else
     render_compose "$storage"
     compose_env
-    docker compose -p "$INSTANCE" -f "$DD/compose.yaml" up -d >&2 || die 4 "docker compose up failed"
-    wait_healthy ""
+    LAUNCH_COMPOSE=(-p "$INSTANCE" -f "$DD/compose.yaml")
+    docker compose "${LAUNCH_COMPOSE[@]}" up -d >&2 || fail_launch "docker compose up failed"
+    wait_healthy "" || fail_launch "instance on port $HTTP did not become healthy"
   fi
   emit started
 }
@@ -192,6 +237,7 @@ cmd_start_repo() {
   cdir="$(dirname "$cf")"
   RUN=repo
   need_lsof; need_docker
+  snapshot_entry
 
   name="$(docker compose -f "$cf" config --format json 2>/dev/null | jq -r '.name // empty')"
   [ -n "$name" ] || die 64 "docker compose cannot read $cf"
@@ -218,7 +264,10 @@ cmd_start_repo() {
     fi
     HTTP="$http"
     [ -n "$GRPC" ] && [ -n "$ADMIN" ] || die 3 "cannot determine the ports of the running stack"
-    lock; write_entry repo "" "$cf"; unlock
+    # managed only when this plugin started that very stack earlier
+    local managed=false
+    if [ "$(entry run)" = repo ] && [ "$(entry managed)" = true ] && [ "$(entry composeProject)" = "$proj" ]; then managed=true; fi
+    lock; write_entry repo "" "$cf" "$proj" "$managed"; unlock
     emit ours; exit 0
   fi
 
@@ -239,12 +288,13 @@ cmd_start_repo() {
       do_pick
       [ -z "$h" ] || HTTP="$h"; [ -z "$g" ] || GRPC="$g"; [ -z "$a" ] || ADMIN="$a"
     fi
-    lock; write_entry repo "" "$cf"; unlock
-    docker compose -f "$cf" up -d >&2 || die 4 "docker compose up failed"
+    lock; write_entry repo "" "$cf" "$name" true; unlock
+    LAUNCH_COMPOSE=(-p "$name" -f "$cf")
+    docker compose "${LAUNCH_COMPOSE[@]}" up -d >&2 || fail_launch "docker compose up failed"
   else
     local attempt
     for attempt in 1 2 3; do
-      reserve repo "" "$cf"
+      reserve repo "" "$cf" "$INSTANCE" true
       if ! listening "$HTTP" && ! listening "$GRPC" && ! listening "$ADMIN"; then break; fi
       [ "$attempt" -lt 3 ] || die 3 "ports kept getting taken"
     done
@@ -256,15 +306,16 @@ cmd_start_repo() {
           ((.value.ports // [])[] | select(.published != null and .published != "")
             | (if .target == 8080 then $h elif .target == 9090 then $g elif .target == 9091 then $a else .published end) as $p
             | "      - \"\((.host_ip // "") | if . == "" then "" else . + ":" end)\($p):\(.target)/\(.protocol // "tcp")\""))' >"$ov"
-    docker compose -p "$INSTANCE" -f "$cf" -f "$ov" up -d >&2 || die 4 "docker compose up failed"
+    LAUNCH_COMPOSE=(-p "$INSTANCE" -f "$cf" -f "$ov")
+    docker compose "${LAUNCH_COMPOSE[@]}" up -d >&2 || fail_launch "docker compose up failed"
   fi
-  wait_healthy ""
+  wait_healthy "" || fail_launch "instance on port $HTTP did not become healthy"
   emit started
 }
 
 cmd_stop() {
   [ $# -eq 0 ] || usage
-  local run dd http pid cf
+  local run dd http pid cf cp
   run="$(entry run)"; dd="$(entry dataDir)"; http="$(rec_port http)"
   [ -n "$dd" ] || exit 0
   DD="$dd"
@@ -286,12 +337,17 @@ cmd_stop() {
         docker compose -p "$INSTANCE" -f "$DD/compose.yaml" down >&2 || die 5 "docker compose down failed" ;;
     repo)
       cf="$(entry compose)"
+      cp="$(entry composeProject)"
+      if [ "$(entry managed)" != true ] || [ -z "$cp" ]; then
+        echo "the compose stack of this project was not started by the plugin; left running"
+        exit 0
+      fi
       [ -f "$cf" ] || exit 0
       need_docker
       if [ -f "$DD/compose.override.yaml" ]; then
-        docker compose -p "$INSTANCE" -f "$cf" -f "$DD/compose.override.yaml" down >&2 || die 5 "docker compose down failed"
+        docker compose -p "$cp" -f "$cf" -f "$DD/compose.override.yaml" down >&2 || die 5 "docker compose down failed"
       else
-        docker compose -f "$cf" down >&2 || die 5 "docker compose down failed"
+        docker compose -p "$cp" -f "$cf" down >&2 || die 5 "docker compose down failed"
       fi ;;
   esac
   exit 0
