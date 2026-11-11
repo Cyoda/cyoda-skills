@@ -47,16 +47,16 @@ Judgment calls (read the named section before proposing):
 
 | Topic | Read | Guidance |
 |---|---|---|
-| States and transitions | `workflows --section TRANSITIONS` | Keep to the states the developer named, plus at least one terminal state. `manual: true` for transitions a caller fires (a user, another system, a batch job, a processor on another entity) |
-| Criteria | `workflows --section CRITERIA`, `search --section "CONDITION DSL"` | Prefer a built-in `simple`/`group` criterion. Use a function criterion only when it needs data that isn't on the entity |
+| States and transitions | `workflows --section TRANSITIONS` | Keep to the states the developer named. Best practices *Define precise terminal states*, *Use manual transitions for external triggers*, *Declare a general action once per state it is legal from* |
+| Criteria | `workflows --section CRITERIA`, `search --section "CONDITION DSL"` | Prefer a built-in `simple`/`group` criterion. Use a function criterion only when it needs data that isn't on the entity. Best practice *Make a function criterion the whole criterion* |
 | Processors | `workflows --section PROCESSORS` | Tags match by **overlap** (any one shared tag). Use `grpc --section "TAG ROUTING"` for routing, not PROCESSORS (#684-B). The processor code itself is a compute node: see the `cyoda:compute` skill |
 | A function criterion or processor that fails or times out | `workflows --section CRITERIA`, `workflows --section PROCESSORS`, `errors DISPATCH_TIMEOUT` | Answer from these three, naming each next to the fact it gives |
-| Time-based moves | `workflows --section "SCHEDULED TRANSITIONS"` | A `schedule` object on an automated transition, not a separate processor |
-| Loop limits | `workflows --section "ENGINE EXECUTION"` | Mind the per-state visit limit when a cycle is intentional |
+| Time-based moves | `workflows --section "SCHEDULED TRANSITIONS"` | A `schedule` object on an automated transition, not a separate processor. Best practice *Never put an automated transition with no criterion beside a scheduled transition* |
+| Loop limits | `workflows --section "ENGINE EXECUTION"` | Best practice *Balance the number of states* |
 
 When help doesn't settle how the behaviour you're building plays out (e.g. what a timed-out function criterion does to its transition), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker) before writing files; `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance. On no, carry on with the increment from help.
 
-For **error states, terminal states, loopback, validation cycles and rejection reasons**, follow the shared best practices. Probe the help topic first: `cyoda-help.sh workflows best-practices`, then `cyoda-help.sh design` (both exit 2 until #684-L ships). Fall back to `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md` and name the bullets you applied.
+The workflow you generate follows the shared best practices. Probe the help topic first: `cyoda-help.sh workflows best-practices`, then `cyoda-help.sh design` (both exit 2 until #684-L ships). Fall back to `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md` and name the practices you applied. Every transition carries `annotations.roles` (best practice *Declare who may fire a transition in its annotations*): ask who fires each transition the developer hasn't covered; `[]` for system-only transitions.
 
 Smoke-tested patterns to start from (each dir has `sample.json`, `workflow.json` and `config.json`):
 
