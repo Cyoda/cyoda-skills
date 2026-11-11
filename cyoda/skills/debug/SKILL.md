@@ -61,7 +61,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
    - Scheduled transitions: the `SCHEDULED_TRANSITION_*` events. The `audit` list omits them (#684-F); read `workflows --section "SCHEDULED TRANSITIONS"`.
 5. Evaluate the criterion against the entity's data yourself (`workflows --section CRITERIA`, `search --section "CONDITION DSL"`) and say which field fails.
 6. Two common causes, from the best practices (`cyoda-help.sh workflows best-practices`, else `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md`):
-   - **The data was fixed, but the held transition never ran again.** Automated transitions are evaluated only when the entity is written. Re-trigger with a loopback, not by firing the automated transition: `PATCH /entity/JSON/{id}` with `{}` (or the corrected fields), `-H 'Content-Type: application/merge-patch+json' -H 'If-Match: *'`. Smoke-tested example: [../build/examples/loopback/](../build/examples/loopback/) (scenario `02-loopback`).
+   - **The data was fixed, but the held transition never ran again.** Automated transitions are evaluated only when the entity is written. Best practice *Re-trigger evaluation with a loopback, not by firing an automated transition*: `PATCH /entity/JSON/{id}` with `{}` (or the corrected fields), `-H 'Content-Type: application/merge-patch+json' -H 'If-Match: *'`. Smoke-tested example: [../build/examples/loopback/](../build/examples/loopback/) (scenario `02-loopback`).
    - **A cycle hit the per-state visit limit** (`workflows --section "ENGINE EXECUTION"`). The fix is a workflow change: "next, type `/cyoda:build`".
 7. When help doesn't settle how the engine features involved combine (e.g. a cascade through several automated transitions), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
 
@@ -91,7 +91,7 @@ Count them per state, then list them and read each errored entity's audit: `GET 
 
 `GET /entity/{id}` returns 404 after a delete. The evidence is a `DELETE` entry in `GET /entity/{id}/changes` and in the audit's `EntityChange` events.
 
-Tell the developer: the delete is soft (history kept; `/changes` shows the DELETE; a point-in-time read from before the delete still returns the entity), it **bypassed the workflow** (no transition, criterion or processor ran, so no state records it), and it can't be undone through the API. Best practice *Prefer a ledger to deletion*: end lifecycles in terminal states.
+Tell the developer: the delete is soft (history kept; `/changes` shows the DELETE; a point-in-time read from before the delete still returns the entity), it **bypassed the workflow** (no transition, criterion or processor ran, so no state records it), and it can't be undone through the API. Best practice *End a lifecycle in a terminal state; never delete*.
 
 ## Observation
 
