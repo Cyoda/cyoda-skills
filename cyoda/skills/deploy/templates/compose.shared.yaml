@@ -1,0 +1,73 @@
+# shared: JWT auth and Postgres, for a team or shared host.
+# Every caller needs a JWT; the bootstrap M2M client below can issue them.
+#
+# Based on deploy/docker/compose.yaml and examples/compose-with-observability
+# at cyoda-go tag v0.8.4 (the otel-backend service is left out; add it from that
+# example if you want traces). Auth follows `cyoda help run` (RUN MODES: Docker,
+# Postgres + JWT; Docker Compose, file-mount approach) and `cyoda help config
+# auth`, not the commented "production" block in the upstream compose.yaml.
+#
+# Before `docker compose up`, create every file and variable listed in
+# secrets-checklist.md. No secret value is written in this file.
+#
+#   docker compose -f compose.yaml up -d
+#
+# Ports (container -> host): 8080 REST API (/api) -> 18080 and 9090 gRPC for
+# compute nodes -> 19090 are published on all interfaces; put a TLS-terminating
+# proxy in front of them for anything beyond a trusted network. 9091 admin
+# (/livez, /readyz, /metrics) -> 19091 stays on 127.0.0.1. The host ports differ
+# from cyoda-go's defaults so the stack never collides with a local cyoda-go on
+# 8080/9090/9091; override with CYODA_HOST_*_PORT.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: cyoda
+      POSTGRES_USER: cyoda
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./secrets/postgres-password:/run/secrets/postgres-password:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyoda -d cyoda"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  cyoda:
+    image: ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4}
+    ports:
+      - "${CYODA_HOST_HTTP_PORT:-18080}:8080"
+      - "${CYODA_HOST_GRPC_PORT:-19090}:9090"
+      - "127.0.0.1:${CYODA_HOST_ADMIN_PORT:-19091}:9091"
+    environment:
+      CYODA_STORAGE_BACKEND: postgres
+      # postgres://cyoda:<password>@postgres:5432/cyoda?sslmode=disable
+      CYODA_POSTGRES_URL_FILE: /run/secrets/postgres-url
+      CYODA_IAM_MODE: jwt
+      # Refuse to start unless JWT mode and the signing key are configured.
+      CYODA_REQUIRE_JWT: "true"
+      CYODA_JWT_SIGNING_KEY_FILE: /run/secrets/signing.pem
+      # Bootstrap M2M client: the id comes from your shell or .env, the secret from a file.
+      CYODA_BOOTSTRAP_CLIENT_ID: ${CYODA_BOOTSTRAP_CLIENT_ID:?set CYODA_BOOTSTRAP_CLIENT_ID (see secrets-checklist.md)}
+      CYODA_BOOTSTRAP_CLIENT_SECRET_FILE: /run/secrets/bootstrap-client-secret
+      # Needed in a container so the healthcheck and port 9091 can reach the probes.
+      CYODA_ADMIN_BIND_ADDRESS: 0.0.0.0
+    volumes:
+      - ./secrets/signing.pem:/run/secrets/signing.pem:ro
+      - ./secrets/bootstrap-client-secret:/run/secrets/bootstrap-client-secret:ro
+      - ./secrets/postgres-url:/run/secrets/postgres-url:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # `cyoda health` GETs /readyz on the admin port. Postgres migrations run
+    # before the admin listener starts: raise start_period on slow hosts.
+    healthcheck:
+      test: ["CMD", "/cyoda", "health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  pgdata:

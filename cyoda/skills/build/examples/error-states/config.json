@@ -1,0 +1,7 @@
+{
+  "uniqueKeys": [
+    { "id": "by-email", "fields": ["$.email"] }
+  ],
+  "changeLevel": null,
+  "env": {}
+}

@@ -1,40 +1,35 @@
 ---
 name: status
-description: Reports current Cyoda connection status. Shows "Connected to Local cyoda-go — vX.X.X", "Connected to Cyoda Cloud — vX.X.X [PRODUCTION]", or "Not connected". Use before any operation requiring an active Cyoda instance.
-when_to_use: When the user asks about their Cyoda connection, at session start when Cyoda work is mentioned, or before build/test/migrate operations.
-allowed-tools: Bash(curl *) Bash(cat *) Bash(grep *) Bash(jq *)
+description: Use when the developer asks whether Cyoda is connected, which cyoda-go instance, project binding, profile or version is active, or why the connection fails; at the start of Cyoda work; and before an operation that needs a running cyoda-go instance.
+allowed-tools: Bash(*cyoda-status.sh*)
 ---
 
-## Cyoda Connection Status
+# Cyoda connection status
 
-Current config:
-```!
-PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default"); jq --arg p "$PROFILE" '.profiles[$p] // {"endpoint":"none"}' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo '{"endpoint":"none"}'
+## Steps
+
+1. Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. It probes the public `/api/help`, so no token is needed. If it exits non-zero (an invalid config file or `projects` entry, or `CYODA_PROFILE` naming a profile that doesn't exist), show its stderr as it is and stop.
+2. Its first line is `STATUS=<s> PROFILE=<P> ENDPOINT=<E> VERSION=<V> BINARY_VERSION=<B> SOURCE=<src>`, plus ` PROJECT=<dir>` when `SOURCE=project`. `PROFILE` is in double quotes when it holds a space or a quote (`PROFILE="my shop"`; report it without the quotes, `\"` as `"`). `PROJECT` is always last and runs to the end of the line. Report exactly one line:
+
+| `STATUS` | Report |
+|---|---|
+| `connected` | `Connected to cyoda-go v<V> — <E> <TAG>` |
+| `unreachable` | `cyoda-go unreachable — <E> <TAG>` |
+| `not_configured` | `Not connected — type /cyoda:setup` |
+
+   - `<TAG>` comes from `SOURCE`: `project` → `[project: <P>]`; `profile` or `default` → `[profile: <P>]`.
+   - `VERSION=unknown`: write `version unknown` in place of `v<V>`.
+   - `<V>` is the instance's version; `BINARY_VERSION` is the local `cyoda` binary.
+3. After the status line, print each `WARN=<text>` line as `Warning: <text>`.
+4. If `STATUS` is `unreachable` or `not_configured`, or a `WARN=` line is present, and no printed line names `/cyoda:setup`, end with "next, type `/cyoda:setup`".
+
+## Examples
+
+```
+Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]
+Warning: no saved profile; using the default local instance http://localhost:8080 — type /cyoda:setup to save it
 ```
 
-Checking reachability and version:
-```!
-PROFILE=$(jq -r '.active // "default"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "default");
-ENDPOINT=$(jq -r --arg p "$PROFILE" '.profiles[$p].endpoint // "none"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "none");
-ENV=$(jq -r --arg p "$PROFILE" '.profiles[$p].env // "development"' "$HOME/.config/cyoda/cyoda-plugin-config.json" 2>/dev/null || echo "development");
-if [ -z "$ENDPOINT" ] || [ "$ENDPOINT" = "none" ]; then
-  echo "STATUS=not_configured PROFILE=$PROFILE";
-else
-  VERSION=$(curl -sf --max-time 3 "${ENDPOINT%/}/api/help" 2>/dev/null | jq -r '.version // ""' 2>/dev/null);
-  if [ -z "$VERSION" ]; then
-    echo "STATUS=unreachable ENDPOINT=$ENDPOINT PROFILE=$PROFILE";
-  else
-    echo "STATUS=connected ENDPOINT=$ENDPOINT VERSION=$VERSION ENV=${ENV:-development} PROFILE=$PROFILE";
-  fi;
-fi
 ```
-
-**Auth error rule:** If any API call returns 401 or 403, invoke `cyoda:auth` to refresh the token, then retry the request once. If the retry also fails, surface the error to the user. Do not retry on any other error code.
-
-Report based on output:
-
-- `STATUS=not_configured` → **"Not connected to Cyoda — run `/cyoda:setup` to get started"**
-- `STATUS=unreachable` → **"Cyoda instance unreachable at {ENDPOINT} [profile: {PROFILE}] — is it running?"**
-- `STATUS=connected`, `ENV=production` → **"⚠️ Connected to Cyoda Cloud [PRODUCTION] — v{VERSION} [profile: {PROFILE}]"**
-- `STATUS=connected`, endpoint contains `localhost` → **"Connected to Local cyoda-go — v{VERSION} [profile: {PROFILE}]"**
-- `STATUS=connected`, cloud endpoint → **"Connected to Cyoda Cloud — v{VERSION} [profile: {PROFILE}]"**
+Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]
+```

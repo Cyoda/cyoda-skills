@@ -1,0 +1,25 @@
+{
+  "workflows": [
+    {
+      "version": "${SCHEMA_VERSION}",
+      "name": "shipment-lifecycle",
+      "initialState": "pending",
+      "active": true,
+      "states": {
+        "pending": {
+          "transitions": [
+            {
+              "name": "dispatch",
+              "next": "dispatched",
+              "manual": true,
+              "annotations": {
+                "roles": []
+              }
+            }
+          ]
+        },
+        "dispatched": {}
+      }
+    }
+  ]
+}

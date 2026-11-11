@@ -1,0 +1,95 @@
+# cyoda-go Helm values for chart cyoda/cyoda (https://cyoda.github.io/cyoda-go).
+# Install with the chart version whose appVersion matches your cyoda-go binary;
+# the image tag then follows the chart (ghcr.io/cyoda/cyoda:<appVersion>).
+#
+# This file holds no secret values. Every credential is a Kubernetes Secret you
+# create first in the release namespace: see secrets-checklist.md next to this file.
+# Pre-creating all of them (instead of letting the chart generate some) keeps
+# `helm template`, --dry-run and GitOps controllers working.
+#
+# Facts: `cyoda help helm` (VALUES, SECRETS PROVISIONING, CRDS / OBJECTS),
+# `cyoda help config`. Keys not listed here stay at the chart defaults.
+
+# -- Scale. Chart defaults: one pod (a cluster of one), no HPA. To scale, raise
+# replicas, or set autoscaling.enabled=true (the HPA then owns the replica count
+# and replicas is only the initial scale). A PodDisruptionBudget is rendered once
+# more than one pod is possible.
+replicas: 1
+autoscaling:
+  enabled: false
+
+# -- Postgres DSN for the cyoda pods (REQUIRED): Secret cyoda-pg, key dsn,
+# value postgres://user:pass@host:5432/db?sslmode=require.
+postgres:
+  existingSecret: cyoda-pg
+  existingSecretKey: dsn
+
+# -- JWT signing key, PEM RSA private key (REQUIRED): Secret cyoda-jwt.
+jwt:
+  existingSecret: cyoda-jwt
+  existingSecretKey: signing-key.pem
+
+# -- HMAC secret for gossip and inter-node dispatch: Secret cyoda-hmac.
+cluster:
+  hmacSecret:
+    existingSecret: cyoda-hmac
+    existingSecretKey: secret
+
+# -- Bootstrap M2M client: the credential seed.sh, verify.sh and your first
+# token script use. Always set (the chart's default leaves it off, which
+# leaves nothing to seed with: cyoda-go#684 item D). Secret cyoda-bootstrap.
+bootstrap:
+  clientId: "<APP>-deployer"
+  clientSecret:
+    existingSecret: cyoda-bootstrap
+    existingSecretKey: secret
+
+# -- Bearer token for /metrics on the admin port 9091: Secret cyoda-metrics-bearer.
+monitoring:
+  metricsBearer:
+    existingSecret: cyoda-metrics-bearer
+    existingSecretKey: bearer
+
+# -- Routing: keep ONE of gateway or ingress enabled (the chart fails on both).
+# An empty gateway.parentRefs doesn't fail the chart; it leaves the routes
+# attached to nothing (cyoda-go#684 item G), so it's always set here.
+#
+# Gateway API (chart default): HTTPRoute (port 8080) and GRPCRoute (port 9090)
+# into a Gateway your cluster already runs. The chart doesn't create the Gateway.
+gateway:
+  enabled: true
+  parentRefs:
+    - name: "<GATEWAY_NAME>"
+      namespace: "<GATEWAY_NAMESPACE>"
+  http:
+    hostnames:
+      - "<API_HOST>"
+  grpc:
+    hostnames:
+      - "<GRPC_HOST>"
+
+# Ingress (transitional): an HTTP and a gRPC Ingress for an existing controller.
+# gRPC through an Ingress needs TLS at the edge (HTTP/2).
+ingress:
+  enabled: false
+  className: "<INGRESS_CLASS>"
+  http:
+    host: "<API_HOST>"
+    tls:
+      - hosts: ["<API_HOST>"]
+        secretName: "<TLS_SECRET>"
+  grpc:
+    host: "<GRPC_HOST>"
+    tls:
+      - hosts: ["<GRPC_HOST>"]
+        secretName: "<TLS_SECRET>"
+
+# -- Migration Job: always on. It runs `cyoda migrate` as a pre-install and
+# pre-upgrade hook, before any pod starts; the pods don't auto-migrate. It uses
+# the postgres DSN above. For a separate owner (DDL) role, set
+# migrate.postgres.existingSecret / existingSecretKey to a second DSN Secret
+# (a chart value missing from `cyoda help helm` VALUES: cyoda-go#684 item H).
+migrate:
+  postgres:
+    existingSecret: ""
+    existingSecretKey: dsn

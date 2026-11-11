@@ -1,0 +1,23 @@
+{
+  "workflows": [
+    {
+      "version": "${SCHEMA_VERSION}",
+      "name": "order-lifecycle",
+      "initialState": "new",
+      "active": true,
+      "states": {
+        "new": {
+          "transitions": [
+            { "name": "activate", "next": "active", "manual": false }
+          ]
+        },
+        "active": {
+          "transitions": [
+            { "name": "close", "next": "closed", "manual": true }
+          ]
+        },
+        "closed": {}
+      }
+    }
+  ]
+}

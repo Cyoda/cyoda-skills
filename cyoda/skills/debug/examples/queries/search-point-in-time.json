@@ -1,0 +1,6 @@
+{
+  "type": "simple",
+  "jsonPath": "$.amount",
+  "operatorType": "GREATER_THAN",
+  "value": 0
+}

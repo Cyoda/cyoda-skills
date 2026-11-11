@@ -1,7 +1,7 @@
 {
   "workflows": [
     {
-      "version": "1",
+      "version": "${SCHEMA_VERSION}",
       "name": "${WORKFLOW_NAME}",
       "initialState": "${INITIAL_STATE}",
       "active": true,
