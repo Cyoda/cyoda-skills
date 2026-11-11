@@ -116,7 +116,7 @@
     {
       "id": 4,
       "prompt": "I'm writing a criteria handler in Kotlin. Exactly which fields does the criteria response need?",
-      "expected_output": "Gets the schema with cyoda-help.sh cloudevents json piped to jq for processing/EntityCriteriaCalculationResponse.json, reports required requestId and entityId plus matches and the optional reason (2 KiB cap per grpc COMPUTE MEMBER PROTOCOL), and mentions `cyoda-help.sh grpc proto` for stubs.",
+      "expected_output": "Gets the schema with cyoda-help.sh cloudevents json piped to jq for processing/EntityCriteriaCalculationResponse.json, reports required requestId and entityId plus matches and the optional reason (Cyoda keeps the first 2048 characters, per grpc COMPUTE MEMBER PROTOCOL), and mentions `cyoda-help.sh grpc proto` for stubs.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/help.md": "cyoda-help.sh cloudevents json prints {schemas:{...}}; schemas[\"processing/EntityCriteriaCalculationResponse.json\"] has required [requestId, entityId] and properties entityId, matches, reason, requestId. `cyoda help grpc proto` prints the .proto text."

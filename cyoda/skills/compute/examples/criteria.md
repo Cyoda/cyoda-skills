@@ -4,7 +4,7 @@ Pseudocode for a criteria handler. Field names are placeholders: take the real o
 
 ## Workflow side
 
-A `function` criterion must be the whole criterion on a transition (or a workflow's selection criterion), not nested in a `group`. Its `function.name` arrives as the request's criteria id/name, and `function.config.calculationNodesTags` routes it by tag overlap.
+A `function` condition may sit at any depth of a transition's (or a workflow's selection) criterion. In a `group`, put in-memory conditions before it, or in its pre-check `function.criterion`, so the callout is made only when it can change the answer (best practice *Put the cheap test before the callout*). Its `function.name` arrives as the request's criteria id/name, and `function.config.calculationNodesTags` routes it by tag overlap.
 
 ## Handler
 
@@ -26,7 +26,7 @@ function handleCriteriaRequest(request):
     matches: ok
   }
   if not ok:
-    response.reason = "amount " + entity.amount + " exceeds credit limit " + limit   // ≤ 2 KiB
+    response.reason = "amount " + entity.amount + " exceeds credit limit " + limit   // Cyoda keeps the first 2048 characters
 
   cache.put(request.<requestId>, response)
   return response

@@ -3,7 +3,7 @@
 # Workflow design best practices
 
 Practices for designing Cyoda entity models and workflows. Each practice has a bold name, and a
-design review cites that name. Platform facts are checked against cyoda-go 0.8.4. Where a practice
+design review cites that name. Platform facts are checked against cyoda-go 0.9.0. Where a practice
 depends on platform mechanics, it names the `cyoda help` section. Read that section for the exact
 syntax. Do not copy syntax from this file.
 
@@ -172,18 +172,19 @@ This file uses these terms and no synonyms for them.
 ## Criteria
 
 - **Give a rejection reason when a criterion fails.** Only a function criterion can return a
-  `reason` (with `matches: false`, at most 2 KiB). A manual transition returns it in its
-  `400 WORKFLOW_FAILED` response. An automated transition records it in the audit event
-  `TRANSITION_NOT_MATCH_CRITERION`. Name the condition that failed. An in-memory criterion records
-  a generic message, so describe its purpose in `criterionAnnotations.description`. Facts:
-  `cyoda help grpc` (criteria response).
+  `reason` (with `matches: false`; Cyoda keeps the first 2048 characters). A manual transition
+  returns it in its `400 WORKFLOW_FAILED` response; an automated transition and workflow selection
+  record it in the audit events `TRANSITION_NOT_MATCH_CRITERION` and `WORKFLOW_SKIP`. Name the
+  condition that failed. Describe an in-memory criterion's purpose in
+  `criterionAnnotations.description`. Facts: `cyoda help grpc` (criteria response).
 - **Compute live facts in a function criterion, not a stored flag.** A flag that one transition
   writes and another reads is out of date as soon as a rule changes or a date passes. When a
   criterion depends on derived facts (eligibility, expiry, coverage), compute them when the
   transition fires.
-- **Make a function criterion the whole criterion.** A function criterion nested in a `group` fails
-  every evaluation, although it imports cleanly. When a criterion needs two computed clauses, write
-  one function criterion that checks both. Facts: `cyoda help workflows` CRITERIA.
+- **Put the cheap test before the callout.** A function condition may sit at any depth of a
+  criterion, and a group stops at the first member that decides it. Put in-memory conditions before
+  function conditions in a group, or in the function condition's pre-check (`function.criterion`),
+  so a callout is made only when it can change the answer. Facts: `cyoda help workflows` CRITERIA.
 - **Check for a non-blank value with a function criterion.** `NOT_NULL` means "present and not
   null", and the empty string `""` meets it. Facts: `cyoda help predicates`.
 - **Fail closed.** A function criterion that cannot decide (a failed read, missing data, an unknown
@@ -197,8 +198,8 @@ This file uses these terms and no synonyms for them.
 - **Let the engine save the anchor.** A processor returns its changes. It never writes the entity
   it was called for, even when it holds the transaction token. Help allows either path, and this
   practice takes the stricter one: the engine applies the returned changes, so one path writes the
-  anchor. Facts: `cyoda help workflows` PROCESSORS ("a processor must not save the entity it is
-  processing for").
+  anchor. Facts: `cyoda help workflows` PROCESSORS ("A processor changes the entity it runs for in one
+  way only").
 - **Pass the anchor's facts down the cascade.** The engine applies a processor's returned changes
   after the processor answers. So while a processor runs, its changes to the anchor are not in the
   store. A processor on another entity, fired by this processor, does not see them when it reads the
@@ -218,10 +219,10 @@ This file uses these terms and no synonyms for them.
   slow external work. The state before that processor is then committed, and other transactions can
   read it. The processor must be idempotent, because a replay dispatches it again. Facts:
   `cyoda help workflows` PROCESSORS (execution modes).
-- **Make every processor safe to run again.** A caller that replays a failed request runs its
-  processors again, in a new transaction. cyoda-go dispatches a processor once, whatever the
-  policy. Facts: `cyoda help workflows` PROCESSORS (`retryPolicy`). A processor's writes through
-  Cyoda roll back with its transaction. Its effects outside Cyoda do not, so make them idempotent.
+- **Declare `idempotent: true` only where a repeat is harmless everywhere.** Cyoda gives a
+  processor that got no answer to another compute member, and repeats it in a scheduled run, only
+  when it is declared `idempotent`; without it, the callout or the scheduled task fails instead.
+  Facts: `cyoda help workflows` PROCESSORS (**Repeating a processor**).
 
 ## Scheduled transitions
 
@@ -249,10 +250,9 @@ This file uses these terms and no synonyms for them.
 - **End the entity that carries a recurring scheduled transition.** A recurring cycle adds
   revisions to its entity forever. For example, create one scan entity per business day. Have each
   one create the next day's entity and then end itself.
-- **Make a scheduled transition's processors safe to run twice.** The scheduler can dispatch a due
-  scheduled transition again after `CYODA_SCHEDULER_REDISPATCH_BACKOFF` (default 30 s). Facts:
-  `cyoda help config scheduler`. On cyoda-go 0.8.4 a failed fire was dispatched again in this way
-  (measured).
+- **Give a scheduled transition a `timeoutMs`.** A failed scheduled run is retried with a growing
+  delay, and without `timeoutMs` it is retried without end. Facts: `cyoda help workflows`
+  SCHEDULED TRANSITIONS (**Retries**).
 
 ## Annotations
 
@@ -274,10 +274,9 @@ This file uses these terms and no synonyms for them.
 - **Set `version` to the import contract.** A workflow's `version` is the version of the workflow
   import contract, not of the model. Facts: `cyoda help workflows schema-version`.
 - **Validate before you import, then fire every transition.** Run each workflow through
-  `@cyoda/workflow-core`, then import it into a throwaway instance. Some defects pass both and fail
-  only when a transition fires: a function criterion nested in a `group`, a criterion on a field
-  that the model does not declare, and a processor with `type: "internalized"`. Facts:
-  `cyoda help workflows` CRITERIA, PROCESSORS.
+  `@cyoda/workflow-core`, then import it into a throwaway instance. One defect passes both and fails
+  only when a transition fires: a criterion on a field that the model does not declare. Facts:
+  `cyoda help workflows` CRITERIA.
 - **Tie call sites to handlers in both directions.** The engine dispatches a callout by name, so a
   call site with no handler fails only when it runs. Test that every call site in a workflow has a
   handler, and that every handler has a call site.
@@ -317,7 +316,7 @@ Several workflows on one model
 Criteria
 - Give a rejection reason when a criterion fails
 - Compute live facts in a function criterion, not a stored flag
-- Make a function criterion the whole criterion
+- Put the cheap test before the callout
 - Check for a non-blank value with a function criterion
 - Fail closed
 Processors and cascades
@@ -326,13 +325,13 @@ Processors and cascades
 - Fail loud
 - State the call site's role in `context`
 - Keep a cascade in one transaction with `SYNC`
-- Make every processor safe to run again
+- Declare `idempotent: true` only where a repeat is harmless everywhere
 Scheduled transitions
 - Poll for a condition that can become true without a write
 - Never put an automated transition with no criterion beside a scheduled transition
 - Expect frequent writes to postpone a scheduled transition
 - End the entity that carries a recurring scheduled transition
-- Make a scheduled transition's processors safe to run twice
+- Give a scheduled transition a `timeoutMs`
 Annotations
 - Choose one annotation vocabulary and enforce it at your API boundary
 - Let the workflow describe the actions
