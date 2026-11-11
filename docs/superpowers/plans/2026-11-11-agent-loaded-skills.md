@@ -1,19 +1,19 @@
-# One `develop` Skill — Implementation Plan
+# Agent-Loaded Technique Skills — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Every task that edits a `SKILL.md` also REQUIRES superpowers:writing-skills.**
 
-**Goal:** Replace `app`, `design`, `setup`, `build`, `test`, `status` and `auth` with one agent-driven `develop` skill that runs requirement → registered, tested app without typed hand-offs, on a project-own cyoda-go instance that never collides with other instances on the machine.
+**Goal:** Every cyoda skill is a technique skill the agent loads itself: no typed hand-offs, no developer-only skills, no orchestrating `app`; and `setup` gives each project (and worktree) its own cyoda-go instance without colliding with others on the machine.
 
-**Architecture:** Mechanical parts become scripts with tests (instance naming, port picking with ownership evidence, starting/stopping a project's instance). `develop`'s `SKILL.md` holds the loop; each step's detail lives in a resource loaded when the step comes up. The other four skills lose their typed hand-offs. Evals: fail-first runs only for the new discovery, port and loop cases; migrated cases whose expectation changed get one run after the edit.
+**Architecture:** Mechanical parts become scripts with tests (instance naming, port picking with ownership evidence, starting/stopping a project's instance). `setup` absorbs `status` and drives the scripts. `build` and `test` carry out `setup`'s procedure themselves when no instance answers. `app` is deleted. Evals: fail-first runs for the new `setup` discovery and port cases and the composition case; cases whose hand-off expectation changed get one run after the edit.
 
 **Tech Stack:** bash + jq scripts and tests (`tests/scripts`, `tests/lib/assert.sh`, `tests/lib/server.sh`), skill markdown, `evals.json`, eval tooling in `tests/evals/`, cyoda-go 0.8.4, Docker for the Docker mode.
 
-**Spec:** `docs/superpowers/specs/2026-11-11-develop-skill-design.md`
+**Spec:** `docs/superpowers/specs/2026-11-11-agent-loaded-skills-design.md`
 
 ## Global Constraints
 
 - Skill text: Cyoda-specific instructions only, compact, no rationale, no choreography, no access checks; `SKILL.md` under 500 lines; facts from `cyoda help`.
-- No `disable-model-invocation` on any skill. Hand-offs between skills: "continue with the `cyoda:<skill>` skill". No "next, type …".
+- No `disable-model-invocation` on any skill. No skill tells the developer to type a command or prescribes what comes after it. A skill that needs another's result to finish carries out that part itself; otherwise it names where the know-how lives ("`cyoda:setup` covers starting an instance").
 - The agent asks only a domain gap in the requirement and, when the project doesn't define it, the one run question (spec § The local instance, step 3, exact wording there).
 - The plugin config stays private (`cyoda-config-write.sh` for every write); nothing is written into the developer's repo except the app's own project files (samples, workflows, configs, manifest).
 - Never stop or remove another process or container.
@@ -55,7 +55,7 @@ compose:  "<path to the repo's compose file>"          # "repo" only
 2. **A stale pid file whose pid was reused by an unrelated process.** Expected: not treated as ours unless that pid listens on the recorded HTTP port. Pinned in Task 1 (`test_pick_stale_pid_not_ours`).
 3. **Another project's recorded block while that project is stopped.** Expected: skipped. Pinned in Task 1 (`test_pick_skips_other_project_block`).
 4. **A repo checkout under a path with spaces, or a basename with dots/uppercase.** Expected: a valid instance name and data dir; scripts quote paths. Pinned in Task 1 (`test_name_sanitised`) and Task 2 (`test_local_path_with_spaces`).
-5. **A developer's existing `localhost:8080` instance with models.** Expected: offered in the one question, never restarted or stopped by `develop`. Pinned in Task 3 (eval `develop-existing-8080`).
+5. **A developer's existing `localhost:8080` instance with models.** Expected: offered in the one question, never restarted or stopped by `setup`. Pinned in Task 3 (eval `setup` "existing 8080").
 
 ---
 
@@ -98,39 +98,31 @@ compose:  "<path to the repo's compose file>"          # "repo" only
 - [ ] **Step 4: Run** the test file, then `bash tests/smoke/run.sh` — Expected: PASS.
 - [ ] **Step 5: Commit** `feat(scripts): cyoda-local.sh starts and stops a project-own cyoda-go (command line, Docker, repo stack)`.
 
-### Task 3: `develop` skill — the loop and the local instance
+### Task 3: `setup` — discovery, the run question, parallel-safe instances; absorbs `status`
 
-**Files:** Create `cyoda/skills/develop/SKILL.md`, `cyoda/skills/develop/resources/instance.md`, `cyoda/skills/develop/evaluations/evals.json`.
+**Files:** Modify `cyoda/skills/setup/SKILL.md` (and a `resources/instance.md` if the procedure would push `SKILL.md` past what's compact), `cyoda/skills/setup/evaluations/evals.json`. Delete `cyoda/skills/status/` after moving its status-line contract (the `cyoda-status.sh` line and WARN handling) into `setup` and its eval cases into `setup`'s evals.
 
-**Content source:** the instance step comes from `setup` (install, discovery, link, Compose start) and `auth` (local JWT mode, token script, non-mock auth paths), rewritten on top of `cyoda-ports.sh`/`cyoda-local.sh`; `status`'s status-line contract (the `cyoda-status.sh` line and WARN handling) moves into `instance.md`. Only Cyoda-specific content carries over.
+- [ ] **Step 1: Write the eval cases** in `setup`: repo stack (simulated Docker; repo with a stopped cyoda Compose stack → started via `cyoda-local.sh start-repo`, bound, no question); ask-run ×2 (nothing defined; answers "command line" / "Docker" → `cyoda-local.sh start --run …`, entry recorded; Docker simulated); port conflict (real; `CYODA_PORT_BASE=31000`, 31000 bound by another listener → next block, the listener untouched); own instance (real; project started earlier via `cyoda-local.sh` → reused, `STATE=ours`); restart (real; recorded entry, instance stopped → restarted on the recorded ports); existing 8080 (simulated: an instance answers at localhost:8080, no entry → the question offers it); plus `status`'s 5 cases migrated (keep the old id in a `"was"` field). Fixtures don't name the behaviour under test.
+- [ ] **Step 2: Fail-first run** (controller) of the new cases against the current skill. Expected: failures on the run question, ports, reuse and the 8080 offer.
+- [ ] **Step 3: Rewrite `setup`** per spec § The local instance on top of `cyoda-ports.sh` / `cyoda-local.sh`: resolution order, the run question with both wordings, starting and binding, identity, ports, repo-stack override, the status report. Remove `disable-model-invocation`, connect/link/unlink stay, typed hand-offs go. `allowed-tools`: the scripts, `cyoda`, `docker compose`, `curl`, `jq`.
+- [ ] **Step 4: Run** (controller) the new and migrated cases. Expected: pass.
+- [ ] **Step 5: Commit** `feat(setup): per-project instances with automatic ports; absorbs status`.
 
-- [ ] **Step 1: Write the eval cases** (new ids in `develop`): `develop-e2e` (real server bound as the active profile; requirement for a small app → design summary shown, registered and smoke-tested with no developer turn after the requirement); `develop-repo-stack` (simulated Docker; repo with a stopped cyoda Compose stack → started and bound, no question); `develop-ask-run` ×2 (no definition; answers "command line" / "Docker" → `cyoda-local.sh start --run …` used, entry recorded; Docker simulated); `develop-port-conflict` (real; 31000 bound by another listener with `CYODA_PORT_BASE=31000` → picks the next block, other listener untouched); `develop-own-instance` (real; project already started via `cyoda-local.sh` → reused, `STATE=ours`); `develop-existing-8080` (simulated: an instance answers at localhost:8080, no project entry → the one question offers it); `develop-design-only` ("how should I model X" → design summary, no instance started); `develop-401` (simulated 401 in the loop → local JWT path from `instance.md`, no typed hand-off). Assertions observe outcomes; fixtures don't name the behaviour under test.
-- [ ] **Step 2: Fail-first run** (controller): run these cases against the current plugin (old skills present, `develop` absent). Expected: failures on chaining (typed hand-offs), the run question, port picking and reuse.
-- [ ] **Step 3: Write** `develop/SKILL.md` (the loop; when each resource is loaded; hand-offs to `debug`/`compute`/`deploy`/`docs`) and `resources/instance.md` (spec § The local instance: resolution order, the one question with its two wordings, starting via `cyoda-local.sh`, binding, ports, identity, repo-stack override, local JWT and token script, non-mock auth paths with their help sections). `allowed-tools` covers the scripts, `cyoda`, `docker compose`, `curl`, `jq`.
-- [ ] **Step 4: Run the cases again** (controller). Expected: all pass.
-- [ ] **Step 5: Commit** `feat(develop): the agent-driven loop and parallel-safe local instances`.
+### Task 4: All skills agent-loaded; `app` removed
 
-### Task 4: `develop` — design, register, test
+**Files:** Delete `cyoda/skills/app/`. Modify `SKILL.md` and evals of `design`, `build`, `test`, `auth`, `compute`, `debug`, `deploy`, `docs`.
 
-**Files:** Create `cyoda/skills/develop/resources/design.md`, `register.md`, `test.md`. Move (git mv) `design/resources/{best-practices,patterns,design-guidelines}.md` → `develop/resources/`; `build/templates/*` and `build/examples/*` → `develop/templates/`, `develop/examples/`; `test/templates/smoke-test.sh` → `develop/templates/`. Modify `develop/SKILL.md`, `develop/evaluations/evals.json`.
+- [ ] **Step 1: Evals first.** Add the composition case to `build`: the executor is told it is a subagent executing task "register Order v1" from a superpowers implementation plan (plan excerpt in the fixture; real server bound as the active profile); assertions: the task is completed (model registered, workflow imported), it reads `build` (and `setup`'s procedure only if no instance answered) and no other cyoda skill, it asks the developer nothing. Add to `build` and `test`: no usable instance (real; no entry, `CYODA_PORT_BASE=31000`, nothing listening, the run-question answer in the fixture) → carries out `setup`'s procedure and finishes, no typed command. In every skill's evals, replace hand-off and `no-invoke` assertions with "continues without asking the developer to type a command"; drop cases that only tested `app`'s sequencing (list each in the report).
+- [ ] **Step 2: Fail-first run** (controller) of the composition case and the two no-instance cases against the current skills. Expected: fail (typed hand-offs, `build` not model-invocable).
+- [ ] **Step 3: Edit the skills.** Remove `disable-model-invocation` from `auth`, `build`, `deploy`, `setup`, `test`. Remove every "next, type …" and every prescribed next step; `design` ends with its summary; `build` and `test` carry out `setup`'s procedure when no instance answers; a 401/403 in `build`/`test`/`debug` carries out `auth`'s procedure. Keep each skill's description a precise trigger (spec § Shape).
+- [ ] **Step 4: Run** (controller) the three new cases and every case whose hand-off assertion changed. Expected: pass.
+- [ ] **Step 5: Commit** `refactor: every skill agent-loaded, no typed hand-offs; app removed`.
 
-- [ ] **Step 1: Migrate eval cases** from `design` (10), `build` (8), `test` (5), `app` (4), `setup` (10), `status` (5), `auth` (4) into `develop/evaluations/evals.json`: keep each case whose behaviour survives (renumber, keep the old id in a `"was"` field), replace hand-off and `no-invoke` assertions with "continues with the next step" or drop them, drop cases that only tested typed hand-offs or a removed mode. List every case kept, changed, dropped in the report.
-- [ ] **Step 2: Write** the three resources from `design`, `build` and `test` `SKILL.md` content (Cyoda-specific only; best-practices review against the checklist; registration in canonical order with the call-failure table; smoke test and CI script), and wire them into `develop/SKILL.md`. Fix every relative link and `${CLAUDE_PLUGIN_ROOT}/skills/...` path to the moved files.
-- [ ] **Step 3: Run** (controller) the migrated cases whose assertions changed. Expected: pass. A failure caused by the move puts back only what that case needs.
-- [ ] **Step 4: Commit** `feat(develop): design, register and test resources; migrated evals`.
+### Task 5: Tests, lint, rules, docs, version
 
-### Task 5: Remove the old skills; hand-offs in the remaining four
+**Files:** `tests/smoke/test-segregation.sh` (`test_flags`: no skill has `disable-model-invocation`; the skill set is exactly `auth build compute debug deploy design docs setup test`), `tests/smoke/lint.sh` (the `invoke-flagged` rule becomes `typed-handoff`, matching `[Nn]ext, type .?/cyoda:`), `cyoda/GEMINI.md`, `CLAUDE.md` (side-effect rule replaced per spec § Rules; skill list), `README.md` and `cyoda/README.md` (skills table without `app` and `status`; one line that skills are loaded by the agent and compose with the developer's own process, e.g. superpowers; 0.8.1 release notes), version `0.8.1` in the three files, header pointers in the 2026-10-17 and 2026-11-07 specs to this one.
 
-**Files:** Delete `cyoda/skills/{app,design,setup,build,test,status,auth}/`. Move `auth/templates/get-token.sh` → `develop/templates/get-token.sh`. Modify `debug`, `compute`, `deploy`, `docs` `SKILL.md` and evals; `compute` gains the node's token handling (from `auth` Step 7, Cyoda-specific only). Update paths in `tests/smoke/scenarios/01-hello-world.sh`, `08-seed.sh`, `tests/scripts/test-get-token.sh`, `test-two-projects.sh`, `tests/smoke/test-harness.sh`, `cyoda/GEMINI.md`, and any `${CLAUDE_PLUGIN_ROOT}/skills/...` reference. `tests/smoke/test-segregation.sh` `test_flags`: no skill has `disable-model-invocation`; the skill set is exactly `develop debug compute deploy docs`. `tests/smoke/lint.sh`: the `invoke-flagged` rule becomes a `typed-handoff` rule matching `next, type .?/cyoda:` (all hand-offs are now skill loads).
-
-- [ ] **Step 1:** Change the segregation test and lint rule first; run them — Expected: FAIL (old skills and flags present, typed hand-offs present).
-- [ ] **Step 2:** Make the changes above.
-- [ ] **Step 3:** `bash tests/smoke/run.sh` and `bash tests/smoke/test-harness.sh` — Expected: PASS. `grep -rn "cyoda:\(app\|design\|setup\|build\|test\|status\|auth\)" cyoda tests` → no hits outside history.
-- [ ] **Step 4:** Run (controller) the `debug`, `compute`, `deploy`, `docs` cases whose hand-off assertions changed. Expected: pass.
-- [ ] **Step 5: Commit** `refactor: five skills; no typed hand-offs`.
-
-### Task 6: Rules, docs, version
-
-**Files:** `CLAUDE.md` (side-effect rule replaced per spec § Rules; skill list), `README.md` and `cyoda/README.md` (skills table, Versioning stays, 0.8.1 release notes naming the removed commands and `/cyoda:develop`), version `0.8.1` in the three files, header pointer in `2026-10-17-…-design.md` and `2026-11-07-…-design.md` to this spec.
-
-- [ ] **Step 1:** Edit. **Step 2:** `bash tests/smoke/run.sh` — Expected: PASS. **Step 3: Commit** `docs: develop skill, 0.8.1`. Ask the user before pushing; afterwards rebase `feat/cyoda-go-0.9.0` onto it.
+- [ ] **Step 1:** Change the segregation test and lint rule; run them — Expected: PASS if Tasks 3–4 are complete (they fail on the current tree, which is the check that they bite: run them once against `HEAD~` of Task 4 to see the failures).
+- [ ] **Step 2:** Edit the docs and versions.
+- [ ] **Step 3:** `bash tests/smoke/run.sh` and `bash tests/smoke/test-harness.sh` — Expected: PASS. `grep -rn "cyoda:\(app\|status\)\|[Nn]ext, type" cyoda` → no hits.
+- [ ] **Step 4: Commit** `docs: agent-loaded skills, 0.8.1`. Ask the user before pushing; afterwards rebase `feat/cyoda-go-0.9.0` onto it.
