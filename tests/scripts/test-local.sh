@@ -218,9 +218,11 @@ test_local_docker_unhealthy_cleans_up() {
   docker_ok || { _ok; echo "  docker unavailable: skipped test_local_docker_unhealthy_cleans_up"; return 0; }
   local d rc inst; d="$(mkproj dsick)"; STARTED+=("$d"); rm -f "$CYODA_PLUGIN_CONFIG"
   inst="$(bash "$S/cyoda-ports.sh" name "$d")"
-  CYODA_LOCAL_HEALTH_TIMEOUT=0 bash "$LOCAL" start "$d" --run docker >/dev/null 2>&1; rc=$?
+  mkdir -p "$T/nocurl"; printf '#!/bin/sh\nexit 7\n' >"$T/nocurl/curl"; chmod +x "$T/nocurl/curl"
+  PATH="$T/nocurl:$PATH" CYODA_LOCAL_HEALTH_TIMEOUT=1 bash "$LOCAL" start "$d" --run docker >/dev/null 2>&1; rc=$?
   assert_status 4 "$rc" "docker not healthy in time: exit 4"
   assert_eq "$(docker ps -aq --filter "label=com.docker.compose.project=$inst")" "" "no container left"
+  docker compose -p "$inst" down >/dev/null 2>&1
   assert_eq "$(jq -c --arg k "$d" '.projects[$k] // null' "$CYODA_PLUGIN_CONFIG")" null "no entry left"
 }
 
