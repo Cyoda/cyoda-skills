@@ -8,7 +8,8 @@
 # is a live process listening on the HTTP port; docker: a cyoda-docker-instances.sh line with
 # COMPOSE_PROJECT=<instance> WORKDIR=<dataDir> on that HTTP port). Otherwise a busy block is skipped.
 # Config: CYODA_PLUGIN_CONFIG (default ~/.config/cyoda/cyoda-plugin-config.json).
-# Exit: 0 ok, 3 no free block, 64 usage.
+# A port also counts as busy when a TCP connect to 127.0.0.1 succeeds (lsof misses other users' listeners).
+# Exit: 0 ok, 1 invalid plugin config, 3 no free block, 5 lsof missing (pick), 64 usage.
 set -euo pipefail
 
 CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
@@ -32,15 +33,23 @@ instance_name() {
   printf '%s-%s\n' "$base" "$hash"
 }
 
-listening() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+listening() {
+  lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 && return 0
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 1 bash -c ">/dev/tcp/127.0.0.1/$1" >/dev/null 2>&1
+  else
+    (exec 3>/dev/tcp/127.0.0.1/"$1") >/dev/null 2>&1
+  fi
+}
 
-have_config() { [ -f "$CONFIG" ] && jq -e 'type == "object"' "$CONFIG" >/dev/null 2>&1; }
+have_config() { [ -f "$CONFIG" ]; }
 
 # Ports recorded by projects other than this one, one per line.
 others_ports() {
   have_config || return 0
   jq -r --arg k "$ROOT" '(.projects // {}) | to_entries[] | select(.key != $k)
-    | (.value.ports // {}) | [.http, .grpc, .admin][] | select(. != null)' "$CONFIG"
+    | (.value.ports // {}) | select(type == "object" and ([.http, .grpc, .admin] | all(type == "number")))
+    | [.http, .grpc, .admin][]' "$CONFIG"
 }
 
 entry() { # field -> value of this project's entry or ""
@@ -49,7 +58,8 @@ entry() { # field -> value of this project's entry or ""
 }
 rec_port() {
   have_config || return 0
-  jq -r --arg k "$ROOT" --arg f "$1" '(.projects // {})[$k].ports[$f] // "" | tostring' "$CONFIG"
+  jq -r --arg k "$ROOT" --arg f "$1" '(.projects // {})[$k].ports
+    | if type == "object" and ([.http, .grpc, .admin] | all(type == "number")) then .[$f] | tostring else "" end' "$CONFIG"
 }
 
 # Does this project's own instance run on HTTP port $1?
@@ -75,6 +85,10 @@ is_ours() {
 }
 
 pick() {
+  command -v lsof >/dev/null 2>&1 || { echo "cyoda-ports.sh: lsof is required" >&2; exit 5; }
+  if have_config && ! jq -e 'type == "object"' "$CONFIG" >/dev/null 2>&1; then
+    echo "invalid plugin config: $CONFIG" >&2; exit 1
+  fi
   local others k http grpc admin cand=() rh
   others="$(others_ports)"
   rh="$(rec_port http)"

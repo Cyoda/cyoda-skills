@@ -135,8 +135,43 @@ test_pick_none_free() {
   assert_status 3 "$rc" "no free block: exit 3"
 }
 
+test_pick_lsof_missing() {
+  local d rc; d="$(mkproj nolsof)"; config '{}'
+  mkdir -p "$T/nolsof"
+  for t in bash jq grep tr cut seq basename dirname cat sed; do
+    p="$(command -v "$t")" && ln -sf "$p" "$T/nolsof/$t"
+  done
+  PATH="$T/nolsof" "$T/nolsof/bash" "$S/cyoda-ports.sh" pick "$d" >/dev/null 2>&1; rc=$?
+  assert_status 5 "$rc" "lsof missing: exit 5"
+}
+
+test_pick_connect_probe() {
+  local d; d="$(mkproj probe)"; config '{}'
+  mkdir -p "$T/blind"
+  printf '#!/bin/sh\nexit 1\n' >"$T/blind/lsof"; chmod +x "$T/blind/lsof"
+  listen 31000; local p=$LPID
+  assert_eq "$(PATH="$T/blind:$PATH" pick "$d")" "HTTP=31100 GRPC=32110 ADMIN=32111 STATE=free" "listener found by connect when lsof sees nothing"
+  unlisten "$p"
+}
+
+test_pick_invalid_config() {
+  local d rc; d="$(mkproj badconf)"; echo 'not json' >"$CYODA_PLUGIN_CONFIG"
+  pick "$d" >/dev/null 2>&1; rc=$?
+  assert_status 1 "$rc" "invalid config: exit 1"
+}
+
+test_pick_malformed_ports_ignored() {
+  local d; d="$(mkproj badports)"
+  config '{"projects":{"/x/o":{"endpoint":"e","ports":{"http":"a"}},"/x/q":{"endpoint":"e","ports":5}}}'
+  assert_eq "$(pick "$d")" "HTTP=31000 GRPC=32010 ADMIN=32011 STATE=free" "malformed ports ignored"
+}
+
 test_name_stable_and_distinct
 test_name_sanitised
+test_pick_lsof_missing
+test_pick_connect_probe
+test_pick_invalid_config
+test_pick_malformed_ports_ignored
 test_pick_free_default
 test_pick_no_config_file
 test_pick_skips_busy
