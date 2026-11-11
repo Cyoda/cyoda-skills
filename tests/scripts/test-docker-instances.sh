@@ -14,7 +14,7 @@ trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/shim" "$T/nodocker"
 cat >"$T/inspect.json" <<'J'
 [
- {"Id":"aaa111","Name":"/shop-cyoda-1","Config":{"Image":"ghcr.io/cyoda/cyoda:0.8.4","Labels":{"com.docker.compose.project":"shop"}},
+ {"Id":"aaa111","Name":"/shop-cyoda-1","Config":{"Image":"ghcr.io/cyoda/cyoda:0.8.4","Labels":{"com.docker.compose.project":"shop","com.docker.compose.project.working_dir":"/work/shop dir"}},
   "NetworkSettings":{"Ports":{"8080/tcp":[{"HostIp":"0.0.0.0","HostPort":"8082"},{"HostIp":"::","HostPort":"8082"}],"9090/tcp":[{"HostIp":"0.0.0.0","HostPort":"9092"}]}}},
  {"Id":"bbb222","Name":"/billing-cyoda-1","Config":{"Image":"ghcr.io/cyoda/cyoda","Labels":{"com.docker.compose.project":"billing"}},
   "NetworkSettings":{"Ports":{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8080"}]}}},
@@ -56,11 +56,11 @@ test_docker_lists_cyoda_containers() {
   rm -f "$T/docker-calls"
   out="$(PATH="$T/shim:$PATH" bash "$S/cyoda-docker-instances.sh")"; rc=$?
   assert_status 0 "$rc" "exit 0"
-  assert_eq "$out" "CONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop ENDPOINT=http://localhost:8082 IMAGE=ghcr.io/cyoda/cyoda:0.8.4
-CONTAINER=billing-cyoda-1 COMPOSE_PROJECT=billing ENDPOINT=http://localhost:8080 IMAGE=ghcr.io/cyoda/cyoda
-CONTAINER=lonely COMPOSE_PROJECT=- ENDPOINT=none IMAGE=ghcr.io/cyoda/cyoda:latest
-CONTAINER=v6 COMPOSE_PROJECT=- ENDPOINT=http://[fd00::5]:8083 IMAGE=ghcr.io/cyoda/cyoda:0.8.4
-CONTAINER=customport COMPOSE_PROJECT=inv ENDPOINT=http://localhost:8085 IMAGE=ghcr.io/cyoda/cyoda:0.8.4" "cyoda-go containers only, with host REST port (CYODA_HTTP_PORT honoured, IPv6 bracketed) and compose project; a docker stderr warning doesn't leak into the ids"
+  assert_eq "$out" "CONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop WORKDIR=/work/shop dir ENDPOINT=http://localhost:8082 IMAGE=ghcr.io/cyoda/cyoda:0.8.4
+CONTAINER=billing-cyoda-1 COMPOSE_PROJECT=billing WORKDIR=- ENDPOINT=http://localhost:8080 IMAGE=ghcr.io/cyoda/cyoda
+CONTAINER=lonely COMPOSE_PROJECT=- WORKDIR=- ENDPOINT=none IMAGE=ghcr.io/cyoda/cyoda:latest
+CONTAINER=v6 COMPOSE_PROJECT=- WORKDIR=- ENDPOINT=http://[fd00::5]:8083 IMAGE=ghcr.io/cyoda/cyoda:0.8.4
+CONTAINER=customport COMPOSE_PROJECT=inv WORKDIR=- ENDPOINT=http://localhost:8085 IMAGE=ghcr.io/cyoda/cyoda:0.8.4" "cyoda-go containers only, with host REST port (CYODA_HTTP_PORT honoured, IPv6 bracketed) and compose project; a docker stderr warning doesn't leak into the ids"
   assert_eq "$(cut -d' ' -f1 "$T/docker-calls" | sort -u | tr '\n' ' ')" "inspect ps " "only docker ps and docker inspect are run"
   assert_contains "$(head -n1 "$T/docker-calls")" "ps --format" "docker ps --format"
 }

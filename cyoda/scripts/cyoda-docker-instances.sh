@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # List running cyoda-go containers (image ghcr.io/cyoda/cyoda, any tag), one per line:
-#   CONTAINER=<name> COMPOSE_PROJECT=<label or -> ENDPOINT=http://<host>:<port>|none IMAGE=<image>
+#   CONTAINER=<name> COMPOSE_PROJECT=<label or -> WORKDIR=<compose working dir label or -> ENDPOINT=http://<host>:<port>|none IMAGE=<image>
 # ENDPOINT is the host side of the container's REST port (CYODA_HTTP_PORT from the
 # container env, else 8080); IPv6 hosts are bracketed; none if unpublished.
 # Read-only: runs only `docker ps` and `docker inspect`; never starts, stops or changes anything.
@@ -43,5 +43,5 @@ jq -r '
           else $ip end) as $h
        | "http://\($h):\($b.HostPort)"
      end) as $ep
-  | "CONTAINER=\(.Name | ltrimstr("/")) COMPOSE_PROJECT=\((.Config.Labels // {})["com.docker.compose.project"] // "-") ENDPOINT=\($ep) IMAGE=\(.Config.Image)"
+  | "CONTAINER=\(.Name | ltrimstr("/")) COMPOSE_PROJECT=\((.Config.Labels // {})["com.docker.compose.project"] // "-") WORKDIR=\((.Config.Labels // {})["com.docker.compose.project.working_dir"] // "-") ENDPOINT=\($ep) IMAGE=\(.Config.Image)"
 ' <<<"$json"
