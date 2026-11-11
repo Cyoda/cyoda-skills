@@ -94,6 +94,37 @@ test_status_ignores_broken_token_command() {
 }
 
 # pcfg <file> <dir> <endpoint> [env]: active profile at localhost:1 plus one project entry
+test_status_plugin_version_matches() {
+  start_server || return
+  echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/i.json"
+  local out
+  out="$(CYODA_PLUGIN_VERSION=0.8.7 CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
+  if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "no plugin-version warning when MAJOR.MINOR match"; else _ok; fi
+  out="$(CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
+  if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "shipped plugin.json matches the 0.8 instance"; else _ok; fi
+  stop_server
+}
+
+test_status_plugin_version_mismatch_instance() {
+  start_server || return
+  echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/i.json"
+  local out
+  out="$(CYODA_PLUGIN_VERSION=0.9.2 CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$out" "WARN=the cyoda plugin targets cyoda-go 0.9; this instance runs 0.8.4. Update the plugin, or run cyoda-go 0.9." "plugin vs instance warn"
+  stop_server
+}
+
+test_status_plugin_version_mismatch_binary() {
+  echo '{"active":"p","profiles":{"p":{"endpoint":"http://localhost:1"}}}' >"$T/u.json"
+  mkdir -p "$T/shim2"
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file)
+  printf '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "cyoda version 0.9.1 (commit x)"; fi\n' >"$T/shim2/cyoda"
+  chmod +x "$T/shim2/cyoda"
+  local out
+  out="$(PATH="$T/shim2:$PATH" CYODA_PLUGIN_VERSION=0.8.0 CYODA_PLUGIN_CONFIG="$T/u.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$out" "WARN=the cyoda plugin targets cyoda-go 0.8; local cyoda is 0.9.1. Update the plugin, or install cyoda-go 0.8." "plugin vs binary warn"
+}
+
 pcfg() {
   jq -n --arg k "$2" --arg ep "$3" --arg env "${4:-development}" \
     '{active: "p", profiles: {p: {endpoint: "http://localhost:1"}}, projects: {($k): {endpoint: $ep, env: $env}}}' >"$1"
@@ -154,5 +185,8 @@ test_status_not_configured
 test_status_no_config_local_up
 test_status_no_config_nothing_listening
 test_status_version_mismatch
+test_status_plugin_version_matches
+test_status_plugin_version_mismatch_instance
+test_status_plugin_version_mismatch_binary
 test_status_stale_token_forwarded
 report

@@ -47,6 +47,21 @@ if [ -n "$ENDPOINT" ]; then
   fi
 fi
 
+# The plugin's MAJOR.MINOR follows the cyoda-go line it targets (plugin 0.8.x -> cyoda-go 0.8.x).
+# Compare it with the instance, or with the local binary when no instance answered.
+PLUGIN_VERSION="${CYODA_PLUGIN_VERSION:-$(jq -r '.version // empty' "$HERE/../.claude-plugin/plugin.json" 2>/dev/null)}"
+mm() { awk -F. 'NF>=2 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ {print $1"."$2}' <<<"$1"; }
+PLUGIN_MM="$(mm "$PLUGIN_VERSION")"
+if [ -n "$PLUGIN_MM" ]; then
+  if [ "$STATUS" = "connected" ] && [ -n "$(mm "$VERSION")" ]; then
+    [ "$(mm "$VERSION")" = "$PLUGIN_MM" ] ||
+      WARNS+=("the cyoda plugin targets cyoda-go $PLUGIN_MM; this instance runs $VERSION. Update the plugin, or run cyoda-go $PLUGIN_MM.")
+  elif [ "$STATUS" != "connected" ] && [ -n "$(mm "$BINVER")" ]; then
+    [ "$(mm "$BINVER")" = "$PLUGIN_MM" ] ||
+      WARNS+=("the cyoda plugin targets cyoda-go $PLUGIN_MM; local cyoda is $BINVER. Update the plugin, or install cyoda-go $PLUGIN_MM.")
+  fi
+fi
+
 qval() { # value -> value, or "value" with \" when it has whitespace or a quote
   case "$1" in
     *[[:space:]]* | *\"*) local v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; printf '"%s"' "$v" ;;
