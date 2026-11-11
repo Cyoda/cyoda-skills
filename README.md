@@ -55,6 +55,11 @@ The plugin's MAJOR.MINOR follows the cyoda-go release line it targets: plugin 0.
 - Local instances are per project, on automatic free ports.
 - Run `/plugin marketplace update cyoda` to pick up this release.
 
+## Release notes — 0.9.0 (unreleased, needs cyoda-go 0.9.0)
+
+- Workflow best practices updated for cyoda-go 0.9.0: function conditions may nest (*Put the cheap test before the callout*), `idempotent: true` processors, scheduled-transition `timeoutMs` retries, `WORKFLOW_SKIP`.
+- Run `/plugin marketplace update cyoda` to pick up this release.
+
 ## Release notes — 0.8.0
 
 - Versions now follow cyoda-go (see Versioning): 0.8.0 is 0.5.0 renumbered for cyoda-go 0.8.4.
