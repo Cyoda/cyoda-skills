@@ -8,7 +8,14 @@
       "states": {
         "pending": {
           "transitions": [
-            { "name": "dispatch", "next": "dispatched", "manual": true }
+            {
+              "name": "dispatch",
+              "next": "dispatched",
+              "manual": true,
+              "annotations": {
+                "roles": []
+              }
+            }
           ]
         },
         "dispatched": {}

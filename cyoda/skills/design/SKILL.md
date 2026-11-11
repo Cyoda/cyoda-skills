@@ -60,7 +60,7 @@ Check the proposed design against two lists, then fix it:
 1. **The Review checklist of the best-practices list from Step 0** (no checklist: its bullets, by bold name). Show one line per checklist line: `- <practice name>: ok | changed: <what> | n/a`.
 2. **The anti-patterns below.** List only the ones you found.
 
-For each violation, change the design and say so in one plain sentence that names the practice or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* Give the reasoning yourself, drawing on [design-guidelines.md](resources/design-guidelines.md) (e.g. § Processors, Async Work & Failure).
+For each violation, change the design and say so in one plain sentence that names the practice or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* Give the reasoning yourself, drawing on the practice and [design-guidelines.md](resources/design-guidelines.md).
 
 **Proposals that map to a best practice:**
 

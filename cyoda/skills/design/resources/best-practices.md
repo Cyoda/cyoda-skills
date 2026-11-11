@@ -219,8 +219,8 @@ This file uses these terms and no synonyms for them.
   read it. The processor must be idempotent, because a replay dispatches it again. Facts:
   `cyoda help workflows` PROCESSORS (execution modes).
 - **Make every processor safe to run again.** A caller that replays a failed request runs its
-  processors again, in a new transaction. cyoda-go dispatches a processor once, whatever the policy. Facts:
-  `cyoda help workflows` PROCESSORS (`retryPolicy`). A processor's writes through
+  processors again, in a new transaction. cyoda-go dispatches a processor once, whatever the
+  policy. Facts: `cyoda help workflows` PROCESSORS (`retryPolicy`). A processor's writes through
   Cyoda roll back with its transaction. Its effects outside Cyoda do not, so make them idempotent.
 
 ## Scheduled transitions

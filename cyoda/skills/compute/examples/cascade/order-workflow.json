@@ -34,7 +34,12 @@
                     "responseTimeoutMs": 10000
                   }
                 }
-              ]
+              ],
+              "annotations": {
+                "roles": [
+                  "customer"
+                ]
+              }
             }
           ]
         },

@@ -14,4 +14,4 @@ Lifecycle judgment that the best practices (`cyoda help workflows best-practices
 ## Parallel Activities
 
 - One state machine has no parallel transitions. Parallel work is sub-entities linked to the parent by entity id.
-- **Join** on the parent by either (a) a processor on each sub-entity's final transition firing a transition on the parent, whose criterion checks that all are done, or (b) a poll on the parent (best practice *Poll for a condition that can become true without a write*).
+- **Join** on the parent by either (a) a processor on each sub-entity's final transition firing a transition on the parent whose body records that sub-entity as done, with the parent's criterion reading only the parent's own record (best practice *Pass the anchor's facts down the cascade*), or (b) a poll on the parent (best practice *Poll for a condition that can become true without a write*).

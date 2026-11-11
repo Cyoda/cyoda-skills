@@ -8,7 +8,16 @@
       "states": {
         "draft": {
           "transitions": [
-            { "name": "submit", "next": "submitted", "manual": true }
+            {
+              "name": "submit",
+              "next": "submitted",
+              "manual": true,
+              "annotations": {
+                "roles": [
+                  "user"
+                ]
+              }
+            }
           ]
         },
         "submitted": {
@@ -22,6 +31,9 @@
                 "jsonPath": "$.amount",
                 "operatorType": "LESS_OR_EQUAL",
                 "value": 1000
+              },
+              "annotations": {
+                "roles": []
               }
             }
           ]

@@ -12,7 +12,12 @@
               "name": "expire",
               "next": "expired",
               "manual": false,
-              "schedule": { "delayMs": 2000 }
+              "schedule": {
+                "delayMs": 2000
+              },
+              "annotations": {
+                "roles": []
+              }
             }
           ]
         },

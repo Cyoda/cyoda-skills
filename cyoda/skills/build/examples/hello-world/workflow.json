@@ -8,17 +8,40 @@
       "states": {
         "new": {
           "transitions": [
-            { "name": "start", "next": "processing", "manual": false }
+            {
+              "name": "start",
+              "next": "processing",
+              "manual": false,
+              "annotations": {
+                "roles": []
+              }
+            }
           ]
         },
         "processing": {
           "transitions": [
-            { "name": "finish", "next": "completed", "manual": false }
+            {
+              "name": "finish",
+              "next": "completed",
+              "manual": false,
+              "annotations": {
+                "roles": []
+              }
+            }
           ]
         },
         "completed": {
           "transitions": [
-            { "name": "archive", "next": "archived", "manual": true }
+            {
+              "name": "archive",
+              "next": "archived",
+              "manual": true,
+              "annotations": {
+                "roles": [
+                  "admin"
+                ]
+              }
+            }
           ]
         },
         "archived": {}

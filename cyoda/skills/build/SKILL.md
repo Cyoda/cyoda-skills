@@ -52,7 +52,7 @@ Judgment calls (read the named section before proposing):
 | Processors | `workflows --section PROCESSORS` | Tags match by **overlap** (any one shared tag). Use `grpc --section "TAG ROUTING"` for routing, not PROCESSORS (#684-B). The processor code itself is a compute node: see the `cyoda:compute` skill |
 | A function criterion or processor that fails or times out | `workflows --section CRITERIA`, `workflows --section PROCESSORS`, `errors DISPATCH_TIMEOUT` | Answer from these three, naming each next to the fact it gives |
 | Time-based moves | `workflows --section "SCHEDULED TRANSITIONS"` | A `schedule` object on an automated transition, not a separate processor. Best practice *Never put an automated transition with no criterion beside a scheduled transition* |
-| Loop limits | `workflows --section "ENGINE EXECUTION"` | Best practice *Balance the number of states* |
+| Loop limits | `workflows --section "ENGINE EXECUTION"` | Best practice *Build explicit validation cycles* |
 
 When help doesn't settle how the behaviour you're building plays out (e.g. what a timed-out function criterion does to its transition), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker) before writing files; `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance. On no, carry on with the increment from help.
 

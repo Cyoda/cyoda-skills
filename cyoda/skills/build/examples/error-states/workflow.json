@@ -16,9 +16,19 @@
                 "type": "simple",
                 "jsonPath": "$.email",
                 "operatorType": "NOT_NULL"
+              },
+              "annotations": {
+                "roles": []
               }
             },
-            { "name": "validation-failed", "next": "errored", "manual": false }
+            {
+              "name": "validation-failed",
+              "next": "errored",
+              "manual": false,
+              "annotations": {
+                "roles": []
+              }
+            }
           ]
         },
         "errored": {
@@ -31,14 +41,35 @@
                 "type": "simple",
                 "jsonPath": "$.email",
                 "operatorType": "NOT_NULL"
+              },
+              "annotations": {
+                "roles": []
               }
             }
           ]
         },
         "ready": {
           "transitions": [
-            { "name": "complete", "next": "completed", "manual": true },
-            { "name": "cancel", "next": "cancelled", "manual": true }
+            {
+              "name": "complete",
+              "next": "completed",
+              "manual": true,
+              "annotations": {
+                "roles": [
+                  "user"
+                ]
+              }
+            },
+            {
+              "name": "cancel",
+              "next": "cancelled",
+              "manual": true,
+              "annotations": {
+                "roles": [
+                  "user"
+                ]
+              }
+            }
           ]
         },
         "completed": {},
