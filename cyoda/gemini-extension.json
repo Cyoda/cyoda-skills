@@ -1,6 +1,6 @@
 {
   "name": "cyoda",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Cyoda skills for building workflow-backed applications with entities, workflows, criteria, processors, tests and local development conventions.",
   "contextFileName": "GEMINI.md"
 }
