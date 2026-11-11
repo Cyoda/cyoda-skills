@@ -53,6 +53,13 @@ python3 "$SC/eval-viewer/generate_review.py" "$W" --skill-name "cyoda:<skill>" \
 - Plugins guide: https://code.claude.com/docs/en/plugins
 - Skills guide: https://code.claude.com/docs/en/skills.md
 
+## Versioning and releases
+
+- The plugin's MAJOR.MINOR follows the cyoda-go line it targets; PATCH is the plugin's own revision. `tests/smoke/cyoda-go.version` holds the exact cyoda-go release; `run.sh` pins to it and `test-segregation.sh` checks the plugin version against it.
+- Bump PATCH for any change merged to `main` (users get `main` on `/plugin marketplace update`). Moving to a new cyoda-go line: update `cyoda-go.version`, set the plugin to `X.Y.0`.
+- The version lives in `cyoda/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` and `cyoda/gemini-extension.json`; each release has a section in the top-level `README.md`.
+- Release: `tests/smoke/run.sh` green on `main`, then `git tag vX.Y.Z` and `gh release create vX.Y.Z` with that README section as notes.
+
 ## Smoke tests
 
 - `tests/smoke/run.sh [--only NN] [--allow-version]` — lint, script tests, then scenarios against a throwaway in-memory cyoda-go (needs v0.8.4)

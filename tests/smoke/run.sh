@@ -21,15 +21,17 @@ done
 
 trap stop_server EXIT
 
+# The cyoda-go release the plugin targets; the plugin's MAJOR.MINOR follows it (test-segregation.sh).
+TARGET="$(cat "$HERE/cyoda-go.version")"
 VERSION="$(cyoda --version 2>&1 | head -n1)"
 case "$VERSION" in
-  *0.8.4*) ;;
+  *" $TARGET "*) ;;
   *)
     if [ "$ALLOW_VERSION" -eq 0 ]; then
-      echo "cyoda version mismatch: got '$VERSION', need 0.8.4 (use --allow-version to override)" >&2
+      echo "cyoda version mismatch: got '$VERSION', need $TARGET (use --allow-version to override)" >&2
       exit 2
     fi
-    echo "warning: running against '$VERSION' (expected 0.8.4)" >&2 ;;
+    echo "warning: running against '$VERSION' (expected $TARGET)" >&2 ;;
 esac
 
 RC=0

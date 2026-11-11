@@ -35,10 +35,15 @@ test_marketplace_single_plugin() {
 
 test_plugin_version() {
   local p="$ROOT/cyoda/.claude-plugin/plugin.json"
-  assert_eq "$(jq -r .version "$p")" 0.5.0 "plugin version"
+  local v target
+  v="$(jq -r .version "$p")"
+  target="$(cat "$ROOT/tests/smoke/cyoda-go.version")"
+  # Plugin MAJOR.MINOR follows the targeted cyoda-go line; PATCH is the plugin's own.
+  assert_eq "${v%.*}" "${target%.*}" "plugin MAJOR.MINOR matches cyoda-go $target"
   assert_eq "$(jq -r .repository "$p")" https://github.com/Cyoda/cyoda-skills "plugin repository"
   jq -r .description "$p" | grep -q Cloud; assert_status 1 $? "description has no Cloud"
-  assert_eq "$(jq -r .version "$ROOT/cyoda/gemini-extension.json")" 0.5.0 "gemini version"
+  assert_eq "$(jq -r .version "$ROOT/cyoda/gemini-extension.json")" "$v" "gemini version matches plugin"
+  assert_eq "$(jq -r '.plugins[0].version' "$ROOT/.claude-plugin/marketplace.json")" "$v" "marketplace version matches plugin"
 }
 
 test_lint_cloud_clean() {
