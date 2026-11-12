@@ -23,7 +23,7 @@ WANT="${CYODA_PROFILE:-}"
 default_json() {
   jq -cn --arg ep "${CYODA_DEFAULT_ENDPOINT:-http://localhost:8080}" '{
     profile: "default", endpoint: $ep, tokenCommand: null,
-    warnings: ["no saved profile; using the default local instance \($ep) — type /cyoda:setup to save it"],
+    warnings: ["no saved profile; using the default local instance \($ep); cyoda:setup binds this project to one"],
     source: "default"
   }'
 }

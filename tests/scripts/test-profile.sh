@@ -21,7 +21,7 @@ test_profile_default_when_no_config() {
   local out
   out="$(unset CYODA_DEFAULT_ENDPOINT; CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-profile.sh")"; local rc=$?
   assert_status 0 "$rc" "exit 0 with no config"
-  assert_eq "$(echo "$out" | jq -c .)" '{"profile":"default","endpoint":"http://localhost:8080","tokenCommand":null,"warnings":["no saved profile; using the default local instance http://localhost:8080 — type /cyoda:setup to save it"],"source":"default"}' "implicit default profile"
+  assert_eq "$(echo "$out" | jq -c .)" '{"profile":"default","endpoint":"http://localhost:8080","tokenCommand":null,"warnings":["no saved profile; using the default local instance http://localhost:8080; cyoda:setup binds this project to one"],"source":"default"}' "implicit default profile"
 }
 
 test_profile_existing_config_without_endpoint() {
@@ -35,7 +35,7 @@ test_profile_no_active_key_falls_back_to_default() {
   echo '{"profiles":{"x":{"endpoint":"http://x"}}}' >"$T/noactive.json"
   local out; out="$(CYODA_PLUGIN_CONFIG="$T/noactive.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
   assert_eq "$(echo "$out" | jq -c '[.source, .profile, .endpoint]')" '["default","default","http://localhost:1"]' "profiles but no active key: implicit default"
-  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "no saved profile; using the default local instance http://localhost:1 — type /cyoda:setup to save it" "implicit default warning"
+  assert_eq "$(echo "$out" | jq -r '.warnings[0]')" "no saved profile; using the default local instance http://localhost:1; cyoda:setup binds this project to one" "implicit default warning"
   echo '{"profiles":{}}' >"$T/noactive.json"
   out="$(CYODA_PLUGIN_CONFIG="$T/noactive.json" CYODA_DEFAULT_ENDPOINT=http://localhost:1 bash "$S/cyoda-profile.sh")"
   assert_eq "$(echo "$out" | jq -r .source)" default "empty profiles, no active key: implicit default"

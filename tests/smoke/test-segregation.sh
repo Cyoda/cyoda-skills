@@ -13,7 +13,7 @@ test_no_migrate_skill() {
 
 test_flags() {
   local s f
-  for s in app setup build test deploy auth; do
+  for s in app build test deploy auth; do
     f="$ROOT/cyoda/skills/$s/SKILL.md"
     if [ ! -f "$f" ]; then
       [ "$s" = deploy ] && continue
@@ -21,7 +21,7 @@ test_flags() {
     fi
     has_flag "$f"; assert_status 0 $? "$s has disable-model-invocation"
   done
-  for s in status docs design compute debug; do
+  for s in setup docs design compute debug; do
     f="$ROOT/cyoda/skills/$s/SKILL.md"
     has_flag "$f"; assert_status 1 $? "$s has no disable-model-invocation"
   done
