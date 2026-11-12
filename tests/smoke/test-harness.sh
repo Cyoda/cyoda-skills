@@ -93,9 +93,9 @@ test_lint_every_rule_fires() {
   lint_fires timeout-60s cyoda/skills/debug/SKILL.md 'waits 60 seconds'
   lint_fires cloud "$D" 'deploy to Cyoda Cloud'
   lint_fires cloud "$D" 'host foo.cyoda.net is used'
-  lint_fires invoke-flagged "$D" 'Invoke /cyoda:build next'
+  lint_fires typed-handoff "$D" 'Next, type /cyoda:build to continue'
   # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
-  lint_fires invoke-flagged "$D" 'invoke `/cyoda:setup`'
+  lint_fires typed-handoff "$D" 'next, type `/cyoda:setup`'
   # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   lint_fires model-list-no-slash "$D" 'curl $BASE/api/model"'
   lint_fires model-list-no-slash "$D" 'GET /api/model '

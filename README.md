@@ -16,11 +16,7 @@ Install via the Claude Code plugin marketplace:
 /reload-plugins
 ```
 
-Then start building:
-
-```
-/cyoda:app
-```
+Then describe what you want to build.
 
 ### Any agent
 
@@ -32,8 +28,7 @@ Point your agent to this repository and ask it to read the skill files before bu
 
 | Skill | Purpose |
 |---|---|
-| `/cyoda:app` | Start here — walks the full build journey |
-| `/cyoda:setup` | Install and start cyoda-go locally |
+| `/cyoda:setup` | Install and start cyoda-go locally; connection status |
 | `/cyoda:auth` | Get tokens for a self-hosted cyoda-go |
 | `/cyoda:design` | Brainstorm entities and workflows for your app |
 | `/cyoda:build` | Incrementally build and register entity models and workflows |
@@ -42,7 +37,8 @@ Point your agent to this repository and ask it to read the skill files before bu
 | `/cyoda:deploy` | Generate Docker Compose or Helm deploy artifacts with idempotent seed and verify scripts |
 | `/cyoda:debug` | Diagnose failures and browse entity history |
 | `/cyoda:docs` | Look up Cyoda documentation |
-| `/cyoda:status` | Check connection status |
+
+Skills are loaded by the agent and compose with your own process (e.g. superpowers).
 
 ## Connection config
 
@@ -50,7 +46,14 @@ The plugin keeps its connections in `~/.config/cyoda/cyoda-plugin-config.json`: 
 
 ## Versioning
 
-The plugin's MAJOR.MINOR follows the cyoda-go release line it targets: plugin 0.8.x is written for cyoda-go 0.8.x, and its patch number counts the plugin's own revisions. `/cyoda:status` warns when the instance (or, without one, the local `cyoda`) runs a different line.
+The plugin's MAJOR.MINOR follows the cyoda-go release line it targets: plugin 0.8.x is written for cyoda-go 0.8.x, and its patch number counts the plugin's own revisions. `/cyoda:setup` warns when the instance (or, without one, the local `cyoda`) runs a different line.
+
+## Release notes — 0.8.1
+
+- Every skill can be used by the agent itself, not only typed; they compose with your own process (e.g. superpowers).
+- `/cyoda:app` and `/cyoda:status` are gone; `/cyoda:setup` covers status.
+- Local instances are per project, on automatic free ports.
+- Run `/plugin marketplace update cyoda` to pick up this release.
 
 ## Release notes — 0.8.0
 

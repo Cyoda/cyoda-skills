@@ -6,8 +6,7 @@ Helps you build applications on [Cyoda](https://docs.cyoda.net/) — an Entity D
 
 | Skill | Purpose |
 |---|---|
-| `/cyoda:app` | Start here if you're new — walks the full journey |
-| `/cyoda:setup` | Install and start cyoda-go locally |
+| `/cyoda:setup` | Install and start cyoda-go locally; connection status |
 | `/cyoda:auth` | Get tokens for a self-hosted cyoda-go |
 | `/cyoda:design` | Brainstorm entities and workflows for your app |
 | `/cyoda:build` | Incrementally build and register entity models and workflows |
@@ -16,7 +15,8 @@ Helps you build applications on [Cyoda](https://docs.cyoda.net/) — an Entity D
 | `/cyoda:debug` | Diagnose failures and browse entity history |
 | `/cyoda:deploy` | Write the files to deploy and seed a self-hosted cyoda-go (Docker Compose, Helm) |
 | `/cyoda:docs` | Look up Cyoda documentation |
-| `/cyoda:status` | Check connection status |
+
+Skills are loaded by the agent and compose with your own process (e.g. superpowers).
 
 ## Setup
 

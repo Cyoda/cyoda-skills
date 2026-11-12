@@ -38,7 +38,7 @@ Run `cyoda-call.sh GET /model/` (help: `models --section ENDPOINTS`). Show each 
 
 Then read the project's `cyoda-manifest.json` at the project root, if there is one, and the files it lists. These files are the source of truth for what `build` has written. If a model the increment touches is on the instance but has no project files, export its workflow (`GET /model/{e}/{v}/workflow/export`) and save it, reshaped as in Step 6.
 
-Fresh instance and empty project: suggest the hello-world increment ([examples/hello-world.md](examples/hello-world.md)).
+Fresh instance and empty project: the starting increment is hello-world ([examples/hello-world.md](examples/hello-world.md)).
 
 ## Step 2 — Agree the increment
 

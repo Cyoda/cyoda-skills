@@ -29,7 +29,7 @@ Two modes: **debugging** (something failed or looks wrong) and **observation** (
 
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and every `WARN=` line.
 - `STATUS=not_configured`: say no instance is configured; starting or linking one is covered by `cyoda:setup`. Stop.
-- `STATUS=unreachable`: the endpoint didn't answer. Read `run --section "HEALTH PROBES"`: the API port serves `GET /api/health` (`{"status":"UP"}`, or 503 `DOWN` after a recovered panic, latched until the node is replaced); `/livez` and `/readyz` are only on the admin listener (`127.0.0.1:9091` by default), and `cyoda health` checks the local one. Ask whether the server is running and the profile's endpoint is right; switching profiles or starting an instance is covered by `cyoda:setup`.
+- `STATUS=unreachable`: the endpoint didn't answer. Read `run --section "HEALTH PROBES"`: the API port serves `GET /api/health` (`{"status":"UP"}`, or 503 `DOWN` after a recovered panic, latched until the node is replaced); `/livez` and `/readyz` are only on the admin listener (`127.0.0.1:9091` by default), and `cyoda health` checks the local one. State that the instance at the endpoint isn't answering; switching profiles or starting an instance is covered by `cyoda:setup`.
 
 ## Debugging
 
@@ -104,4 +104,4 @@ Read `crud --section ENDPOINTS`, `crud --section "POINT-IN-TIME SEMANTICS"` and 
 | One transaction's outcome | `GET /audit/entity/{id}/workflow/{transactionId}/finished` |
 | The entity at a past time | `GET '/entity/{id}?pointInTime=<RFC 3339>'` (inclusive), or `?transactionId=<tx>`; never both |
 
-Leave `eventType=System` out: open-source cyoda-go doesn't emit those events. The audit API has no `level` parameter; filter with `severity` and `eventType`. Present a timeline, newest first: time, change or event, state, transition, transaction, and the reason where there is one. Then offer a point-in-time read at any moment of interest.
+Leave `eventType=System` out: open-source cyoda-go doesn't emit those events. The audit API has no `level` parameter; filter with `severity` and `eventType`. Present a timeline, newest first: time, change or event, state, transition, transaction, and the reason where there is one. When the question concerns a past moment, read the entity at that time.

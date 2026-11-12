@@ -62,7 +62,7 @@ fi
 scan stale-production-flag '--confirm-production' ${FILES[@]+"${FILES[@]}"}
 scan stale-production-tag '\[PRODUCTION\]' ${FILES[@]+"${FILES[@]}"}
 scan stale-cloud-line 'not covered by this plugin' ${FILES[@]+"${FILES[@]}"}
-scan invoke-flagged '[Ii]nvoke .?/cyoda:(app|setup|build|test|deploy|auth)' ${FILES[@]+"${FILES[@]}"}
+scan typed-handoff '[Nn]ext, type .?/cyoda:' ${FILES[@]+"${FILES[@]}"}
 scan model-list-no-slash "/api/model[\"' )]" ${FILES[@]+"${FILES[@]}"}
 
 HITS=0

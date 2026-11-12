@@ -10,8 +10,7 @@ When the user asks to build, design, test, debug, deploy or document a Cyoda app
 
 Skills:
 
-- `skills/app/SKILL.md` for the full journey, start to finish
-- `skills/setup/SKILL.md` for installing and connecting to cyoda-go
+- `skills/setup/SKILL.md` for installing, starting and connecting to cyoda-go, and connection status
 - `skills/auth/SKILL.md` for tokens on an instance that isn't running mock auth
 - `skills/design/SKILL.md` for entity and workflow design
 - `skills/build/SKILL.md` for registering entity models and workflows
@@ -20,4 +19,3 @@ Skills:
 - `skills/debug/SKILL.md` for debugging and entity history
 - `skills/deploy/SKILL.md` for deploying to a self-hosted cyoda-go (Docker Compose, Helm)
 - `skills/docs/SKILL.md` for documentation lookups
-- `skills/status/SKILL.md` for checking the connection

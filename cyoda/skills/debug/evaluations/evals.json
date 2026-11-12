@@ -50,7 +50,7 @@
     {
       "id": 2,
       "prompt": "Show me the full history of entity abc-123. I need it for an audit.",
-      "expected_output": "Observation mode. Reads crud ENDPOINTS / POINT-IN-TIME SEMANTICS and audit ENDPOINTS, calls GET /entity/abc-123/changes and GET /audit/entity/abc-123?eventType=StateMachine (with limit and cursor paging), presents a newest-first timeline with time, change/event, state, transition and transaction, and offers a point-in-time read (pointInTime or transactionId). Does not use a ?level=DEBUG parameter or request System events.",
+      "expected_output": "Observation mode. Reads crud ENDPOINTS / POINT-IN-TIME SEMANTICS and audit ENDPOINTS, calls GET /entity/abc-123/changes and GET /audit/entity/abc-123?eventType=StateMachine (with limit and cursor paging), presents a newest-first timeline with time, change/event, state, transition and transaction, and reads or names a point-in-time read (pointInTime or transactionId). Does not use a ?level=DEBUG parameter or request System events.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "GET /entity/abc-123/changes: UPDATE 2026-10-17T10:05Z tx t2; CREATE 2026-10-17T10:00Z tx t1. GET /audit/entity/abc-123?eventType=StateMachine: TRANSITION_MAKE submit (10:05), STATE_MACHINE_FINISH (10:00), TRANSITION_MAKE start (10:00); pagination.hasNext=false."
@@ -78,7 +78,7 @@
         },
         {
           "id": "offers-pit",
-          "text": "Offers a point-in-time read with `pointInTime` (or `transactionId`), not both",
+          "text": "Reads or names a point-in-time read with `pointInTime` (or `transactionId`), not both",
           "type": "behavior"
         },
         {
@@ -155,7 +155,7 @@
         },
         {
           "id": "pit-read",
-          "text": "Offers a point-in-time read from before the delete",
+          "text": "Reads or names a point-in-time read from before the delete",
           "type": "behavior"
         },
         {
@@ -199,7 +199,7 @@
     {
       "id": 6,
       "prompt": "Nothing works, every call times out. Is cyoda down?",
-      "expected_output": "Runs cyoda-status.sh: STATUS=unreachable. Reads run --section \"HEALTH PROBES\": the API port serves GET /api/health; /livez and /readyz are only on the admin listener (127.0.0.1:9091). Asks whether the server is running and whether the profile endpoint is right; may name `cyoda:setup` as covering switching the profile or starting an instance. No typed command. Does not probe /readyz on port 8080.",
+      "expected_output": "Runs cyoda-status.sh: STATUS=unreachable. Reads run --section \"HEALTH PROBES\": the API port serves GET /api/health; /livez and /readyz are only on the admin listener (127.0.0.1:9091). States that the instance isn't answering and names `cyoda:setup` as covering switching the profile or starting an instance. No typed command. Does not probe /readyz on port 8080.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"staging\":{\"endpoint\":\"http://staging.internal:8080\"}}}",
         "_simulated/instance.md": "cyoda-status.sh: STATUS=unreachable PROFILE=staging ENDPOINT=http://staging.internal:8080 VERSION=none; WARN=active profile staging is unreachable; switch to default or another profile (cyoda:setup)"

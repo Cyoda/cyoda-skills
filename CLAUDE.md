@@ -9,14 +9,14 @@ Design specs (source of truth changed date): `docs/superpowers/specs/*`
 When creating or editing skills, invoke the `superpowers:writing-skills` skill first.
 
 Each skill lives in its own directory under `skills/` with:
-- `SKILL.md` — required frontmatter: `name`, `description`, and `disable-model-invocation: true` for skills with side effects
+- `SKILL.md` — required frontmatter: `name`, `description`
 - `evaluations/` — 3+ JSON eval files covering happy path, edge case, and failure scenario
 - Optional: `examples/`, `templates/`, `resources/`
 
 Rules that are easy to get wrong:
 - `SKILL.md` files stay under 500 lines — reference supporting files rather than embedding content inline
 - Never embed Cyoda docs in skill bodies — `cyoda:docs` fetches them dynamically at runtime
-- Skills with side effects (`setup`, `build`, `test`, `app`, `deploy`, `auth`) must have `disable-model-invocation: true`
+- Every skill is loadable by the agent: no `disable-model-invocation`; the sandbox decides what the agent may do. Skills: `auth build compute debug deploy design docs setup test`
 - Shared helpers live in `cyoda/scripts/`. Skills invoke them with a plain instruction "Run `${CLAUDE_PLUGIN_ROOT}/scripts/<name>.sh`" (substituted in skill markdown). Do not rely on ```! blocks expanding `${CLAUDE_PLUGIN_ROOT}` (not verified: the probe could not run in the sandbox).
 
 ## Running evals
