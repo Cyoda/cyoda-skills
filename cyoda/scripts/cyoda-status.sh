@@ -31,11 +31,11 @@ if [ -n "$ENDPOINT" ]; then
   if [ -z "$code" ] || [ "$code" = "000" ]; then
     STATUS="unreachable"
     if [ "$SOURCE" = "default" ]; then
-      WARNS+=("no cyoda-go is answering at $ENDPOINT — type /cyoda:setup to install or start one")
+      WARNS+=("no cyoda-go is answering at $ENDPOINT; start or link one (cyoda:setup)")
     elif [ "$SOURCE" = "project" ]; then
-      WARNS+=("project $PROFILE is bound to $ENDPOINT, which is unreachable; type /cyoda:setup to start it or re-link this project")
+      WARNS+=("project $PROFILE is bound to $ENDPOINT, which is unreachable; start it or re-link this project (cyoda:setup)")
     else
-      WARNS+=("active profile $PROFILE is unreachable; type /cyoda:setup to switch to default")
+      WARNS+=("active profile $PROFILE is unreachable; switch to default or another profile (cyoda:setup)")
     fi
   else
     STATUS="connected"

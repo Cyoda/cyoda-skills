@@ -2,6 +2,7 @@
 
 **Date:** 2026-11-07
 **Status:** Draft, awaiting approval
+**Note:** Parts superseded by `2026-11-11-agent-loaded-skills-design.md`.
 **Supersedes:** in `2026-10-17-cyoda-go-split-and-help-first-design.md`, the `env` field, the production guard and `deploy` Step 7. The rest of that document stands.
 
 ## Intent

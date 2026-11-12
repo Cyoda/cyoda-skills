@@ -4,170 +4,463 @@
     {
       "id": 1,
       "prompt": "/cyoda:setup — I want cyoda running locally on my laptop.",
-      "expected_output": "Runs cyoda-status.sh (STATUS=unreachable for the implicit default http://localhost:8080, with WARN lines 'no saved profile; using the default local instance http://localhost:8080 — type /cyoda:setup to save it' and 'no cyoda-go is answering at http://localhost:8080 — type /cyoda:setup to install or start one'), goes to local mode without offering to switch profiles, finds no cyoda binary, runs `brew install cyoda/cyoda-go/cyoda` (succeeds), runs `cyoda init`, starts `cyoda`, polls http://localhost:8080/api/health until {\"status\":\"UP\"}, writes the `default` profile {endpoint: http://localhost:8080} as active with no token or tokenCommand, re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]', says mock auth needs no token, and ends with 'next, type `/cyoda:build`'.",
+      "expected_output": "Runs cyoda-status.sh (STATUS=unreachable for the implicit default http://localhost:8080, no saved profile). The repo defines no cyoda-go, so it asks once: 'Run cyoda-go for local development and testing from the command line or in Docker?'; the developer answers command line. `command -v cyoda` finds nothing, so it runs `brew install cyoda/cyoda-go/cyoda` (succeeds), then `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/inventory --run binary`, which prints ENDPOINT=http://localhost:8080 HTTP=8080 GRPC=9090 ADMIN=9091 RUN=binary STATE=started and records the project's entry. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: inventory]' and that mock auth needs no token. No `cyoda init`, no hand-started `cyoda`, no machine-wide profile, no typed command.",
       "files": {
-        "_simulated/machine.md": "No `cyoda` on PATH. Homebrew is installed and `brew install cyoda/cyoda-go/cyoda` succeeds; afterwards `cyoda --version` prints `cyoda version 0.8.4 (commit e861154)`. `cyoda init` succeeds. No config file at ~/.config/cyoda/cyoda-plugin-config.json. Port 8080 is free; once `cyoda` is started, GET http://localhost:8080/api/health returns {\"status\":\"UP\"} and GET /api/help returns {\"version\":\"0.8.4\",...}."
+        "_simulated/machine.md": "The working directory is /Users/dev/work/inventory, the root of the git repo `inventory` (only a README.md); `git rev-parse --show-toplevel` and `pwd -P` both print it. No `cyoda` on PATH. Homebrew is installed and `brew install cyoda/cyoda-go/cyoda` succeeds; afterwards `cyoda --version` prints `cyoda version 0.8.4 (commit e861154)`. No plugin config file exists. cyoda-status.sh prints `STATUS=unreachable PROFILE=default ENDPOINT=http://localhost:8080 VERSION=none BINARY_VERSION=none SOURCE=default`, `WARN=no saved profile; using the default local instance http://localhost:8080; cyoda:setup binds this project to one` and `WARN=no cyoda-go is answering at http://localhost:8080; start or link one (cyoda:setup)`. Docker is not installed. Nothing listens on any port from 8080 to 10100; a cyoda started on free ports answers GET /api/health {\"status\":\"UP\"} and GET /api/help {\"version\":\"0.8.4\",...} within 3 s. Plugin scripts that run Docker or start cyoda answer per their header contract and this state. Once the plugin config has an entry for /Users/dev/work/inventory whose endpoint answers, cyoda-status.sh prints `STATUS=connected PROFILE=inventory ENDPOINT=<that endpoint> VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/inventory`. The developer runs local tools straight from the shell rather than in containers."
       },
       "assertions": [
         { "id": "status-first", "text": "Runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh` before installing anything", "type": "behavior" },
         { "id": "brew-formula", "text": "Installs with exactly `brew install cyoda/cyoda-go/cyoda` (no `brew tap cyoda-platform/...`, no other formula name)", "type": "behavior" },
-        { "id": "init-and-start", "text": "Runs `cyoda init` and then starts the server with `cyoda`", "type": "behavior" },
-        { "id": "health-api", "text": "Verifies readiness with GET http://localhost:8080/api/health (expects {\"status\":\"UP\"}); does not probe /readyz on the API port", "type": "behavior" },
-        { "id": "default-profile", "text": "Writes ~/.config/cyoda/cyoda-plugin-config.json with active `default` and profile `default` containing only endpoint http://localhost:8080 (no env, no token, no tokenCommand)", "type": "behavior" },
-        { "id": "reports-connected", "text": "Reports the result in the form 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'", "type": "format" },
-        { "id": "mock-no-token", "text": "Says the local instance runs mock auth, so no token or /cyoda:auth is needed", "type": "behavior" },
-        { "id": "no-invoke", "text": "The hand-off says 'next, type `/cyoda:build`' (or another `/cyoda:<x>`) with a one-line reason and does not say it will invoke or run another skill itself", "type": "behavior" }
+        { "id": "run-question", "text": "Asks exactly once: 'Run cyoda-go for local development and testing from the command line or in Docker?', and asks nothing else", "type": "format" },
+        { "id": "starts-binary", "text": "After the install, starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/inventory --run binary`; runs no `cyoda init` and starts no `cyoda` by hand", "type": "behavior" },
+        { "id": "entry-recorded", "text": "The binding is the project's entry for /Users/dev/work/inventory recorded by cyoda-local.sh (run `binary`, endpoint http://localhost:8080); no machine-wide `default` profile is written", "type": "behavior" },
+        { "id": "reports-connected", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: inventory]'", "type": "format" },
+        { "id": "mock-no-token", "text": "Says the instance runs mock auth, so no token is needed", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 2,
       "prompt": "/cyoda:setup",
-      "expected_output": "Finds no cyoda binary, tries `brew install cyoda/cyoda-go/cyoda`, which fails with a permission error. Shows the error and the ways to install (brew, the install.sh curl line, the release page, the Docker image ghcr.io/cyoda/cyoda) and waits for the developer before continuing with `cyoda init`.",
+      "expected_output": "Asks the run question once; the developer answers command line. No cyoda binary: `brew install cyoda/cyoda-go/cyoda` fails with a permission error. It shows the error and runs the install script `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh` itself, which installs cyoda 0.8.4. It then starts the instance with `cyoda-local.sh start /Users/dev/work/inventory --run binary` and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: inventory]', without waiting for the developer.",
       "files": {
-        "_simulated/machine.md": "No `cyoda` on PATH. `brew install cyoda/cyoda-go/cyoda` exits 1 with: `Error: Permission denied @ dir_s_mkdir - /opt/homebrew/Cellar`. No config file at ~/.config/cyoda/cyoda-plugin-config.json."
+        "_simulated/machine.md": "The working directory is /Users/dev/work/inventory, the root of the git repo `inventory` (only a README.md); `git rev-parse --show-toplevel` and `pwd -P` both print it. No `cyoda` on PATH. `brew install cyoda/cyoda-go/cyoda` exits 1 with: `Error: Permission denied @ dir_s_mkdir - /opt/homebrew/Cellar`. `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh` exits 0 and installs ~/.local/bin/cyoda (on PATH); afterwards `cyoda --version` prints `cyoda version 0.8.4`. No plugin config file exists. cyoda-status.sh prints `STATUS=unreachable PROFILE=default ENDPOINT=http://localhost:8080 VERSION=none BINARY_VERSION=none SOURCE=default`, `WARN=no saved profile; using the default local instance http://localhost:8080; cyoda:setup binds this project to one` and `WARN=no cyoda-go is answering at http://localhost:8080; start or link one (cyoda:setup)`. Docker is not installed. Nothing listens on any port from 8080 to 10100; a cyoda started on free ports answers GET /api/health {\"status\":\"UP\"} and GET /api/help {\"version\":\"0.8.4\",...} within 3 s. Plugin scripts that run Docker or start cyoda answer per their header contract and this state. Once the plugin config has an entry for /Users/dev/work/inventory whose endpoint answers, cyoda-status.sh prints `STATUS=connected PROFILE=inventory ENDPOINT=<that endpoint> VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/inventory`. The developer runs local tools straight from the shell rather than in containers."
       },
       "assertions": [
-        { "id": "install-list", "text": "After the failure, shows the brew error and all four install routes: brew, `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`, the GitHub release page https://github.com/cyoda/cyoda-go/releases, and the Docker image `ghcr.io/cyoda/cyoda`", "type": "behavior" },
-        { "id": "waits", "text": "Stops and waits for the developer to confirm the install before running `cyoda init`", "type": "behavior" },
-        { "id": "no-stale-tap", "text": "Does not mention `cyoda-platform/cyoda-go` or `brew tap`", "type": "behavior" }
+        { "id": "install-fallback", "text": "After the brew failure, shows its error and runs `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh` itself", "type": "behavior" },
+        { "id": "continues", "text": "Then starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/inventory --run binary` without waiting for the developer to install anything", "type": "behavior" },
+        { "id": "no-stale-tap", "text": "Does not mention `cyoda-platform/cyoda-go` or `brew tap`", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 3,
       "prompt": "/cyoda:setup — connect to our team's dev instance at https://cyoda-dev.internal.example.com/api/",
-      "expected_output": "Uses connect mode. Normalises the endpoint to https://cyoda-dev.internal.example.com (drops the trailing /api/), probes /api/health (UP), asks for a profile name other than `default` (developer says team-dev), writes {endpoint} to profile team-dev and makes it active, probes GET /api/model/ without a token and gets 401, so it says the instance needs a token and ends with 'next, type `/cyoda:auth`'.",
+      "expected_output": "Uses connect mode. Normalises the endpoint to https://cyoda-dev.internal.example.com (drops the trailing /api/), probes /api/health (UP), names the profile `cyoda-dev` after the host (says so, doesn't ask), writes {endpoint} to profile cyoda-dev and makes it active, probes GET /api/model/ without a token and gets 401, so it reports 'This instance needs a token; token setup for it is covered by `cyoda:auth`.' No typed or run command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
-        "_simulated/instance.md": "GET https://cyoda-dev.internal.example.com/api/health returns {\"status\":\"UP\"}. GET /api/help returns {\"version\":\"0.8.4\",...}. GET /api/model/ without an Authorization header returns 401. The developer answers: profile name team-dev."
+        "_simulated/instance.md": "GET https://cyoda-dev.internal.example.com/api/health returns {\"status\":\"UP\"}. GET /api/help returns {\"version\":\"0.8.4\",...}. GET /api/model/ without an Authorization header returns 401. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=cyoda-dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`."
       },
       "assertions": [
         { "id": "normalises-endpoint", "text": "Stores the endpoint as https://cyoda-dev.internal.example.com (no trailing /api or slash)", "type": "behavior" },
         { "id": "probes-health", "text": "Probes <endpoint>/api/health before writing the profile", "type": "behavior" },
-        { "id": "profile-fields", "text": "Writes profile team-dev with only endpoint (no env, no token, no secret, no tokenCommand yet) through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh with values passed as --arg, keeps the existing `default` profile, and sets active to team-dev", "type": "behavior" },
+        { "id": "profile-fields", "text": "Names the profile after the host (`cyoda-dev`) without asking, and writes it with only endpoint (no env, no token, no secret, no tokenCommand) through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh with values passed as --arg, keeps the existing `default` profile, and sets active to cyoda-dev", "type": "behavior" },
         { "id": "detects-auth", "text": "Detects that the instance is not mock auth from the 401 on an unauthenticated GET /api/model/", "type": "behavior" },
         { "id": "no-credentials", "text": "Does not ask for a client id, secret or token", "type": "behavior" },
-        { "id": "no-invoke", "text": "Hands off with 'next, type `/cyoda:auth`' and a one-line reason; does not say it will invoke the auth skill", "type": "behavior" }
+        { "id": "token-pointer", "text": "Says the instance needs a token and names `cyoda:auth` as where token setup is covered, without telling the developer to run or type anything", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 4,
       "prompt": "/cyoda:setup",
-      "expected_output": "cyoda-status.sh prints STATUS=unreachable for the active profile `old`, with WARN lines 'profile old contains a stored token, which this plugin no longer reads; you can remove it' and 'active profile old is unreachable; type /cyoda:setup to switch to default'. The skill shows both warnings as they are, offers to switch the active profile to `default`, and on yes sets active to default (local cyoda is already installed and healthy), leaving the old profile in place, and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable for the active profile `old`, with WARN lines 'profile old contains a stored token, which this plugin no longer reads; you can remove it' and 'active profile old is unreachable; …'. The skill shows the stored-token warning, says the active profile old doesn't answer and stays as it is, and does not switch profiles. The repo defines no cyoda-go and status isn't SOURCE=default, so it asks 'Run cyoda-go for local development and testing from the command line or in Docker?'; the developer answers command line. cyoda is installed, so it runs `cyoda-local.sh start /Users/dev/work/orders --run binary`; the developer's own cyoda-go holds 8080/9090/9091, so the script takes the next block (ENDPOINT=http://localhost:8180). The instance on 8080 is left alone. It reports 'Connected to cyoda-go v0.8.4 — http://localhost:8180 [project: orders]'.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"old\",\"profiles\":{\"old\":{\"endpoint\":\"https://gone.example.com\",\"token\":\"eyJhbGciOiJSUzI1NiJ9.e30.sig\"},\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
-        "_simulated/instance.md": "`cyoda --version` prints `cyoda version 0.8.4`. https://gone.example.com does not answer. http://localhost:8080/api/health returns {\"status\":\"UP\"}. The developer answers yes to switching to default."
+        "_simulated/instance.md": "The working directory is /Users/dev/work/orders, the root of the git repo `orders` (only a README.md); `git rev-parse --show-toplevel` and `pwd -P` both print it. `cyoda --version` prints `cyoda version 0.8.4`. First cyoda-status.sh prints `STATUS=unreachable PROFILE=old ENDPOINT=https://gone.example.com VERSION=none BINARY_VERSION=0.8.4 SOURCE=profile`, `WARN=profile old contains a stored token, which this plugin no longer reads; you can remove it` and `WARN=active profile old is unreachable; switch to default or another profile (cyoda:setup)`. https://gone.example.com does not answer. A `cyoda` process (pid 5150) the developer started by hand listens on 8080, 9090 and 9091; http://localhost:8080/api/health returns {\"status\":\"UP\"}. Nothing else listens on ports 8080 to 10100. Docker is not installed. Plugin scripts that run Docker or start cyoda answer per their header contract and this state. Once the plugin config has an entry for /Users/dev/work/orders whose endpoint answers, cyoda-status.sh prints `STATUS=connected PROFILE=orders ENDPOINT=<that endpoint> VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/orders`. The developer runs local tools straight from the shell rather than in containers."
       },
       "assertions": [
         { "id": "shows-stale-token-warning", "text": "Shows the warning 'profile old contains a stored token, which this plugin no longer reads; you can remove it' in neutral wording", "type": "behavior" },
-        { "id": "offers-default", "text": "Offers to switch the active profile to `default` because `old` is unreachable", "type": "behavior" },
         { "id": "no-token-reuse", "text": "Does not read, print, or use the stored token value", "type": "behavior" },
         { "id": "no-silent-delete", "text": "Does not delete the old profile or its token field without the developer's yes", "type": "behavior" },
-        { "id": "skips-install", "text": "Does not reinstall cyoda, since `cyoda --version` already reports 0.8.4", "type": "behavior" }
+        { "id": "skips-install", "text": "Does not reinstall cyoda, since `cyoda --version` already reports 0.8.4", "type": "behavior" },
+        { "id": "no-profile-switch", "text": "Does not offer or perform a switch of the active profile and changes no profile; this project gets its own entry instead", "type": "behavior" },
+        { "id": "run-question", "text": "Asks exactly once: 'Run cyoda-go for local development and testing from the command line or in Docker?', and asks nothing else", "type": "format" },
+        { "id": "leaves-8080", "text": "Starts this project's instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/orders --run binary` on a block other than 8080/9090/9091, and does not stop, kill or reconfigure the cyoda-go on 8080", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 5,
       "prompt": "/cyoda:setup — link this project to its cyoda-go. It runs in our Docker Compose stack.",
-      "expected_output": "Runs cyoda-status.sh first. The working directory is the git repo `shop` (not $HOME), so it offers to link this project. It proposes the git top level /Users/dev/work/shop as the project root and the developer confirms; the key is its real path (`pwd -P`). Docker is on PATH, so it runs ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh (read-only) and lists shop-cyoda-1 (compose shop, http://localhost:8082) and billing-cyoda-1 (compose billing, http://localhost:8080). The developer picks shop. It probes http://localhost:8082/api/health (UP) and the version 0.8.4 from /api/help, probes GET /api/model/ without a token (401), asks how tokens are obtained (the project's `scripts/auth.sh token`), test-runs that from the project root with CYODA_ENDPOINT set without printing the token (3 parts), then writes projects[\"/Users/dev/work/shop\"] = {endpoint: http://localhost:8082, tokenCommand: \"scripts/auth.sh token\"} into the plugin config with jq to a temp file and mv, mode 0600, keeping the default profile and active. Nothing is written into the project tree. Finishes with cyoda-status.sh: 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'.",
+      "expected_output": "Runs cyoda-status.sh first. The working directory is the git repo `shop` (not $HOME), so it links this project, using the git top level /Users/dev/work/shop as root (its real path, `pwd -P`) and saying so without asking. Docker is on PATH, so it runs ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh (read-only), which lists shop-cyoda-1 (compose shop, http://localhost:8082) and billing-cyoda-1 (compose billing, http://localhost:8080); it takes shop, whose compose project matches the project name, and says so. It probes http://localhost:8082/api/health (UP) and the version 0.8.4 from /api/help, probes GET /api/model/ without a token (401), asks how tokens are obtained (the project's `scripts/auth.sh token`), test-runs that from the project root with CYODA_ENDPOINT set without printing the token (3 parts), then writes projects[\"/Users/dev/work/shop\"] = {endpoint: http://localhost:8082, tokenCommand: \"scripts/auth.sh token\"} through cyoda-config-write.sh, keeping the default profile and active. Nothing is written into the project tree. Finishes with cyoda-status.sh: 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'.",
       "files": {
         "scripts/auth.sh": "#!/usr/bin/env bash\n# Prints a JWT for the shop stack's cyoda-go (client credentials from the developer's keychain).\nset -eu\n[ \"${1:-}\" = token ] || { echo 'usage: auth.sh token' >&2; exit 2; }\nsecret=\"$(security find-generic-password -s shop-cyoda -w)\"\ncurl -sS -u \"shop-dev:$secret\" -d grant_type=client_credentials \"$CYODA_ENDPOINT/api/oauth/token\" | jq -r .access_token\n",
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
-        "_simulated/instance.md": "The working directory is the root of the git repo `shop`; `git rev-parse --show-toplevel` and `pwd -P` both print /Users/dev/work/shop (not $HOME). There is no .cyoda/ dir. cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile` (the billing stack's instance). `command -v docker` succeeds. `cyoda-docker-instances.sh` prints:\n```\nCONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop ENDPOINT=http://localhost:8082 IMAGE=ghcr.io/cyoda/cyoda:0.8.4\nCONTAINER=billing-cyoda-1 COMPOSE_PROJECT=billing ENDPOINT=http://localhost:8080 IMAGE=ghcr.io/cyoda/cyoda:0.8.4\n```\nGET http://localhost:8082/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without an Authorization header returns 401. Running `scripts/auth.sh token` from the project root with CYODA_ENDPOINT=http://localhost:8082 prints a 3-part JWT (exit 0). After the write, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. The developer answers: yes, that root; the shop one; tokens come from `scripts/auth.sh token`."
+        "_simulated/instance.md": "The working directory is the root of the git repo `shop`; `git rev-parse --show-toplevel` and `pwd -P` both print /Users/dev/work/shop (not $HOME). There is no .cyoda/ dir. cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile` (the billing stack's instance). `command -v docker` succeeds. `cyoda-docker-instances.sh` prints:\n```\nCONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop WORKDIR=/Users/dev/work/shop ENDPOINT=http://localhost:8082 IMAGE=ghcr.io/cyoda/cyoda:0.8.4\nCONTAINER=billing-cyoda-1 COMPOSE_PROJECT=billing WORKDIR=/Users/dev/work/billing ENDPOINT=http://localhost:8080 IMAGE=ghcr.io/cyoda/cyoda:0.8.4\n```\nGET http://localhost:8082/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without an Authorization header returns 401. Running `scripts/auth.sh token` from the project root with CYODA_ENDPOINT=http://localhost:8082 prints a 3-part JWT (exit 0). After the write, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. Asked how tokens are obtained, the developer says: `scripts/auth.sh token`."
       },
       "assertions": [
         { "id": "offers-link", "text": "Recognises it is inside a project directory (a git repo, not $HOME) and goes to linking this project, rather than local install or a machine-wide connect profile", "type": "behavior" },
-        { "id": "proposes-root", "text": "Proposes the git top level /Users/dev/work/shop as the project root and lets the developer confirm or change it", "type": "behavior" },
-        { "id": "lists-docker", "text": "Lists the running cyoda-go containers with ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh and shows both with compose project and endpoint (shop → http://localhost:8082, billing → http://localhost:8080), letting the developer pick or type a URL", "type": "behavior" },
+        { "id": "states-root", "text": "Uses the git top level /Users/dev/work/shop as the project root and says so, without asking the developer to confirm it", "type": "behavior" },
+        { "id": "lists-docker", "text": "Lists the running cyoda-go containers with ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh and takes shop (http://localhost:8082), whose compose project matches the project name, saying so; does not ask which one", "type": "behavior" },
         { "id": "docker-read-only", "text": "Runs no docker command that changes anything: no docker run/start/stop/restart/rm, no docker compose up/down", "type": "behavior" },
         { "id": "probes", "text": "Probes http://localhost:8082/api/health (UP) and reads the version from /api/help before writing anything", "type": "behavior" },
         { "id": "token-way", "text": "Detects that a token is needed from the 401 on an unauthenticated GET /api/model/, asks how tokens are obtained, keeps the relative command `scripts/auth.sh token`, and test-runs it from the project root without printing the token", "type": "behavior" },
         { "id": "writes-entry", "text": "Writes the binding as `projects[\"/Users/dev/work/shop\"]` (the real path from `pwd -P`) in the plugin config ${CYODA_PLUGIN_CONFIG:-~/.config/cyoda/cyoda-plugin-config.json}, with exactly endpoint http://localhost:8082 and tokenCommand `scripts/auth.sh token` (no env), through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh with the values passed as --arg (the config stays 0600); no token, client id or secret in it", "type": "behavior" },
         { "id": "keeps-profiles", "text": "Keeps the `default` profile and `active` unchanged in the plugin config", "type": "behavior" },
         { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" },
-        { "id": "reports-project", "text": "Finishes by re-running cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" }
+        { "id": "reports-project", "text": "Finishes by re-running cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 6,
       "prompt": "/cyoda:setup",
-      "expected_output": "cyoda-status.sh, run in the linked project `shop`, prints STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 … SOURCE=project PROJECT=/Users/dev/work/shop and WARN=project shop is bound to http://localhost:8082, which is unreachable; type /cyoda:setup to start it or re-link this project. The skill shows the warning. It does NOT offer to switch the machine-wide active profile to `default` and does not edit the plugin config. The project root /Users/dev/work/shop has compose.yaml whose service `cyoda` uses image ghcr.io/cyoda/cyoda:0.8.4, so it runs `docker compose up -d` in /Users/dev/work/shop itself, re-runs cyoda-status.sh (now STATUS=connected) and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'. Re-linking the project to another instance may be mentioned as an option, but it is not what the skill does.",
+      "expected_output": "cyoda-status.sh, run in the linked project `shop`, prints STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 … SOURCE=project PROJECT=/Users/dev/work/shop. The entry has no `run`, and /Users/dev/work/shop has compose.yaml whose service `cyoda` uses image ghcr.io/cyoda/cyoda:0.8.4, so it says in one line that it starts the project's stack and runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start-repo /Users/dev/work/shop /Users/dev/work/shop/compose.yaml` (ENDPOINT=http://localhost:8082 … RUN=repo STATE=started; the script updates the entry and keeps its tokenCommand). It does not offer to switch the machine-wide active profile. It re-runs cyoda-status.sh (now STATUS=connected) and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'. Re-linking may be mentioned as an option, but it is not what the skill does.",
       "files": {
         "compose.yaml": "services:\n  cyoda:\n    image: ghcr.io/cyoda/cyoda:0.8.4\n    ports: [\"127.0.0.1:8082:8080\", \"127.0.0.1:9092:9090\"]\n",
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}},\"projects\":{\"/Users/dev/work/shop\":{\"endpoint\":\"http://localhost:8082\",\"tokenCommand\":\"scripts/auth.sh token\"}}}",
-        "_simulated/instance.md": "The working directory is /Users/dev/work/shop, the root of the git repo `shop`. First cyoda-status.sh prints `STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=none BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop` and `WARN=project shop is bound to http://localhost:8082, which is unreachable; type /cyoda:setup to start it or re-link this project`. The shop Compose stack is stopped: `cyoda-docker-instances.sh` prints nothing (exit 0). `docker compose up -d` run in /Users/dev/work/shop (or with `-f /Users/dev/work/shop/compose.yaml` / `--project-directory /Users/dev/work/shop`) exits 0 and prints `Container shop-cyoda-1  Started`; Docker Compose run in any other directory finds no Compose file. After that, `cyoda-docker-instances.sh` prints `CONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop ENDPOINT=http://localhost:8082 IMAGE=ghcr.io/cyoda/cyoda:0.8.4`, GET http://localhost:8082/api/health returns {\"status\":\"UP\"}, and cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. Before `docker compose up -d` has run, cyoda-status.sh keeps printing the unreachable line and WARN above. If asked, the developer answers yes to starting the stack."
+        "_simulated/instance.md": "The working directory is /Users/dev/work/shop, the root of the git repo `shop`. First cyoda-status.sh prints `STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=none BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop` and `WARN=project shop is bound to http://localhost:8082, which is unreachable; start it or re-link this project (cyoda:setup)`. The shop Compose stack is stopped: `cyoda-docker-instances.sh` prints nothing (exit 0). Any `docker compose … up -d` that uses /Users/dev/work/shop/compose.yaml exits 0 and starts container shop-cyoda-1; Docker Compose run in any other directory finds no Compose file. Nothing else listens on ports 8080 to 10100. Plugin scripts that run Docker or start cyoda answer per their header contract and this state. After that, `cyoda-docker-instances.sh` prints `CONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop WORKDIR=/Users/dev/work/shop ENDPOINT=http://localhost:8082 IMAGE=ghcr.io/cyoda/cyoda:0.8.4`, GET http://localhost:8082/api/health returns {\"status\":\"UP\"}, and cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. Before the stack runs, cyoda-status.sh keeps printing the unreachable line and WARN above."
       },
       "assertions": [
-        { "id": "shows-warning", "text": "Shows the 'project shop is bound to http://localhost:8082, which is unreachable; …' warning as the script printed it", "type": "behavior" },
-        { "id": "no-default-switch", "text": "Does not offer or perform a switch of the machine-wide active profile to `default`, and does not write to the plugin config", "type": "behavior" },
-        { "id": "starts-stack", "text": "Itself runs `docker compose up -d` for the project's Compose file in the project root /Users/dev/work/shop (cwd, or `-f /Users/dev/work/shop/compose.yaml` / `--project-directory /Users/dev/work/shop`); runs Docker Compose in no other directory, runs no other state-changing docker command, and does not hand the command to the developer to run instead", "type": "behavior" },
+        { "id": "states-start", "text": "Says in one line that the project's instance at http://localhost:8082 isn't answering and that it starts the project's Compose stack", "type": "behavior" },
+        { "id": "no-default-switch", "text": "Does not offer or perform a switch of the machine-wide active profile to `default` and changes no profile", "type": "behavior" },
+        { "id": "starts-stack", "text": "Starts the stack with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start-repo /Users/dev/work/shop /Users/dev/work/shop/compose.yaml`; runs no `docker compose up` of its own and does not hand a command to the developer to run instead", "type": "behavior" },
         { "id": "rechecks", "text": "After `docker compose up -d`, re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" },
-        { "id": "relink-not-default", "text": "Does not re-link the project or ask for another endpoint; mentioning re-linking as an alternative is fine", "type": "behavior" }
+        { "id": "relink-not-default", "text": "Does not re-link the project or ask for another endpoint; mentioning re-linking as an alternative is fine", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 7,
       "prompt": "/cyoda:setup — re-link this project, we moved the shop stack to port 8086.",
-      "expected_output": "cyoda-status.sh prints SOURCE=project PROJECT=/Users/dev/work/shop (connected to http://localhost:8082). The developer wants to re-link, so it goes to link mode with the existing entry's key `/Users/dev/work/shop` (from PROJECT) as the root. It takes http://localhost:8086 (typed URL), probes /api/health (UP) and /api/help (0.8.4), probes GET /api/model/ without a token (401) and keeps the existing tokenCommand `scripts/auth.sh token` after the developer confirms (test-run from the project root, 3 parts). It replaces projects[\"/Users/dev/work/shop\"] (jq to a temp file, mv, 0600), so the map still has exactly one entry for this project, then reports 'Connected to cyoda-go v0.8.4 — http://localhost:8086 [project: shop]'.",
+      "expected_output": "cyoda-status.sh prints SOURCE=project PROJECT=/Users/dev/work/shop (connected to http://localhost:8082). The developer wants to re-link, so it goes to link mode with the existing entry's key `/Users/dev/work/shop` (from PROJECT) as the root. It takes http://localhost:8086 (typed URL), probes /api/health (UP) and /api/help (0.8.4), probes GET /api/model/ without a token (401) and keeps the existing tokenCommand `scripts/auth.sh token` without asking (test-run from the project root, 3 parts). It replaces projects[\"/Users/dev/work/shop\"] (jq to a temp file, mv, 0600), so the map still has exactly one entry for this project, then reports 'Connected to cyoda-go v0.8.4 — http://localhost:8086 [project: shop]'.",
       "files": {
         "scripts/auth.sh": "#!/usr/bin/env bash\n# Prints a JWT for the shop stack's cyoda-go (client credentials from the developer's keychain).\nset -eu\n[ \"${1:-}\" = token ] || { echo 'usage: auth.sh token' >&2; exit 2; }\nsecret=\"$(security find-generic-password -s shop-cyoda -w)\"\ncurl -sS -u \"shop-dev:$secret\" -d grant_type=client_credentials \"$CYODA_ENDPOINT/api/oauth/token\" | jq -r .access_token\n",
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}},\"projects\":{\"/Users/dev/work/shop\":{\"endpoint\":\"http://localhost:8082\",\"tokenCommand\":\"scripts/auth.sh token\"}}}",
-        "_simulated/instance.md": "The working directory is /Users/dev/work/shop (git top level and `pwd -P`). First cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. `command -v docker` fails (no docker). GET http://localhost:8086/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without a token returns 401. `scripts/auth.sh token` from the project root with CYODA_ENDPOINT=http://localhost:8086 prints a 3-part JWT. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8086 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. The developer answers: yes, re-link this root; http://localhost:8086; keep scripts/auth.sh token."
+        "_simulated/instance.md": "The working directory is /Users/dev/work/shop (git top level and `pwd -P`). First cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. `command -v docker` fails (no docker). GET http://localhost:8086/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without a token returns 401. `scripts/auth.sh token` from the project root with CYODA_ENDPOINT=http://localhost:8086 prints a 3-part JWT. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8086 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`."
       },
       "assertions": [
         { "id": "uses-existing-key", "text": "Uses the existing entry's key /Users/dev/work/shop (the status PROJECT value) as the key to replace", "type": "behavior" },
         { "id": "probes", "text": "Probes http://localhost:8086/api/health and /api/help before writing", "type": "behavior" },
         { "id": "replaces-entry", "text": "Replaces projects[\"/Users/dev/work/shop\"] with endpoint http://localhost:8086 (tokenCommand scripts/auth.sh token, no env) through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg), leaving exactly one entry for this project and the profiles unchanged", "type": "behavior" },
         { "id": "reports-project", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8086 [project: shop]'", "type": "format" },
-        { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" }
+        { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" },
+        { "id": "asks-nothing", "text": "Asks the developer nothing (not the root, not the token command)", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 8,
       "prompt": "/cyoda:setup — unlink this project, I want it to use my normal profile again.",
-      "expected_output": "cyoda-status.sh prints SOURCE=project PROJECT=/Users/dev/work/shop. It confirms the unlink, deletes projects[\"/Users/dev/work/shop\"] (the PROJECT key) from the plugin config with jq to a temp file and mv, mode 0600, keeping profiles and active, then re-runs cyoda-status.sh, which now shows SOURCE=profile, and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
+      "expected_output": "cyoda-status.sh prints SOURCE=project PROJECT=/Users/dev/work/shop. The entry has no `run`, so nothing is stopped. Without asking, it deletes projects[\"/Users/dev/work/shop\"] (the PROJECT key) through cyoda-config-write.sh, keeping profiles and active, then re-runs cyoda-status.sh, which now shows SOURCE=profile, and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}},\"projects\":{\"/Users/dev/work/shop\":{\"endpoint\":\"http://localhost:8082\",\"tokenCommand\":\"scripts/auth.sh token\"}}}",
-        "_simulated/instance.md": "The working directory is /Users/dev/work/shop. First cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. After the entry is removed, cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`. The developer answers yes to the unlink."
+        "_simulated/instance.md": "The working directory is /Users/dev/work/shop. First cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`. After the entry is removed, cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`."
       },
       "assertions": [
         { "id": "deletes-entry", "text": "Deletes projects[\"/Users/dev/work/shop\"] (the key from status PROJECT) from the plugin config through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (key as --arg), keeping `profiles` and `active`", "type": "behavior" },
-        { "id": "confirms", "text": "Asks for confirmation before deleting the entry", "type": "behavior" },
+        { "id": "no-confirm", "text": "Deletes the entry without asking for confirmation (the request already says so)", "type": "behavior" },
         { "id": "reports-profile", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'", "type": "format" },
-        { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" }
+        { "id": "no-tree-files", "text": "Writes nothing into the project tree: no .cyoda/ file, no .gitignore change", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 9,
       "prompt": "/cyoda:setup — link this project",
-      "expected_output": "Link mode in /Users/dev/work/sioms. The project has a legacy `.cyoda/config` written by an older plugin with endpoint http://localhost:8080, env development and a `token` field. The skill reads only its endpoint (e.g. `jq -r .endpoint`), never shows or copies the token or env, and offers once to import the endpoint; the developer agrees. It probes http://localhost:8080/api/health (UP) and /api/help (0.8.4), probes GET /api/model/ without a token (200: mock auth, no tokenCommand), and writes projects[\"/Users/dev/work/sioms\"] = {endpoint: http://localhost:8080} into the plugin config atomically, mode 0600. It then says the old file is no longer read and gives `rm .cyoda/config` (or `rm -r .cyoda`) for the developer to run, without deleting it itself. Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: sioms]'.",
+      "expected_output": "Link mode in /Users/dev/work/sioms. The project has a legacy `.cyoda/config` written by an older plugin with endpoint http://localhost:8080, env development and a `token` field. The skill reads only its endpoint (e.g. `jq -r .endpoint`), never shows or copies the token or env, and uses that endpoint, saying so without asking. It probes http://localhost:8080/api/health (UP) and /api/help (0.8.4), probes GET /api/model/ without a token (200: mock auth, no tokenCommand), and writes projects[\"/Users/dev/work/sioms\"] = {endpoint: http://localhost:8080} through cyoda-config-write.sh. It then says the old file is no longer read and can be removed, without deleting it itself. Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: sioms]'.",
       "files": {
         ".cyoda/config": "{\"endpoint\":\"http://localhost:8080\",\"env\":\"development\",\"token\":\"eyJhbGciOiJSUzI1NiJ9.e30.c2lnbmF0dXJl\"}",
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team\",\"profiles\":{\"team\":{\"endpoint\":\"https://cyoda-dev.example.com\"}}}",
-        "_simulated/instance.md": "The working directory is /Users/dev/work/sioms, the git top level (`pwd -P` prints the same). cyoda-status.sh prints `STATUS=connected PROFILE=team ENDPOINT=https://cyoda-dev.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`. `command -v docker` fails. GET http://localhost:8080/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without a token returns 200. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=sioms ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/sioms`. The developer answers: yes, that root; yes, import."
+        "_simulated/instance.md": "The working directory is /Users/dev/work/sioms, the git top level (`pwd -P` prints the same). cyoda-status.sh prints `STATUS=connected PROFILE=team ENDPOINT=https://cyoda-dev.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`. `command -v docker` fails. GET http://localhost:8080/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without a token returns 200. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=sioms ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/sioms`."
       },
       "assertions": [
-        { "id": "offers-import", "text": "Notices the legacy .cyoda/config and offers to import its endpoint into the project entry, asking the developer to confirm", "type": "behavior" },
+        { "id": "imports-legacy", "text": "Notices the legacy .cyoda/config and uses its endpoint for the project entry, saying so in one line, without asking", "type": "behavior" },
         { "id": "no-token", "text": "Never prints, copies or stores the `token` from the legacy file (reads only the endpoint) and stores no tokenCommand from it", "type": "behavior" },
         { "id": "probes", "text": "Probes http://localhost:8080/api/health and /api/help before writing, and detects mock auth from a 200 on an unauthenticated GET /api/model/", "type": "behavior" },
         { "id": "writes-entry", "text": "Writes projects[\"/Users/dev/work/sioms\"] = {endpoint: http://localhost:8080} (no env) into the plugin config through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg), keeping the `team` profile and `active`", "type": "behavior" },
-        { "id": "suggests-delete", "text": "Says the old .cyoda/config is no longer read and gives a command for the developer to delete it, without deleting it itself", "type": "behavior" },
-        { "id": "reports-project", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: sioms]'", "type": "format" }
+        { "id": "suggests-delete", "text": "Says the old .cyoda/config is no longer read and can be removed, without deleting it itself", "type": "behavior" },
+        { "id": "reports-project", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: sioms]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 10,
       "prompt": "/cyoda:setup — link this project",
-      "expected_output": "Runs cyoda-status.sh first (connected to the default profile). The working directory /work/shop is the git top level (`pwd -P` gives the same), so it goes to link mode and proposes /work/shop as the root; the developer confirms. Docker is on PATH, so it runs ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh, which prints nothing: no cyoda-go container runs. The project has compose.yaml with service `cyoda` on image ghcr.io/cyoda/cyoda:0.8.4, so it runs `docker compose up -d` in /work/shop itself, then re-runs cyoda-docker-instances.sh, which now lists shop-cyoda-1 (compose shop, http://localhost:18080). It probes http://localhost:18080/api/health (UP) and /api/help (0.8.4), probes GET /api/model/ without a token (200: mock auth, no tokenCommand), and writes projects[\"/work/shop\"] = {endpoint: http://localhost:18080} through cyoda-config-write.sh, keeping the default profile and active. Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:18080 [project: shop]'.",
+      "expected_output": "Runs cyoda-status.sh first (connected to the default profile). The request is to link: /work/shop is the git top level (`pwd -P` gives the same). Docker is on PATH, so it runs ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh, which prints nothing: no cyoda-go container runs. The project has compose.yaml with service `cyoda` on image ghcr.io/cyoda/cyoda:0.8.4, so it runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start-repo /work/shop /work/shop/compose.yaml`, which starts the stack and records projects[\"/work/shop\"] (run repo, endpoint http://localhost:18080), printing ENDPOINT=http://localhost:18080 HTTP=18080 … RUN=repo STATE=started. The default profile and active stay. Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:18080 [project: shop]'.",
       "files": {
         "compose.yaml": "services:\n  cyoda:\n    image: ghcr.io/cyoda/cyoda:0.8.4\n    ports: [\"127.0.0.1:18080:8080\"]\n",
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
-        "_simulated/instance.md": "The working directory is /work/shop, the root of the git repo `shop`; `git rev-parse --show-toplevel` and `pwd -P` both print /work/shop (not $HOME). There is no .cyoda/ dir. First cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`. `command -v docker` succeeds. Until `docker compose up -d` has run in /work/shop, `cyoda-docker-instances.sh` prints nothing (exit 0): no cyoda-go container is running. `docker compose up -d` run in /work/shop (or with `-f /work/shop/compose.yaml` / `--project-directory /work/shop`) exits 0 and prints `Container shop-cyoda-1  Started`; Docker Compose run in any other directory finds no Compose file. After that, `cyoda-docker-instances.sh` prints:\n```\nCONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop ENDPOINT=http://localhost:18080 IMAGE=ghcr.io/cyoda/cyoda:0.8.4\n```\nGET http://localhost:18080/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without an Authorization header returns 200 []. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:18080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/work/shop`. The developer answers: yes, that root; yes to anything else asked about starting or linking the shop stack."
+        "_simulated/instance.md": "The working directory is /work/shop, the root of the git repo `shop`; `git rev-parse --show-toplevel` and `pwd -P` both print /work/shop (not $HOME). There is no .cyoda/ dir. First cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`. `command -v docker` succeeds. Until the stack runs, `cyoda-docker-instances.sh` prints nothing (exit 0): no cyoda-go container is running. Any `docker compose … up -d` that uses /work/shop/compose.yaml exits 0 and starts container shop-cyoda-1; Docker Compose run in any other directory finds no Compose file. Nothing else listens on ports 8080 to 20000. Plugin scripts that run Docker or start cyoda answer per their header contract and this state. After that, `cyoda-docker-instances.sh` prints:\n```\nCONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop WORKDIR=/work/shop ENDPOINT=http://localhost:18080 IMAGE=ghcr.io/cyoda/cyoda:0.8.4\n```\nGET http://localhost:18080/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without an Authorization header returns 200 []. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:18080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/work/shop`."
       },
       "assertions": [
-        { "id": "starts-stack", "text": "Itself runs `docker compose up -d` for the project's Compose file in /work/shop (cwd /work/shop, or `-f /work/shop/compose.yaml` / `--project-directory /work/shop`), after cyoda-docker-instances.sh listed no container; runs Docker Compose in no other directory and does not hand the command to the developer to run instead", "type": "behavior" },
-        { "id": "relists", "text": "After `docker compose up -d`, re-runs ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-docker-instances.sh and takes the endpoint http://localhost:18080 from its shop-cyoda-1 line", "type": "behavior" },
-        { "id": "writes-entry", "text": "Writes `projects[\"/work/shop\"]` with endpoint http://localhost:18080 through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg), keeping the `default` profile and `active` unchanged", "type": "behavior" },
-        { "id": "no-env", "text": "Writes no `env` field anywhere in the plugin config (not in the project entry, not in a profile)", "type": "behavior" }
+        { "id": "starts-stack", "text": "After cyoda-docker-instances.sh listed no container, starts the stack with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start-repo /work/shop /work/shop/compose.yaml`; runs no `docker compose up` of its own and does not hand the command to the developer", "type": "behavior" },
+        { "id": "endpoint-from-script", "text": "Takes the endpoint http://localhost:18080 from the script's output (or a listing after it), and the binding for /work/shop is recorded by cyoda-local.sh, not by a hand edit; the `default` profile and `active` stay unchanged", "type": "behavior" },
+        { "id": "no-env", "text": "Writes no `env` field anywhere in the plugin config (not in the project entry, not in a profile)", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Get cyoda running for this project.",
+      "expected_output": "Runs cyoda-status.sh: no saved profile and nothing answers at http://localhost:8080. The repo defines its cyoda-go: compose.yaml has service `cyoda` on ghcr.io/cyoda/cyoda:0.8.4 publishing 8085/9095/9096, and cyoda-docker-instances.sh lists no container. Without asking anything it runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start-repo /Users/dev/work/shop /Users/dev/work/shop/compose.yaml`; the published ports are free, so no override file; the script records projects[\"/Users/dev/work/shop\"] (run repo, compose, ports, endpoint http://localhost:8085) and prints ENDPOINT=http://localhost:8085 HTTP=8085 GRPC=9095 ADMIN=9096 RUN=repo STATE=started. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8085 [project: shop]'. The repo is unchanged.",
+      "files": {
+        "README.md": "# shop\n\nOrder and payment service on cyoda-go.\n",
+        "compose.yaml": "services:\n  cyoda:\n    image: ghcr.io/cyoda/cyoda:0.8.4\n    environment:\n      CYODA_IAM_MODE: mock\n      CYODA_STORAGE_BACKEND: memory\n      CYODA_ADMIN_BIND_ADDRESS: 0.0.0.0\n    ports:\n      - \"127.0.0.1:8085:8080\"\n      - \"127.0.0.1:9095:9090\"\n      - \"127.0.0.1:9096:9091\"\n",
+        "_simulated/instance.md": "The working directory is /Users/dev/work/shop, the root of the git repo `shop`; `git rev-parse --show-toplevel` and `pwd -P` both print /Users/dev/work/shop. No plugin config file exists yet. `cyoda --version` prints `cyoda version 0.8.4`. First cyoda-status.sh prints `STATUS=unreachable PROFILE=default ENDPOINT=http://localhost:8080 VERSION=none BINARY_VERSION=0.8.4 SOURCE=default`, `WARN=no saved profile; using the default local instance http://localhost:8080; cyoda:setup binds this project to one` and `WARN=no cyoda-go is answering at http://localhost:8080; start or link one (cyoda:setup)`. Docker is running (`docker` and `docker compose` v2.29 work); no container is running, so `cyoda-docker-instances.sh` prints nothing (exit 0). Nothing listens on any port from 8080 to 10100. Any `docker compose … up -d` that uses /Users/dev/work/shop/compose.yaml exits 0 and starts container shop-cyoda-1; 5 s later GET http://localhost:8085/api/health returns {\"status\":\"UP\"}, GET /api/help returns {\"version\":\"0.8.4\",...}, GET /api/model/ without an Authorization header returns 200 [], and cyoda-docker-instances.sh prints `CONTAINER=shop-cyoda-1 COMPOSE_PROJECT=shop WORKDIR=/Users/dev/work/shop ENDPOINT=http://localhost:8085 IMAGE=ghcr.io/cyoda/cyoda:0.8.4`. Plugin scripts that run Docker answer per their header contract and this state. Once the plugin config has an entry for /Users/dev/work/shop with endpoint http://localhost:8085 and the stack runs, cyoda-status.sh prints `STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8085 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop`."
+      },
+      "assertions": [
+        { "id": "start-repo", "text": "Starts the repo's stack with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start-repo` given the root /Users/dev/work/shop and /Users/dev/work/shop/compose.yaml; runs no `docker compose up` of its own, no `cyoda-local.sh start --run …` and no `cyoda` binary", "type": "behavior" },
+        { "id": "asks-nothing", "text": "Asks the developer nothing: no question whether to run cyoda-go from the command line or in Docker, no confirmation of the project root or of starting the stack", "type": "behavior" },
+        { "id": "entry-recorded", "text": "The binding for /Users/dev/work/shop is recorded by cyoda-local.sh (run `repo`, the compose file, endpoint http://localhost:8085), not by a hand edit of the plugin config; no token in it", "type": "behavior" },
+        { "id": "repo-untouched", "text": "Writes nothing into the project tree: compose.yaml unchanged, no override or other new file in /Users/dev/work/shop", "type": "behavior" },
+        { "id": "reports-project", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8085 [project: shop]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Set up cyoda for this project.",
+      "expected_output": "REAL run (CYODA_PORT_BASE=31000, CYODA_LOCAL_DATA_ROOT=<outputs>/data, no plugin config, CYODA_DEFAULT_ENDPOINT=http://localhost:1). <root> is the real path of outputs/project (its own git repo). cyoda-status.sh: STATUS=unreachable SOURCE=default. Nothing in the repo says how to run cyoda-go and nothing answers at the implicit default, so it asks once, exactly: 'Run cyoda-go for local development and testing from the command line or in Docker?'. The developer answers command line. It runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> --run binary` (in-memory storage: default or `--storage memory`), which prints ENDPOINT=http://localhost:31000 HTTP=31000 GRPC=32010 ADMIN=32011 RUN=binary STATE=started and records projects[<root>] = {run: binary, instance: project-<hash6>, dataDir: <outputs>/data/project-<hash6>, ports: {http: 31000, grpc: 32010, admin: 32011}, storage: memory, endpoint: http://localhost:31000}. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:31000 [project: project]'. Nothing is written into the project tree.",
+      "files": {
+        "README.md": "# orders\n\nOrder intake service built on cyoda-go.\n",
+        "_simulated/developer.md": "A fresh checkout of the project; the `cyoda` binary is installed. The developer runs local tools straight from the shell rather than in containers. To anything else, a short yes."
+      },
+      "assertions": [
+        { "id": "run-question", "text": "Asks exactly once, in these words: 'Run cyoda-go for local development and testing from the command line or in Docker?' (not the localhost:8080 wording), and asks the developer nothing else", "type": "format" },
+        { "id": "starts-binary", "text": "Starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> --run binary` (no `--storage`, or `--storage memory`), whose real output is ENDPOINT=http://localhost:31000 … RUN=binary STATE=started; starts no `cyoda` process by hand and runs no docker", "type": "behavior" },
+        { "id": "entry-recorded", "text": "Afterwards outputs/plugin-config.json has projects[<real path of outputs/project>] with run `binary`, ports {http 31000, grpc 32010, admin 32011}, storage `memory`, endpoint http://localhost:31000, and no token; it holds no profile the skill created", "type": "behavior" },
+        { "id": "no-tree-files", "text": "Writes nothing into the project tree (data dir, pid file, log and config are all outside outputs/project)", "type": "behavior" },
+        { "id": "reports-project", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:31000 [project: project]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Set up cyoda for this project.",
+      "expected_output": "cyoda-status.sh: STATUS=unreachable SOURCE=default for http://localhost:8080. Nothing in the repo says how to run cyoda-go and nothing answers at localhost:8080, so it asks once, exactly: 'Run cyoda-go for local development and testing from the command line or in Docker?'. The developer answers Docker. It runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/orders --run docker` (in-memory storage), which renders the compose file into the project's data dir, starts it under the instance name as Compose project and prints ENDPOINT=http://localhost:8080 HTTP=8080 GRPC=9090 ADMIN=9091 RUN=docker STATE=started, recording the entry (run docker, instance, dataDir, ports, storage memory, endpoint). It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: orders]'. Nothing is written into the repo.",
+      "files": {
+        "README.md": "# orders\n\nOrder intake service built on cyoda-go.\n",
+        "_simulated/instance.md": "The working directory is /Users/dev/work/orders, the root of the git repo `orders`; `git rev-parse --show-toplevel` and `pwd -P` both print /Users/dev/work/orders. No plugin config file exists yet. `cyoda --version` prints `cyoda version 0.8.4`. First cyoda-status.sh prints `STATUS=unreachable PROFILE=default ENDPOINT=http://localhost:8080 VERSION=none BINARY_VERSION=0.8.4 SOURCE=default`, `WARN=no saved profile; using the default local instance http://localhost:8080; cyoda:setup binds this project to one` and `WARN=no cyoda-go is answering at http://localhost:8080; start or link one (cyoda:setup)`. Docker is running (`docker` and `docker compose` v2.29 work); no container is running, so `cyoda-docker-instances.sh` prints nothing (exit 0). Nothing listens on any port from 8080 to 10100. Any Compose project started from image ghcr.io/cyoda/cyoda:0.8.4 comes up healthy within 5 s on the host ports it publishes; it answers GET /api/health {\"status\":\"UP\"}, GET /api/help {\"version\":\"0.8.4\",...}, and GET /api/model/ without an Authorization header 200 []. Plugin scripts that run Docker answer per their header contract and this state. Once the plugin config has an entry for /Users/dev/work/orders whose endpoint answers, cyoda-status.sh prints `STATUS=connected PROFILE=orders ENDPOINT=<that endpoint> VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/orders`. The developer keeps local services in Docker containers. To anything else, a short yes."
+      },
+      "assertions": [
+        { "id": "run-question", "text": "Asks exactly once, in these words: 'Run cyoda-go for local development and testing from the command line or in Docker?' (not the localhost:8080 wording), and asks the developer nothing else", "type": "format" },
+        { "id": "starts-docker", "text": "Starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/orders --run docker` (no `--storage`, or `--storage memory`); runs no `docker compose up`/`docker run` of its own and starts no `cyoda` binary", "type": "behavior" },
+        { "id": "entry-recorded", "text": "The binding for /Users/dev/work/orders (run `docker`, ports, endpoint http://localhost:8080) is recorded by cyoda-local.sh, not by a hand edit of the plugin config; no machine-wide profile is created or switched", "type": "behavior" },
+        { "id": "no-tree-files", "text": "Writes nothing into the project tree: no compose file, override or .env in /Users/dev/work/orders", "type": "behavior" },
+        { "id": "reports-project", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: orders]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "I need a cyoda-go instance for this project.",
+      "expected_output": "REAL run (CYODA_PORT_BASE=34000, CYODA_LOCAL_DATA_ROOT=<outputs>/data, no plugin config, CYODA_DEFAULT_ENDPOINT=http://localhost:1). Another process (not cyoda-go) listens on 127.0.0.1:34000. cyoda-status.sh: STATUS=unreachable SOURCE=default. It asks the run question once ('Run cyoda-go for local development and testing from the command line or in Docker?'); the developer answers command line. It runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> --run binary`; the default block is busy, so the script takes the next one and prints ENDPOINT=http://localhost:34100 HTTP=34100 GRPC=35110 ADMIN=35111 RUN=binary STATE=started, recording those ports in projects[<root>]. The other listener on 34000 is left alone and still listens. It reports 'Connected to cyoda-go v0.8.4 — http://localhost:34100 [project: project]', at most mentioning in one line that the default ports were taken.",
+      "files": {
+        "README.md": "# billing\n\nInvoice and payment tracking on cyoda-go.\n",
+        "_simulated/developer.md": "A fresh checkout of the project; the `cyoda` binary is installed. The developer runs local tools straight from the shell rather than in containers. To anything else, a short yes."
+      },
+      "assertions": [
+        { "id": "next-block", "text": "The instance it starts runs on HTTP 34100 / gRPC 35110 / admin 35111 (real cyoda-local.sh output ENDPOINT=http://localhost:34100 … STATE=started), and outputs/plugin-config.json records these ports and endpoint http://localhost:34100 for the project", "type": "behavior" },
+        { "id": "listener-untouched", "text": "Does not stop, kill, signal or reconfigure the process listening on 34000 (no kill/pkill, no `lsof … | xargs kill`, no cyoda-local.sh stop); that listener still listens after the run", "type": "behavior" },
+        { "id": "asks-nothing-else", "text": "Asks no question about ports or the busy port; the only question is the run question", "type": "behavior" },
+        { "id": "reports-project", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:34100 [project: project]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "Get cyoda running for this project.",
+      "expected_output": "REAL run (CYODA_PORT_BASE=37000, CYODA_LOCAL_DATA_ROOT=<outputs>/data, CYODA_DEFAULT_ENDPOINT=http://localhost:1). Before the run the controller started this project's own instance with cyoda-local.sh (command line, ports 37400/38410/38411), so outputs/plugin-config.json has projects[<root>] with run binary and endpoint http://localhost:37400. cyoda-status.sh prints STATUS=connected PROFILE=project ENDPOINT=http://localhost:37400 … SOURCE=project. It uses that instance: no question, no new instance (if it runs `cyoda-local.sh start <root>` the script prints STATE=ours on 37400), nothing stopped or restarted. It reports 'Connected to cyoda-go v0.8.4 — http://localhost:37400 [project: project]'.",
+      "files": {
+        "README.md": "# catalog\n\nProduct catalog service on cyoda-go.\n",
+        "_simulated/developer.md": "The project has been worked on before on this machine; the `cyoda` binary is installed. The developer runs local tools straight from the shell rather than in containers. To anything else, a short yes."
+      },
+      "assertions": [
+        { "id": "reuses", "text": "Uses the instance at http://localhost:37400 from the project's entry; starts no second instance (no cyoda-local.sh output with STATE=started, no `cyoda` launched, nothing new on 37000 or any other port)", "type": "behavior" },
+        { "id": "no-restart", "text": "Does not stop, kill or restart the running instance (no `cyoda-local.sh stop`, no kill); the pid in its data dir's cyoda.pid is the one the controller started", "type": "behavior" },
+        { "id": "asks-nothing", "text": "Asks the developer nothing (no run question, no confirmation)", "type": "behavior" },
+        { "id": "entry-kept", "text": "The project's entry still has run `binary`, ports {http 37400, grpc 38410, admin 38411} and endpoint http://localhost:37400", "type": "behavior" },
+        { "id": "reports-project", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:37400 [project: project]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Picking this project up again — get cyoda going.",
+      "expected_output": "REAL run (CYODA_PORT_BASE=40000, CYODA_LOCAL_DATA_ROOT=<outputs>/data, CYODA_DEFAULT_ENDPOINT=http://localhost:1). Before the run the controller started this project's instance with cyoda-local.sh (command line, ports 40300/41310/41311) and stopped it again, so outputs/plugin-config.json has projects[<root>] with run binary, those ports, storage memory and endpoint http://localhost:40300, and nothing listens there. cyoda-status.sh prints STATUS=unreachable PROFILE=project ENDPOINT=http://localhost:40300 … SOURCE=project. Without asking, it runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root>` (no --run, or --run binary), which comes up on the recorded ports and prints ENDPOINT=http://localhost:40300 HTTP=40300 GRPC=41310 ADMIN=41311 RUN=binary STATE=started. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:40300 [project: project]'.",
+      "files": {
+        "README.md": "# ledger\n\nAccount ledger service on cyoda-go.\n",
+        "_simulated/developer.md": "The project has been worked on before on this machine; the `cyoda` binary is installed. The developer runs local tools straight from the shell rather than in containers. To anything else, a short yes."
+      },
+      "assertions": [
+        { "id": "restarts-recorded", "text": "Starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root>` (no `--run`, or `--run binary`) and it comes up on the recorded ports: real output ENDPOINT=http://localhost:40300 HTTP=40300 GRPC=41310 ADMIN=41311 RUN=binary STATE=started (not 40000)", "type": "behavior" },
+        { "id": "asks-nothing", "text": "Asks the developer nothing: no run question, no re-link or endpoint question", "type": "behavior" },
+        { "id": "entry-kept", "text": "The project's entry keeps run `binary`, storage `memory`, ports {http 40300, grpc 41310, admin 41311} and endpoint http://localhost:40300; no second entry or profile is created", "type": "behavior" },
+        { "id": "reports-project", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:40300 [project: project]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "Set up cyoda for this project.",
+      "expected_output": "cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=default (no saved profile, no entry for /Users/dev/work/invoices). Nothing in the repo says how to run cyoda-go, and a cyoda-go already answers at the implicit localhost:8080, so it asks once, exactly: 'Use the cyoda-go already running on localhost:8080, or start one for this project from the command line or in Docker?'. The developer picks the running one. It writes projects[\"/Users/dev/work/invoices\"] = {run: existing, endpoint: http://localhost:8080} through cyoda-config-write.sh (values as --arg; no ports, dataDir or token), never stops, restarts or reconfigures the instance on 8080 and starts nothing. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: invoices]'.",
+      "files": {
+        "README.md": "# invoices\n\nInvoice approval service on cyoda-go.\n",
+        "_simulated/instance.md": "The working directory is /Users/dev/work/invoices, the root of the git repo `invoices`; `git rev-parse --show-toplevel` and `pwd -P` both print /Users/dev/work/invoices. No plugin config file exists. `cyoda --version` prints `cyoda version 0.8.4`. A `cyoda` process (pid 4242) the developer started by hand weeks ago listens on 8080, 9090 and 9091; it uses sqlite storage and mock auth. cyoda-status.sh prints `STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=default` and `WARN=no saved profile; using the default local instance http://localhost:8080; cyoda:setup binds this project to one`. GET http://localhost:8080/api/health returns {\"status\":\"UP\"}; GET /api/help returns {\"version\":\"0.8.4\",...}; GET /api/model/ without an Authorization header returns 200 with models customer v1 (LOCKED) and invoice v1 (LOCKED). Docker is running; no container is running, so `cyoda-docker-instances.sh` prints nothing. Nothing else listens on ports 8080 to 10100. Once the plugin config has an entry for /Users/dev/work/invoices with endpoint http://localhost:8080, cyoda-status.sh prints `STATUS=connected PROFILE=invoices ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/invoices`. The developer's customer and invoice models on that instance are what they have been working with; asked how to run cyoda-go, they want that one. To anything else, a short yes."
+      },
+      "assertions": [
+        { "id": "offers-existing", "text": "Asks exactly once, in these words: 'Use the cyoda-go already running on localhost:8080, or start one for this project from the command line or in Docker?', and asks the developer nothing else", "type": "format" },
+        { "id": "leaves-8080", "text": "Does not stop, kill, restart or reconfigure the instance on localhost:8080 (no kill, no `cyoda-local.sh stop`/`start`, no `cyoda` launch, no docker command that changes anything)", "type": "behavior" },
+        { "id": "entry-existing", "text": "Writes projects[\"/Users/dev/work/invoices\"] with run `existing` and endpoint http://localhost:8080 through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg); no ports, dataDir or token in it, and no machine-wide profile created or switched", "type": "behavior" },
+        { "id": "reports-project", "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [project: invoices]'", "type": "format" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 18,
+      "was": "status:1",
+      "prompt": "Am I connected to cyoda?",
+      "expected_output": "Runs ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh, which prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile and no WARN lines, and answers with exactly 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
+        "_simulated/status.txt": "STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile"
+      },
+      "assertions": [
+        { "id": "runs-script", "text": "Gets the status by running `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`, not by reading the config file and curling by hand", "type": "behavior" },
+        { "id": "connected-line", "text": "Reports 'Connected to cyoda-go v0.8.4 — http://localhost:8080 [profile: default]'", "type": "format" }
+      ]
+    },
+    {
+      "id": 19,
+      "was": "status:2",
+      "prompt": "Check my Cyoda status",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com VERSION=none BINARY_VERSION=0.8.4 SOURCE=profile and WARN=active profile staging is unreachable; switch to default or another profile (cyoda:setup). The skill reports the unreachable form 'cyoda-go unreachable — https://cyoda-staging.example.com [profile: staging]' and that the active profile staging is unreachable. It changes nothing, runs no tokenCommand, asks nothing and tells the developer to type no command.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"staging\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"staging\":{\"endpoint\":\"https://cyoda-staging.example.com\",\"tokenCommand\":\"/work/shop/scripts/get-token.sh\"}}}",
+        "_simulated/status.txt": "STATUS=unreachable PROFILE=staging ENDPOINT=https://cyoda-staging.example.com VERSION=none BINARY_VERSION=0.8.4 SOURCE=profile\nWARN=active profile staging is unreachable; switch to default or another profile (cyoda:setup)"
+      },
+      "assertions": [
+        { "id": "unreachable-line", "text": "Reports 'cyoda-go unreachable — https://cyoda-staging.example.com [profile: staging]'", "type": "format" },
+        { "id": "warns-unreachable", "text": "Tells the developer that the active profile staging is unreachable (the script's WARN)", "type": "behavior" },
+        { "id": "no-switch", "text": "Does not edit the config or switch the active profile itself", "type": "behavior" },
+        { "id": "no-token-command", "text": "Does not run the profile's tokenCommand", "type": "behavior" },
+        { "id": "asks-nothing", "text": "Asks the developer no question (not whether to switch profiles, start or re-link anything)", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 20,
+      "was": "status:3",
+      "prompt": "Is this project's cyoda-go up?",
+      "expected_output": "cyoda-status.sh prints STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=none BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop and WARN=project shop is bound to http://localhost:8082, which is unreachable; start it or re-link this project (cyoda:setup). The skill reports 'cyoda-go unreachable — http://localhost:8082 [project: shop]' and that project shop is bound to http://localhost:8082, which is unreachable. It starts nothing, changes nothing, asks nothing and tells the developer to type no command.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}},\"projects\":{\"/Users/dev/work/shop\":{\"endpoint\":\"http://localhost:8082\"}}}",
+        "_simulated/status.txt": "STATUS=unreachable PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=none BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop\nWARN=project shop is bound to http://localhost:8082, which is unreachable; start it or re-link this project (cyoda:setup)"
+      },
+      "assertions": [
+        { "id": "unreachable-project-line", "text": "Reports 'cyoda-go unreachable — http://localhost:8082 [project: shop]'", "type": "format" },
+        { "id": "warns-unreachable", "text": "Tells the developer that project shop is bound to http://localhost:8082, which is unreachable (the script's WARN)", "type": "behavior" },
+        { "id": "no-start", "text": "Does not start cyoda-go, edit the plugin config or re-link the project itself", "type": "behavior" },
+        { "id": "asks-nothing", "text": "Asks the developer no question (not whether to start or re-link anything)", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 21,
+      "was": "status:4",
+      "prompt": "What cyoda version am I on?",
+      "expected_output": "cyoda-status.sh prints STATUS=connected PROFILE=team-dev ENDPOINT=https://cyoda-dev.example.com VERSION=0.8.4 BINARY_VERSION=0.9.0 SOURCE=profile and WARN=local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance. The skill reports 'Connected to cyoda-go v0.8.4 — https://cyoda-dev.example.com [profile: team-dev]' and prints the version-mismatch warning, making clear the instance runs 0.8.4 and the local binary is 0.9.0.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\"}}}",
+        "_simulated/status.txt": "STATUS=connected PROFILE=team-dev ENDPOINT=https://cyoda-dev.example.com VERSION=0.8.4 BINARY_VERSION=0.9.0 SOURCE=profile\nWARN=local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance"
+      },
+      "assertions": [
+        { "id": "connected-line", "text": "Reports 'Connected to cyoda-go v0.8.4 — https://cyoda-dev.example.com [profile: team-dev]' (the instance version, not the binary version)", "type": "format" },
+        { "id": "prints-mismatch", "text": "Prints the warning 'local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance'", "type": "behavior" },
+        { "id": "no-upgrade", "text": "Does not upgrade, downgrade or reinstall anything", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 22,
+      "was": "status:5",
+      "prompt": "Which cyoda instance is this project using?",
+      "expected_output": "Runs cyoda-status.sh from the project. It prints STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop and no WARN lines. The skill reports exactly 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]': this project's entry in the plugin config, not the machine-wide active profile team-dev, and not a [profile: …] tag.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"team-dev\",\"profiles\":{\"team-dev\":{\"endpoint\":\"https://cyoda-dev.example.com\"}},\"projects\":{\"/Users/dev/work/shop\":{\"endpoint\":\"http://localhost:8082\",\"tokenCommand\":\"scripts/auth.sh token\"}}}",
+        "_simulated/status.txt": "STATUS=connected PROFILE=shop ENDPOINT=http://localhost:8082 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop"
+      },
+      "assertions": [
+        { "id": "project-line", "text": "Reports exactly 'Connected to cyoda-go v0.8.4 — http://localhost:8082 [project: shop]'", "type": "format" },
+        { "id": "not-profile-tag", "text": "Does not write '[profile: shop]' or '[profile: team-dev]', and does not present the machine-wide active profile team-dev as the instance in use", "type": "behavior" },
+        { "id": "read-only", "text": "Does not edit the plugin config and does not run the tokenCommand", "type": "behavior" }
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "Set up cyoda for this project.",
+      "expected_output": "REAL run (CYODA_PORT_BASE=31000, CYODA_LOCAL_DATA_ROOT=<outputs>/data, CYODA_DEFAULT_ENDPOINT=http://localhost:1, no profile). outputs/project is a git repo whose main checkout already has its own instance: projects[<real path of outputs/project>] = {run: binary, ports 31000/32010/32011, endpoint http://localhost:31000}, running. The working directory is the linked git worktree outputs/project/.worktrees/feat (branch feat); <root> is its real path (`git rev-parse --show-toplevel`). cyoda-status.sh run there prints STATUS=unreachable SOURCE=default (the main checkout's entry does not apply inside the worktree). Nothing in the worktree says how to run cyoda-go, so it asks once, exactly: 'Run cyoda-go for local development and testing from the command line or in Docker?'. The developer answers command line. It runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> --run binary`, which skips the main checkout's block and prints ENDPOINT=http://localhost:31100 HTTP=31100 GRPC=32110 ADMIN=32111 RUN=binary STATE=started, recording projects[<root>] (run binary, instance feat-<hash6>, ports 31100/32110/32111, endpoint http://localhost:31100). The main checkout's entry and instance are unchanged and still running. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:31100 [project: feat]'. Nothing is written into either checkout.",
+      "files": {
+        "README.md": "# orders\n\nOrder intake service built on cyoda-go.\n",
+        ".gitignore": ".worktrees/\n",
+        "_simulated/developer.md": "The developer is working in a git worktree of the project: the current directory for every command is outputs/project/.worktrees/feat (branch feat), not outputs/project. The `cyoda` binary is installed. The developer runs local tools straight from the shell rather than in containers. To anything else, a short yes."
+      },
+      "assertions": [
+        {
+          "id": "worktree-root",
+          "text": "Treats the worktree (the real path of outputs/project/.worktrees/feat) as the project: does not use or report the main checkout's instance on 31000 as this project's",
+          "type": "behavior"
+        },
+        {
+          "id": "run-question",
+          "text": "Asks exactly once, in these words: 'Run cyoda-go for local development and testing from the command line or in Docker?', and asks the developer nothing else",
+          "type": "format"
+        },
+        {
+          "id": "starts-binary",
+          "text": "Starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <worktree root> --run binary`, whose real output is ENDPOINT=http://localhost:31100 … RUN=binary STATE=started (a block other than the main checkout's 31000); starts no `cyoda` process by hand",
+          "type": "behavior"
+        },
+        {
+          "id": "entry-keyed-by-worktree",
+          "text": "Afterwards outputs/plugin-config.json has projects[<real path of the worktree>] with run `binary`, ports {http 31100, grpc 32110, admin 32111}, endpoint http://localhost:31100; the main checkout's entry is unchanged (31000) and its instance was not stopped or restarted",
+          "type": "behavior"
+        },
+        {
+          "id": "reports-project",
+          "text": "Re-runs cyoda-status.sh from the worktree and reports 'Connected to cyoda-go v0.8.4 — http://localhost:31100 [project: feat]'",
+          "type": "format"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "Set up cyoda for this project.",
+      "expected_output": "REAL run (CYODA_DEFAULT_ENDPOINT=http://localhost:1). The plugin config holds only the active profile `default`, written by an older plugin, pointing at the eval's running cyoda-go http://localhost:<P> (P = the eval server's HTTP port); no projects entry. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:<P> VERSION=0.8.4 … SOURCE=profile. That profile is the old machine-wide local default, not a binding for this project, and nothing in the repo says how to run cyoda-go, so it asks once, exactly: 'Use the cyoda-go already running on localhost:<P>, or start one for this project from the command line or in Docker?'. The developer picks the running one. It writes projects[<real path of outputs/project>] = {run: existing, endpoint: http://localhost:<P>} through cyoda-config-write.sh (values as --arg; no ports, dataDir or token), leaves profile `default` and `active` as they are, stops and starts nothing. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:<P> [project: project]'.",
+      "files": {
+        "README.md": "# orders\n\nOrder intake service built on cyoda-go.\n",
+        "cyoda-plugin-config.json": {
+          "active": "default",
+          "profiles": {
+            "default": {
+              "endpoint": "http://localhost:8080"
+            }
+          }
+        },
+        "_simulated/developer.md": "The developer set up cyoda-go on this machine months ago with an older version of the plugin and has worked against that instance since. Asked how to run cyoda-go, they want the one already running. To anything else, a short yes."
+      },
+      "assertions": [
+        {
+          "id": "offers-existing",
+          "text": "Asks exactly once, in these words with the profile's host and port: 'Use the cyoda-go already running on localhost:<P>, or start one for this project from the command line or in Docker?', and asks the developer nothing else; it does not simply go on with the `default` profile without asking",
+          "type": "format"
+        },
+        {
+          "id": "entry-existing",
+          "text": "Writes projects[<real path of outputs/project>] with run `existing` and endpoint http://localhost:<P> through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg); no ports, dataDir or token in it",
+          "type": "behavior"
+        },
+        {
+          "id": "profile-kept",
+          "text": "Profile `default` and `active` are unchanged in outputs/plugin-config.json; no new profile; the instance on <P> is not stopped, restarted or reconfigured",
+          "type": "behavior"
+        },
+        {
+          "id": "reports-project",
+          "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:<P> [project: project]'",
+          "type": "format"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
+          "type": "behavior"
+        }
       ]
     }
   ]

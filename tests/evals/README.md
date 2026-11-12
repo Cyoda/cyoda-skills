@@ -6,6 +6,7 @@ Helpers for running `cyoda/skills/<skill>/evaluations/evals.json` (process: "Run
 
 - **Real server** for anything the skill does to an instance (status, register, create, transitions, auth). One throwaway in-memory cyoda-go per eval, then `setup.py` writes the fixtures and a plugin config pointed at it. Prompts: `exec-prompt.md`, `grade-prompt.md`.
 - **Simulated instance** when the fixture needs state a fresh server can't give cheaply: specific entity ids or histories, a running compute node, a remote or production endpoint. The executor answers instance calls from `outputs/_simulated/instance.md` (marked SIMULATED/ASSUMED); setup.py writes it there in both modes, since it also holds the developer's scripted answers. Prompts: `exec-prompt-sim.md`, `grade-prompt-sim.md`; run `setup.py … none`.
+- **No stray instance:** executors always set `CYODA_DEFAULT_ENDPOINT=http://localhost:1` (unless the fixture says otherwise), so a developer's own cyoda-go on :8080 is never reached.
 - **Help runs for real** in both: executors call `cyoda help` / `cyoda-help.sh` against the installed binary. For a "cyoda not installed" eval, render the prompt with `--no-cyoda`: it tells the executor to use the PATH from `nocyoda-path.sh`, which hides only the `cyoda` binary.
 
 ## Commands

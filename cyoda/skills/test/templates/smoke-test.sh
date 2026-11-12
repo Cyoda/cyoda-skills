@@ -80,7 +80,7 @@ MSTATE="$(jq -r --arg n "$ENTITY_NAME" --argjson v "$MODEL_VERSION" \
   '[.[] | select(.modelName == $n and .modelVersion == $v)][0].currentState // "MISSING"' <<<"$BODY" 2>/dev/null)" \
   || fail "unexpected model list: $(printf '%s' "$BODY" | head -c 200)"
 echo "Model: $MSTATE"
-[ "$MSTATE" = LOCKED ] || fail "model must be registered and LOCKED (type /cyoda:build)"
+[ "$MSTATE" = LOCKED ] || fail "model must be registered and LOCKED (cyoda:build registers it)"
 
 echo "--- Creating entity..."
 req POST "$API/entity/JSON/$ENTITY_NAME/$MODEL_VERSION" -H 'Content-Type: application/json' --data-binary @"$SAMPLE_FILE"

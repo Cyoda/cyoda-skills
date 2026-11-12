@@ -5,6 +5,8 @@
 #   1. CYODA_PROFILE=<name>: that profile, over everything (unknown: exit 1).
 #   2. A "projects" entry whose key (a project dir) is $PWD or its nearest ancestor,
 #      compared with -ef (same inode, so symlinks and letter case don't matter).
+#      The walk stops at a git checkout's top level (a dir holding .git, a file in a
+#      linked worktree): a worktree or nested repo never matches its parent's entry.
 #      Only absolute keys for existing dirs owned by you count; keys whose dir is
 #      gone are skipped silently, relative/~/newline/foreign keys with a warning.
 #      source "project", profile = key's basename.
@@ -23,7 +25,7 @@ WANT="${CYODA_PROFILE:-}"
 default_json() {
   jq -cn --arg ep "${CYODA_DEFAULT_ENDPOINT:-http://localhost:8080}" '{
     profile: "default", endpoint: $ep, tokenCommand: null,
-    warnings: ["no saved profile; using the default local instance \($ep) — type /cyoda:setup to save it"],
+    warnings: ["no saved profile; using the default local instance \($ep); cyoda:setup binds this project to one"],
     source: "default"
   }'
 }
@@ -81,6 +83,7 @@ find_project() {
       if [ -O "$k" ]; then KEY="$k"; return 0; fi
       WARNS+=("projects entry $k skipped: the directory is not owned by you")
     done
+    [ -e "$dir/.git" ] && return 0
     [ "$dir" = / ] && return 0
     dir="${dir%/*}"
     [ -n "$dir" ] || dir=/

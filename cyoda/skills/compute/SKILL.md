@@ -1,7 +1,7 @@
 ---
 name: compute
 description: Use when a cyoda-go workflow needs the developer's own code (a processor, a function criterion, or a schedule function served by a compute node over gRPC), when deciding whether a compute node is needed at all, or when a compute node won't connect, isn't routed requests, is evicted, or times out.
-allowed-tools: Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(mktemp *) Bash(rm *)
 ---
 
 # Cyoda compute nodes
@@ -23,7 +23,7 @@ Many workflows need none. Read `workflows --section CRITERIA` and `workflows --s
 | Calling another system, computing and writing data | - | Processor |
 | Moving a linked entity when this one changes | - | Processor that fires the linked entity's transition |
 
-If none apply, say so and stop. Wiring a processor or criterion into the workflow is a workflow change: "next, type `/cyoda:build` to add it".
+If none apply, say so and stop. Wiring a processor or criterion into the workflow is a workflow change, covered by `cyoda:build`.
 
 ## Step 1 — Get the contract
 
@@ -81,7 +81,7 @@ Read `workflows --section PROCESSORS`. `executionMode` is set per processor in t
 
 **Timeout.** `responseTimeoutMs` on the processor's config. Unset or `0` means the server default of 30 s, not a node default (#684-J). A miss is `DISPATCH_TIMEOUT` (503). Prefer raising `responseTimeoutMs` with `COMMIT_BEFORE_DISPATCH` over long `SYNC` calls.
 
-**Behaviour help doesn't settle.** When help doesn't settle how the execution mode, timeout and callbacks combine (e.g. what a `COMMIT_BEFORE_DISPATCH` replay re-runs), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
+**Behaviour help doesn't settle.** When help doesn't settle how the execution mode, timeout and callbacks combine (e.g. what a `COMMIT_BEFORE_DISPATCH` replay re-runs), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
 
 ## Step 7 — Calling back into Cyoda
 
@@ -89,7 +89,7 @@ A processor may read or write other entities over REST (`CYODA_COMPUTE_HTTP_BASE
 - **Joining the transaction.** Each dispatched request carries a signed token in the CloudEvent extension `cyodatxtoken`. Echo it as the `X-Tx-Token` HTTP header or `tx-token` gRPC metadata, and the callback runs inside the originating transaction: it sees the cascade's uncommitted writes and commits or rolls back with it (`cluster --section "COMPUTE CALLBACK TRANSACTION ROUTING"`). Without the echo, the callback is a standalone transaction. Which modes supply a usable transaction is in `workflows` PROCESSORS (`startNewTxOnDispatch`).
 - **Don't write the entity you're processing**; return its changes (best practice *Let the engine save the anchor*; `workflows` PROCESSORS).
 - **Moving a linked entity (event cascade).** Keep the linked entity's id in this entity's data. The processor fires a transition on it: `PATCH <http-base>/api/entity/JSON/{linkedId}/{transition}` with `Content-Type: application/merge-patch+json`, `If-Match: *` and body `{}` (`crud --section ENDPOINTS`). Mark that transition `manual: true` in the linked workflow. With the tx-token the two moves commit together; without it they commit separately. Best practice *Use manual transitions for external triggers*.
-- **Worked cascade:** [examples/cascade/](examples/cascade/) holds the workflow side only. An `order`'s manual `confirm` carries the function criterion `has-address` and the processor `create-shipment`, tagged `smoke-compute`. The processor creates a `shipment` linked by `$.orderId`, stores its id in `$.shipmentId` and fires the shipment's manual `dispatch`. The files keep `"version": "${SCHEMA_VERSION}"`; importing them is a workflow change: "next, type `/cyoda:build`". No node code is included; write it in the developer's language from Steps 1–7. The order sample declares `shipmentId`, so the processor's returned data passes the locked (strict) model.
+- **Worked cascade:** [examples/cascade/](examples/cascade/) holds the workflow side only. An `order`'s manual `confirm` carries the function criterion `has-address` and the processor `create-shipment`, tagged `smoke-compute`. The processor creates a `shipment` linked by `$.orderId`, stores its id in `$.shipmentId` and fires the shipment's manual `dispatch`. The files keep `"version": "${SCHEMA_VERSION}"`; importing them is a workflow change (`cyoda:build`). No node code is included; write it in the developer's language from Steps 1–7. The order sample declares `shipmentId`, so the processor's returned data passes the locked (strict) model.
 
 ## Node checklist
 

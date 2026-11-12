@@ -36,7 +36,7 @@ test_status_unreachable() {
   local out
   out="$(CYODA_PLUGIN_CONFIG="$T/u.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable" "unreachable"
-  assert_contains "$out" "WARN=active profile dead is unreachable; type /cyoda:setup to switch to default" "unreachable warn"
+  assert_contains "$out" "WARN=active profile dead is unreachable; switch to default or another profile (cyoda:setup)" "unreachable warn"
 }
 
 test_status_not_configured() {
@@ -53,7 +53,7 @@ test_status_no_config_local_up() {
   out="$(CYODA_DEFAULT_ENDPOINT="$ep" CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=default ENDPOINT=$ep VERSION=0.8.4" "implicit default connected"
   assert_contains "$(echo "$out" | head -n1)" "SOURCE=default" "implicit default source"
-  assert_contains "$out" "WARN=no saved profile; using the default local instance $ep — type /cyoda:setup to save it" "implicit default warn"
+  assert_contains "$out" "WARN=no saved profile; using the default local instance $ep; cyoda:setup binds this project to one" "implicit default warn"
   stop_server
 }
 
@@ -61,7 +61,7 @@ test_status_no_config_nothing_listening() {
   local out
   out="$(CYODA_DEFAULT_ENDPOINT="http://localhost:1" CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable PROFILE=default ENDPOINT=http://localhost:1" "implicit default unreachable"
-  assert_contains "$out" "WARN=no cyoda-go is answering at http://localhost:1 — type /cyoda:setup to install or start one" "implicit default unreachable warn"
+  assert_contains "$out" "WARN=no cyoda-go is answering at http://localhost:1; start or link one (cyoda:setup)" "implicit default unreachable warn"
   if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for the implicit default"; else _ok; fi
 }
 
@@ -141,7 +141,7 @@ test_status_project_binding() {
   pcfg "$T/g.json" "$pd" "http://localhost:1"
   out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=unreachable PROFILE=shop" "project entry unreachable"
-  assert_contains "$out" "WARN=project shop is bound to http://localhost:1, which is unreachable; type /cyoda:setup to start it or re-link this project" "project unreachable warn"
+  assert_contains "$out" "WARN=project shop is bound to http://localhost:1, which is unreachable; start it or re-link this project (cyoda:setup)" "project unreachable warn"
   if [[ "$out" == *"switch to default"* ]]; then _bad "no switch-to-default offer for a project entry"; else _ok; fi
   stop_server
 }

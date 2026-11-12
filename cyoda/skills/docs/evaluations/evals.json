@@ -45,7 +45,7 @@
     {
       "id": 2,
       "prompt": "What does WORKFLOW_SCHEMA_VERSION_UNSUPPORTED mean? I don't see it in the error list.",
-      "expected_output": "Runs cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED. With no binary and no instance, the helper falls back to the web help mirror (SOURCE=web); the skill says once 'Next, type `/cyoda:setup` to install cyoda-go locally' and answers from the mirror. Explains that the ERROR CODE INDEX is incomplete (cyoda-go#684 item N) and every code has its own page, so the code exists; the workflow version must be a supported MAJOR.MINOR, read from `cyoda help workflows schema-version versions`.",
+      "expected_output": "Runs cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED. With no binary and no instance, the helper falls back to the web help mirror (SOURCE=web); the skill says so, answers from the mirror and asks the developer to type no command. Explains that the ERROR CODE INDEX is incomplete (cyoda-go#684 item N) and every code has its own page, so the code exists; the workflow version must be a supported MAJOR.MINOR, read from `cyoda help workflows schema-version versions`.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{}",
         "_simulated/machine.md": "`cyoda` is not on PATH. No profile has an endpoint. cyoda-help.sh prints SOURCE=web VERSION=0.8.4 and the whole web page for errors/WORKFLOW_SCHEMA_VERSION_UNSUPPORTED: HTTP 400, the workflow `version` is not in the supported MAJOR.MINOR range; see `cyoda help workflows schema-version versions`."
@@ -67,18 +67,13 @@
           "type": "behavior"
         },
         {
-          "id": "recommends-install",
-          "text": "Says once to type `/cyoda:setup` to install cyoda-go (e.g. 'Next, type `/cyoda:setup` to install cyoda-go locally'), and still answers the question from the web help mirror",
-          "type": "behavior"
-        },
-        {
           "id": "schema-version-pointer",
           "text": "Points to `cyoda help workflows schema-version versions` for the supported version instead of stating a version from memory",
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:setup`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         },
         {

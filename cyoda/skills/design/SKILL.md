@@ -1,12 +1,12 @@
 ---
 name: design
 description: Use when the developer describes an application idea for cyoda-go, asks how to model their domain as Cyoda entities and workflows, or wants a proposed entity or workflow design reviewed before building it.
-allowed-tools: Bash(*cyoda-help.sh *) Read Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(mktemp *) Bash(rm *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-help.sh *) Read Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(mktemp *) Bash(rm *)
 ---
 
 # Cyoda application design
 
-Turn an app idea into entities and workflows, review them against the Cyoda best practices, and hand a summary to `/cyoda:build`. This skill writes no project files and calls no project instance.
+Turn an app idea into entities and workflows, review them against the Cyoda best practices, and end with a design summary. This skill writes no project files and calls no project instance.
 
 **Facts come from `cyoda help`, not from this file or from memory.** Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> [--section "<NAME>"]`. It prints the topic or section body, and stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2 means unknown topic; exit 6 means unknown section (stderr lists the sections that exist). With no binary installed it falls back to the web help mirror by itself. The mirror ignores `--section` and prints the whole page, so find the section by its heading there. If a topic you know exists still exits 2 (offline), carry on with the design and tell the developer which facts you couldn't check.
 
@@ -79,7 +79,7 @@ For each violation, change the design and say so in one plain sentence that name
 2. An `ASYNC_NEW_TX` processor on the transition into the state, whose compute node sends the message. Show the processor entry (`workflows --section PROCESSORS`).
 3. A scheduled transition for escalation, e.g. `errored` → `escalated` after 30 minutes. Show the transition (`workflows --section "SCHEDULED TRANSITIONS"`).
 
-**Behaviour help doesn't settle.** When help doesn't settle how engine features combine (e.g. a failing criterion and a schedule on the same state), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
+**Behaviour help doesn't settle.** When help doesn't settle how engine features combine (e.g. a failing criterion and a schedule on the same state), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
 
 **Other features help doesn't document.** "Coming soon" is only for features known to be planned, which today means notifications. For anything else the developer asks for that `cyoda help` doesn't document, say: "Not available in cyoda-go <VERSION> — check `cyoda help`." `<VERSION>` is the `VERSION=` that `cyoda-help.sh` reported. Then offer the closest documented way, if there is one.
 
@@ -124,13 +124,7 @@ Review: <each checklist line changed, one line each; the rest ok or n/a>
 First increment: <Entity> with <minimal workflow>
 ```
 
-Ask: *"Does this match what you want? (yes, or tell me what to change)"*
-
-Then hand off:
-- If `cyoda-help.sh` reported `SOURCE=instance`: "Next, type `/cyoda:build` to turn the first increment into project files and register it on your instance."
-- `SOURCE=binary`: "Next, type `/cyoda:setup` to start cyoda-go locally, then `/cyoda:build` to register the first increment."
-- `SOURCE=web`: "Next, type `/cyoda:setup` to install and start cyoda-go, then `/cyoda:build` to register the first increment."
-- If the developer already has an instance running, `/cyoda:build` alone.
+The summary is the end of the reply.
 
 ## Common mistakes
 

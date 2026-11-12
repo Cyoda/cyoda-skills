@@ -1,8 +1,7 @@
 ---
 name: test
-description: Use when the developer types /cyoda:test to smoke-test the entity models and workflows registered on their cyoda-go instance (create an entity, fire its manual transitions, check the states), or to get a re-runnable smoke-test script for one entity.
-allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(*cyoda-profile.sh*) Bash(jq *) Bash(cat *) Bash(ls *) Bash(cp *) Bash(mkdir *) Bash(bash *)
-disable-model-invocation: true
+description: Use when the entity models and workflows of a cyoda-go app need a smoke test on the instance (create an entity, fire its manual transitions, check the states), or a re-runnable smoke-test script for one entity is wanted, e.g. for CI.
+allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(*cyoda-profile.sh*) Bash(jq *) Bash(cat *) Bash(ls *) Bash(cp *) Bash(mkdir *) Bash(bash *) Bash(*cyoda-local.sh *) Bash(*cyoda-config-write.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*get-token.sh*) Bash(cyoda *) Bash(brew *) Bash(curl *) Bash(command -v *) Bash(git rev-parse *) Bash(pwd *) Bash(cd * && pwd -P) Bash(sh) Bash(chmod *) Bash(cmp *) Bash(find *)
 ---
 
 # Cyoda smoke test
@@ -16,33 +15,36 @@ Create one entity per model, walk its manual transitions on the happy path, and 
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | 2xx | continue |
-| 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr, stop, and say "next, type `/cyoda:setup`" |
-| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): a call problem, not a test result. Fix the call and re-run it. 401/403: the script already retried once with a fresh token. Show the error, stop, and say "next, type `/cyoda:auth`". Anything else: record ✗ for the step (Step 3) |
-| 4 | the profile's tokenCommand failed | show stderr, stop, and say "next, type `/cyoda:auth`" |
-| 5 | no endpoint configured | stop and say "next, type `/cyoda:setup`" |
+| 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr and stop; the plugin config is covered by `cyoda:setup` |
+| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): a call problem, not a test result. Fix the call and re-run it. 401/403: the script already retried once with a fresh token. Show the error and [get a token](#no-instance-or-no-token). Anything else: record ✗ for the step (Step 3) |
+| 4 | the profile's tokenCommand failed | show stderr and [get a token](#no-instance-or-no-token) |
+| 5 | no endpoint configured | [get an instance](#no-instance-or-no-token) |
 | 64 | usage error (a leading `-` or a missing method/path) | fix the call form |
 
 Request bodies are files (`--data-binary @<file>`) or a short inline literal (`-d '{}'`), never stdin: a token retry would resend an empty body.
 
 ## Step 0 — Connection
 
-Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`.
-- `STATUS=not_configured`: "No cyoda-go instance is configured. Next, type `/cyoda:setup`." Stop.
-- `STATUS=unreachable`: show the `WARN=` line and stop.
-- Show any other `WARN=` lines as they are.
+Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. `STATUS=connected` with `SOURCE=project`, with `SOURCE=profile` for a `PROFILE` other than `default` (the old machine-wide local default), or with `CYODA_PROFILE` set: show any `WARN=` lines as they are and go on. Otherwise, `SOURCE=default` included, [get an instance](#no-instance-or-no-token).
+
+### No instance or no token
+
+- **Get an instance** (Step 0 doesn't go on, or exit 5): carry out `cyoda:setup`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/setup/SKILL.md` and follow its *Getting an instance* for this project. Then go on with the test.
+- **Get a token** (401/403, or exit 4): carry out `cyoda:auth`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md` and follow it for the bound instance. Explain the error from help: read `cyoda-help.sh auth tokens --section ERRORS` (and `auth clients --section "REQUEST FLOW"` for a rejected client) and name the section next to the fact. Once a call succeeds, re-run the failed call and go on. While the token can't be had (credentials only the developer holds), run no test calls.
 
 ## Step 1 — Mode
 
-Ask: "Run the smoke test now (**automated**), or get a script you can re-run (**guided**)?"
+**Guided** (a script to re-run, e.g. in CI) when the request asks for one; otherwise **automated**: run the test now.
 
 ## Step 2 — Discover
 
 1. **Read help.** Run `cyoda-help.sh crud --section ENDPOINTS` (the entity calls) and `cyoda-help.sh models --section ENDPOINTS` (the model calls) before any call below.
 2. `cyoda-call.sh GET /model/`. Print "Discovered N models: `<name>` v`<version>` (`<currentState>`), ...".
-3. Only LOCKED models can hold entities. If any model is UNLOCKED, run `cyoda-help.sh models --section LIFECYCLE` and give its reason when you list the model as skipped: "not locked yet (<reason>, `models` § LIFECYCLE); next, type `/cyoda:build` to finish registering it".
-4. More than 3 testable models: ask which to test (names or `all`).
-5. For each selected model, `cyoda-call.sh GET /model/{e}/{v}/workflow/export`. Note `initialState` and, per state, the transitions with `manual: true`, skipping any with `disabled: true` or a `schedule` (those can't be fired by name). No workflow: skip the model and say so in the summary.
-6. The payload is the project's sample: read `cyoda-manifest.json` at the project root and use the `sample` file listed for `{e}` v`{v}`. No manifest entry: write a minimal payload from `GET /model/export/SIMPLE_VIEW/{e}/{v}` and check it with `POST /model/validate/{e}/{v}` (it answers 200 either way: read `.success` and `.message`).
+3. A model in the project's `cyoda-manifest.json` that is missing from the instance (e.g. a fresh instance): register it from its listed files following `cyoda:build`'s Step 7 (canonical order; read `${CLAUDE_PLUGIN_ROOT}/skills/build/SKILL.md`), then list again. The project's files stay unchanged.
+4. Only LOCKED models can hold entities. If any model is UNLOCKED, run `cyoda-help.sh models --section LIFECYCLE` and give its reason when you list the model as skipped: "not locked yet (<reason>, `models` § LIFECYCLE)".
+5. More than 3 testable models: test the ones the request names, else all.
+6. For each selected model, `cyoda-call.sh GET /model/{e}/{v}/workflow/export`. Note `initialState` and, per state, the transitions with `manual: true`, skipping any with `disabled: true` or a `schedule` (those can't be fired by name). No workflow: skip the model and say so in the summary.
+7. The payload is the project's sample: read `cyoda-manifest.json` at the project root and use the `sample` file listed for `{e}` v`{v}`. No manifest entry: write a minimal payload from `GET /model/export/SIMPLE_VIEW/{e}/{v}` and check it with `POST /model/validate/{e}/{v}` (it answers 200 either way: read `.success` and `.message`).
 
 Guided mode continues at [Guided mode](#guided-mode).
 
@@ -65,10 +67,9 @@ Model        | Transitions fired | Result
 <e> v<v>     | N                 | PASS / FAIL (step, errorCode)
 ```
 
-Then offer:
-- **Clean-up**: "Delete the N test entities? (yes/no)". On yes, `DELETE /entity/{id}` for each id created in this run, nothing else. Delete is soft: the history stays, and no workflow runs. Never send the model-wide `DELETE /entity/{e}/{v}`: with no condition it deletes every entity of the model.
-- **History**: "Show the audit trail of `<id>`?" On yes, use the `cyoda:debug` skill in observation mode for that entity.
-- A failure: offer the `cyoda:debug` skill with the call, status and body. If the fix is a workflow change, "next, type `/cyoda:build`".
+Then:
+- **Clean-up**: `DELETE /entity/{id}` for each id created in this run, nothing else; the models stay. Say so in one line. Delete is soft: the history stays, and no workflow runs. Never send the model-wide `DELETE /entity/{e}/{v}`: with no condition it deletes every entity of the model.
+- A failure: give the call, status and body; diagnosing it is covered by `cyoda:debug`, and a workflow fix by `cyoda:build`.
 
 ## Guided mode
 

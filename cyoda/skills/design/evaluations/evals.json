@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "I want to build an app where tenants report maintenance issues for their flat and the landlord assigns a contractor to fix them.",
-      "expected_output": "Probes `cyoda-help.sh workflows best-practices` then `cyoda-help.sh design`, gets exit 2 for both and loads resources/best-practices.md, saying which source it used. Gives a short orientation (no Cyoda terms in the prompt). Asks about entities, states, triggers, external code, unique fields and schema evolution. Proposes MaintenanceRequest (and possibly Contractor) with an explicit error or blocked state and several precise terminal states. Reviews the design against the best-practice bullets by name. Presents the summary and hands off with 'next, type `/cyoda:build`'. No full workflow files before the design is confirmed.",
+      "expected_output": "Probes `cyoda-help.sh workflows best-practices` then `cyoda-help.sh design`, gets exit 2 for both and loads resources/best-practices.md, saying which source it used. Gives a short orientation (no Cyoda terms in the prompt). Asks about entities, states, triggers, external code, unique fields and schema evolution. Proposes MaintenanceRequest (and possibly Contractor) with an explicit error or blocked state and several precise terminal states. Reviews the design against the best-practice bullets by name. Ends with the summary; prescribes no next step and asks the developer to type no command. No full workflow files.",
       "files": {
         "_simulated/env.md": "The cyoda binary 0.8.4 is installed; no instance profile is configured. `cyoda-help.sh workflows best-practices` exits 2 (unknown help topic: workflows best-practices). `cyoda-help.sh design` exits 2 (unknown help topic: design). Every other cyoda-help.sh call prints SOURCE=binary VERSION=0.8.4 on stderr and the real section text.",
         "_simulated/developer.md": "The developer answers each question briefly. Entities: maintenance request; contractors are a list they keep. A request is reported, then the landlord assigns a contractor, the contractor schedules a visit, fixes it, and the tenant confirms. Sometimes the contractor can't fix it, or the tenant withdraws the request. Triggers: tenant, landlord and contractor actions in the UI. No external code. Each request has a reference number that must be unique. It's a prototype; they expect to add fields while building."
@@ -19,8 +19,9 @@
         { "id": "unique-key-captured", "text": "Records the reference number as a unique key in the summary", "type": "behavior" },
         { "id": "schema-evolution-not-discover", "text": "Frames the schema question as how much schema evolution to allow on a locked model (changeLevel), after consulting `models` LIFECYCLE itself and presenting the options from it, and does not describe a 'discover mode' where entities can be posted to an unlocked model", "type": "behavior" },
         { "id": "summary", "text": "Produces a structured design summary with entities, states (initial, terminal and error marked), transitions with their triggers, compute nodes (none), unique keys, schema evolution and a first increment", "type": "format" },
-        { "id": "no-workflow-json-early", "text": "Does not generate complete workflow JSON files before the design is confirmed (short fragments illustrating a proposal are fine)", "type": "behavior" },
-        { "id": "handoff-type", "text": "Hands off with 'next, type `/cyoda:build`' plus a one-line reason (and suggests `/cyoda:setup` first since no instance is configured); does not say it will invoke another skill", "type": "behavior" }
+        { "id": "no-workflow-json-early", "text": "Does not generate complete workflow JSON files (short fragments illustrating a proposal are fine)", "type": "behavior" },
+        { "id": "ends-with-summary", "text": "Ends with the design summary: prescribes no next step (no 'next, …', no suggestion to set up an instance or to run the build)", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
@@ -62,7 +63,7 @@
     {
       "id": 4,
       "prompt": "I haven't installed cyoda yet. Can you help me design a simple event ticketing app first? Tickets get reserved, then paid, and a reservation should expire if it isn't paid within 15 minutes.",
-      "expected_output": "Does not stop to install or require an instance. It recommends once that the developer type `/cyoda:setup` to install cyoda-go locally, and carries on with the design. cyoda-help.sh falls back to the web help mirror (SOURCE=web; --section ignored, so it reads the named section heading in the whole page). Both best-practices probes exit 2, so it uses resources/best-practices.md. Models the expiry as a scheduled transition (schedule.delayMs on an automated transition), consulting `workflows` SCHEDULED TRANSITIONS itself and producing the transition, not a scheduled processor. Completes the design summary with explicit terminal states (e.g. Paid/Used, Expired, Cancelled), then hands off: 'next, type `/cyoda:setup`' to install, then `/cyoda:build`.",
+      "expected_output": "Does not stop to install or require an instance. It carries on with the design and asks the developer to type no command. cyoda-help.sh falls back to the web help mirror (SOURCE=web; --section ignored, so it reads the named section heading in the whole page). Both best-practices probes exit 2, so it uses resources/best-practices.md. Models the expiry as a scheduled transition (schedule.delayMs on an automated transition), consulting `workflows` SCHEDULED TRANSITIONS itself and producing the transition, not a scheduled processor. Completes the design summary with explicit terminal states (e.g. Paid/Used, Expired, Cancelled), and ends with it.",
       "files": {
         "_simulated/env.md": "`command -v cyoda` finds nothing, and no instance profile is configured. `cyoda-help.sh workflows best-practices` exits 2 and `cyoda-help.sh design` exits 2. Every other cyoda-help.sh call prints 'SOURCE=web VERSION=0.8.4' and 'note: --section is ignored for web pages; showing the whole page' on stderr, then the whole topic page from docs.cyoda.net/help.",
         "_simulated/developer.md": "Entities: event and ticket. Ticket: reserved, paid, then scanned at the door; the buyer can cancel before paying. No external code. Ticket numbers must be unique. Prototype."
@@ -74,7 +75,8 @@
         { "id": "scheduled-transition", "text": "Models the 15-minute expiry as a scheduled transition (a `schedule` with delayMs on an automated transition out of reserved), consulting `workflows` SCHEDULED TRANSITIONS itself and producing the transition, and does not describe a 'scheduled processor'", "type": "behavior" },
         { "id": "terminal-states", "text": "Names several precise terminal states (e.g. expired, cancelled, used) instead of deleting tickets", "type": "behavior" },
         { "id": "design-completes", "text": "Produces the full design summary in this session", "type": "format" },
-        { "id": "handoff-setup-then-build", "text": "Hands off with 'next, type `/cyoda:setup`' (to install and start cyoda-go), then `/cyoda:build`; does not say it will invoke them", "type": "behavior" }
+        { "id": "ends-with-summary", "text": "Ends with the design summary: prescribes no next step (no 'next, …', no suggestion to set up an instance or to run the build)", "type": "behavior" },
+        { "id": "no-typed-command", "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
