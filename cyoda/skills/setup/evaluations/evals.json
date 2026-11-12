@@ -376,6 +376,92 @@
         { "id": "not-profile-tag", "text": "Does not write '[profile: shop]' or '[profile: team-dev]', and does not present the machine-wide active profile team-dev as the instance in use", "type": "behavior" },
         { "id": "read-only", "text": "Does not edit the plugin config and does not run the tokenCommand", "type": "behavior" }
       ]
+    },
+    {
+      "id": 23,
+      "prompt": "Set up cyoda for this project.",
+      "expected_output": "REAL run (CYODA_PORT_BASE=31000, CYODA_LOCAL_DATA_ROOT=<outputs>/data, CYODA_DEFAULT_ENDPOINT=http://localhost:1, no profile). outputs/project is a git repo whose main checkout already has its own instance: projects[<real path of outputs/project>] = {run: binary, ports 31000/32010/32011, endpoint http://localhost:31000}, running. The working directory is the linked git worktree outputs/project/.worktrees/feat (branch feat); <root> is its real path (`git rev-parse --show-toplevel`). cyoda-status.sh run there prints STATUS=unreachable SOURCE=default (the main checkout's entry does not apply inside the worktree). Nothing in the worktree says how to run cyoda-go, so it asks once, exactly: 'Run cyoda-go for local development and testing from the command line or in Docker?'. The developer answers command line. It runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> --run binary`, which skips the main checkout's block and prints ENDPOINT=http://localhost:31100 HTTP=31100 GRPC=32110 ADMIN=32111 RUN=binary STATE=started, recording projects[<root>] (run binary, instance feat-<hash6>, ports 31100/32110/32111, endpoint http://localhost:31100). The main checkout's entry and instance are unchanged and still running. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:31100 [project: feat]'. Nothing is written into either checkout.",
+      "files": {
+        "README.md": "# orders\n\nOrder intake service built on cyoda-go.\n",
+        ".gitignore": ".worktrees/\n",
+        "_simulated/developer.md": "The developer is working in a git worktree of the project: the current directory for every command is outputs/project/.worktrees/feat (branch feat), not outputs/project. The `cyoda` binary is installed. The developer runs local tools straight from the shell rather than in containers. To anything else, a short yes."
+      },
+      "assertions": [
+        {
+          "id": "worktree-root",
+          "text": "Treats the worktree (the real path of outputs/project/.worktrees/feat) as the project: does not use or report the main checkout's instance on 31000 as this project's",
+          "type": "behavior"
+        },
+        {
+          "id": "run-question",
+          "text": "Asks exactly once, in these words: 'Run cyoda-go for local development and testing from the command line or in Docker?', and asks the developer nothing else",
+          "type": "format"
+        },
+        {
+          "id": "starts-binary",
+          "text": "Starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <worktree root> --run binary`, whose real output is ENDPOINT=http://localhost:31100 … RUN=binary STATE=started (a block other than the main checkout's 31000); starts no `cyoda` process by hand",
+          "type": "behavior"
+        },
+        {
+          "id": "entry-keyed-by-worktree",
+          "text": "Afterwards outputs/plugin-config.json has projects[<real path of the worktree>] with run `binary`, ports {http 31100, grpc 32110, admin 32111}, endpoint http://localhost:31100; the main checkout's entry is unchanged (31000) and its instance was not stopped or restarted",
+          "type": "behavior"
+        },
+        {
+          "id": "reports-project",
+          "text": "Re-runs cyoda-status.sh from the worktree and reports 'Connected to cyoda-go v0.8.4 — http://localhost:31100 [project: feat]'",
+          "type": "format"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "Set up cyoda for this project.",
+      "expected_output": "REAL run (CYODA_DEFAULT_ENDPOINT=http://localhost:1). The plugin config holds only the active profile `default`, written by an older plugin, pointing at the eval's running cyoda-go http://localhost:<P> (P = the eval server's HTTP port); no projects entry. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:<P> VERSION=0.8.4 … SOURCE=profile. That profile is the old machine-wide local default, not a binding for this project, and nothing in the repo says how to run cyoda-go, so it asks once, exactly: 'Use the cyoda-go already running on localhost:<P>, or start one for this project from the command line or in Docker?'. The developer picks the running one. It writes projects[<real path of outputs/project>] = {run: existing, endpoint: http://localhost:<P>} through cyoda-config-write.sh (values as --arg; no ports, dataDir or token), leaves profile `default` and `active` as they are, stops and starts nothing. It re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:<P> [project: project]'.",
+      "files": {
+        "README.md": "# orders\n\nOrder intake service built on cyoda-go.\n",
+        "cyoda-plugin-config.json": {
+          "active": "default",
+          "profiles": {
+            "default": {
+              "endpoint": "http://localhost:8080"
+            }
+          }
+        },
+        "_simulated/developer.md": "The developer set up cyoda-go on this machine months ago with an older version of the plugin and has worked against that instance since. Asked how to run cyoda-go, they want the one already running. To anything else, a short yes."
+      },
+      "assertions": [
+        {
+          "id": "offers-existing",
+          "text": "Asks exactly once, in these words with the profile's host and port: 'Use the cyoda-go already running on localhost:<P>, or start one for this project from the command line or in Docker?', and asks the developer nothing else; it does not simply go on with the `default` profile without asking",
+          "type": "format"
+        },
+        {
+          "id": "entry-existing",
+          "text": "Writes projects[<real path of outputs/project>] with run `existing` and endpoint http://localhost:<P> through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh (values as --arg); no ports, dataDir or token in it",
+          "type": "behavior"
+        },
+        {
+          "id": "profile-kept",
+          "text": "Profile `default` and `active` are unchanged in outputs/plugin-config.json; no new profile; the instance on <P> is not stopped, restarted or reconfigured",
+          "type": "behavior"
+        },
+        {
+          "id": "reports-project",
+          "text": "Re-runs cyoda-status.sh and reports 'Connected to cyoda-go v0.8.4 — http://localhost:<P> [project: project]'",
+          "type": "format"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
+          "type": "behavior"
+        }
+      ]
     }
   ]
 }
