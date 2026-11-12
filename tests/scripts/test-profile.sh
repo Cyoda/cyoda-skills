@@ -243,6 +243,27 @@ test_project_malformed_projects() {
   assert_contains "$err" "invalid projects entry in $T/p.json: /y needs an object with a string endpoint" "entry without endpoint: message"
 }
 
+test_project_worktree_is_its_own_project() {
+  # superpowers puts worktrees in .worktrees/<branch> inside the repo: the parent's entry must not match there.
+  local pd wt out; pd="$(real "$W/wtrepo")"
+  git -C "$pd" init -q && git -C "$pd" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$pd" worktree add -q "$pd/.worktrees/feat" -b feat 2>/dev/null
+  wt="$(cd "$pd/.worktrees/feat" && pwd -P)"; mkdir -p "$wt/src" "$pd/src"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://main"}}')"
+  out="$(prof "$pd/src")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["project","http://main"]' "in the repo: its entry"
+  out="$(prof "$wt/src")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint]')" '["profile","http://global"]' "in a worktree inside the repo: no project entry"
+  cfg "$(jq -n --arg k "$pd" --arg w "$wt" '{($k): {endpoint: "http://main"}, ($w): {endpoint: "http://wt"}}')"
+  out="$(prof "$wt/src")"
+  assert_eq "$(echo "$out" | jq -c '[.source, .endpoint, .projectDir]')" "[\"project\",\"http://wt\",\"$wt\"]" "the worktree's own entry"
+  # a nested git checkout (its .git a directory) is a boundary too
+  mkdir -p "$pd/vendor/lib/.git" "$pd/vendor/lib/src"
+  cfg "$(jq -n --arg k "$pd" '{($k): {endpoint: "http://main"}}')"
+  out="$(prof "$pd/vendor/lib/src")"
+  assert_eq "$(echo "$out" | jq -r .source)" profile "a nested checkout: no parent entry"
+}
+
 test_profile_default_when_no_config
 test_profile_existing_config_without_endpoint
 test_profile_no_active_key_falls_back_to_default
@@ -265,4 +286,5 @@ test_project_relative_keys_skipped
 test_project_foreign_dir_skipped
 test_project_newline_key_warned
 test_project_malformed_projects
+test_project_worktree_is_its_own_project
 report
