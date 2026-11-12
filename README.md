@@ -48,16 +48,16 @@ The plugin keeps its connections in `~/.config/cyoda/cyoda-plugin-config.json`: 
 
 The plugin's MAJOR.MINOR follows the cyoda-go release line it targets: plugin 0.8.x is written for cyoda-go 0.8.x, and its patch number counts the plugin's own revisions. `/cyoda:setup` warns when the instance (or, without one, the local `cyoda`) runs a different line.
 
+## Release notes — 0.9.0 (unreleased, needs cyoda-go 0.9.0)
+
+- Workflow best practices updated for cyoda-go 0.9.0: function conditions may nest (*Put the cheap test before the callout*), `idempotent: true` processors, scheduled-transition `timeoutMs` retries, `WORKFLOW_SKIP`.
+- Run `/plugin marketplace update cyoda` to pick up this release.
+
 ## Release notes — 0.8.1
 
 - Every skill can be used by the agent itself, not only typed; they compose with your own process (e.g. superpowers).
 - `/cyoda:app` and `/cyoda:status` are gone; `/cyoda:setup` covers status.
 - Local instances are per project, on automatic free ports.
-- Run `/plugin marketplace update cyoda` to pick up this release.
-
-## Release notes — 0.9.0 (unreleased, needs cyoda-go 0.9.0)
-
-- Workflow best practices updated for cyoda-go 0.9.0: function conditions may nest (*Put the cheap test before the callout*), `idempotent: true` processors, scheduled-transition `timeoutMs` retries, `WORKFLOW_SKIP`.
 - Run `/plugin marketplace update cyoda` to pick up this release.
 
 ## Release notes — 0.8.0
