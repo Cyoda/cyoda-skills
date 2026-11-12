@@ -219,6 +219,46 @@
         { "id": "no-tree-files", "text": "Writes into the project tree only the order v1 files and cyoda-manifest.json (the instance's data dir, pid file, log and config are outside outputs/project)", "type": "behavior" },
         { "id": "no-typed-command", "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "Add an Order entity with draft and submitted states.",
+      "expected_output": "SIMULATED instance. The working directory is /Users/dev/work/shop/.worktrees/order (outputs/project), a linked git worktree (branch order) of the repo whose main checkout /Users/dev/work/shop has its own projects entry and instance on localhost:8080; the worktree has no entry. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=default: the implicit default, which happens to answer because the main checkout's instance is there. Build does not go on with it: it carries out setup's Getting an instance itself (reads ${CLAUDE_PLUGIN_ROOT}/skills/setup/SKILL.md); nothing in the worktree says how to run cyoda-go, so it asks once, exactly: 'Use the cyoda-go already running on localhost:8080, or start one for this project from the command line or in Docker?'. The developer answers command line. It runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/shop/.worktrees/order --run binary`, which prints ENDPOINT=http://localhost:8180 HTTP=8180 GRPC=9190 ADMIN=9191 RUN=binary STATE=started. It re-runs cyoda-status.sh (connected, http://localhost:8180, [project: order]) and carries on with the build there: GET /model/ is [], it writes order-v1-sample.json, order-v1-workflow.json, order-v1-config.json in the TypeScript default dirs plus cyoda-manifest.json, registers in the canonical order on 8180 and reports order v1 registered. Nothing is sent to localhost:8080 except the status probe. No typed command.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"projects\":{\"/Users/dev/work/shop\":{\"run\":\"binary\",\"instance\":\"shop-3f9a1c\",\"dataDir\":\"/Users/dev/.local/share/cyoda/projects/shop-3f9a1c\",\"ports\":{\"http\":8080,\"grpc\":9090,\"admin\":9091},\"storage\":\"memory\",\"endpoint\":\"http://localhost:8080\"}}}",
+        "README.md": "# shop\n\nOrder service built on cyoda-go.\n",
+        "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
+        "tsconfig.json": "{\"compilerOptions\":{\"strict\":true}}",
+        "_simulated/instance.md": "The working directory is /Users/dev/work/shop/.worktrees/order (its files are outputs/project), a linked git worktree (branch order) of the repo whose main checkout is /Users/dev/work/shop; `git rev-parse --show-toplevel` and `pwd -P` both print /Users/dev/work/shop/.worktrees/order. There is no Compose file, Makefile or script that runs cyoda-go. `command -v cyoda` prints /opt/homebrew/bin/cyoda. Until the worktree has its own entry, cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=default, and cyoda-call.sh targets http://localhost:8080, the main checkout's instance: GET /model/ returns [{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}] and every POST/PUT returns 200. `cyoda-local.sh start /Users/dev/work/shop/.worktrees/order --run binary` (with or without `--storage memory`) prints ENDPOINT=http://localhost:8180 HTTP=8180 GRPC=9190 ADMIN=9191 RUN=binary STATE=started and records projects[\"/Users/dev/work/shop/.worktrees/order\"] = {run: binary, instance: order-7d2e04, ports 8180/9190/9191, storage memory, endpoint http://localhost:8180}. From then on cyoda-status.sh prints STATUS=connected PROFILE=order ENDPOINT=http://localhost:8180 VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=project PROJECT=/Users/dev/work/shop/.worktrees/order, and cyoda-call.sh targets http://localhost:8180: GET /model/ returns [] until the sample is imported, every POST/PUT returns 200, and after the lock GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}].",
+        "_simulated/developer.md": "The developer is working in a git worktree of the shop repo, branch order. The `cyoda` binary is installed. Asked how or where to run cyoda-go, the developer says \"command line\". Order has orderId, customer and amount, no unique keys and a strict schema (changeLevel none); no processor adds fields. Shown files or asked to go ahead, the developer says \"yes\"."
+      },
+      "assertions": [
+        {
+          "id": "not-on-default",
+          "text": "Registers nothing on the instance at localhost:8080: no POST or PUT through cyoda-call.sh while the status is SOURCE=default, and it does not treat the customer model there as this project's",
+          "type": "behavior"
+        },
+        {
+          "id": "setup-run-question",
+          "text": "Carries out setup's Getting an instance itself instead of going on with the implicit default, and asks exactly once, in these words: 'Use the cyoda-go already running on localhost:8080, or start one for this project from the command line or in Docker?'",
+          "type": "format"
+        },
+        {
+          "id": "starts-binary",
+          "text": "Starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start /Users/dev/work/shop/.worktrees/order --run binary` (no `--storage`, or `--storage memory`), whose simulated output is ENDPOINT=http://localhost:8180 … RUN=binary STATE=started; starts no `cyoda` process by hand, runs no docker, and records no `existing` entry for localhost:8080",
+          "type": "behavior"
+        },
+        {
+          "id": "registers-on-new",
+          "text": "Re-runs cyoda-status.sh (SOURCE=project, http://localhost:8180) and carries on with the build there without being asked: writes the order v1 sample, workflow and config files plus cyoda-manifest.json, and the sample import, lock and workflow import for order v1 go to the new instance in the canonical order; reports order v1 registered",
+          "type": "behavior"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
+          "type": "behavior"
+        }
+      ]
     }
   ]
 }

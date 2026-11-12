@@ -25,11 +25,11 @@ Request bodies are files (`--data-binary @<file>`) or a short inline literal (`-
 
 ## Step 0 — Connection
 
-Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. `STATUS=connected`: show any `WARN=` lines as they are and go on. Otherwise [get an instance](#no-instance-or-no-token).
+Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. `STATUS=connected` with `SOURCE=project`, with `SOURCE=profile` for a `PROFILE` other than `default` (the old machine-wide local default), or with `CYODA_PROFILE` set: show any `WARN=` lines as they are and go on. Otherwise, `SOURCE=default` included, [get an instance](#no-instance-or-no-token).
 
 ### No instance or no token
 
-- **Get an instance** (`STATUS` not `connected`, or exit 5): carry out `cyoda:setup`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/setup/SKILL.md` and follow its *Getting an instance* for this project. Then go on with the test.
+- **Get an instance** (Step 0 doesn't go on, or exit 5): carry out `cyoda:setup`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/setup/SKILL.md` and follow its *Getting an instance* for this project. Then go on with the test.
 - **Get a token** (401/403, or exit 4): carry out `cyoda:auth`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md` and follow it for the bound instance. Explain the error from help: read `cyoda-help.sh auth tokens --section ERRORS` (and `auth clients --section "REQUEST FLOW"` for a rejected client) and name the section next to the fact. Once a call succeeds, re-run the failed call and go on. While the token can't be had (credentials only the developer holds), run no test calls.
 
 ## Step 1 — Mode
