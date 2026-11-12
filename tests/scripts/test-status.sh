@@ -100,8 +100,16 @@ test_status_plugin_version_matches() {
   local out
   out="$(CYODA_PLUGIN_VERSION=0.8.7 CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
   if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "no plugin-version warning when MAJOR.MINOR match"; else _ok; fi
+  # The shipped plugin.json warns exactly when its MAJOR.MINOR differs from the running instance's.
   out="$(CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
-  if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "shipped plugin.json matches the 0.8 instance"; else _ok; fi
+  local pv iv
+  pv="$(jq -r .version "$ROOT/cyoda/.claude-plugin/plugin.json")"
+  iv="$(sed -n 's/.* VERSION=\([^ ]*\) .*/\1/p' <<<"$(head -n1 <<<"$out")")"
+  if [ "${pv%.*}" = "${iv%.*}" ]; then
+    if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "shipped plugin.json matches the instance: no warning"; else _ok; fi
+  else
+    assert_contains "$out" "targets cyoda-go ${pv%.*}" "shipped plugin.json differs from the instance: warning"
+  fi
   stop_server
 }
 
