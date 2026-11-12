@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "/cyoda:build — add an Order entity with draft and submitted states. Order has orderId, customer and amount.",
-      "expected_output": "Checks the connection with cyoda-status.sh, lists models with cyoda-call.sh GET /model/ (empty), reads cyoda help models LIFECYCLE/ENDPOINTS and workflows WORKFLOW SCHEMA, reads the schema version from cyoda-help.sh workflows schema-version versions at run time, asks for unique keys and the changeLevel, shows the three files for confirmation, writes order-v1-sample.json / order-v1-workflow.json / order-v1-config.json in the TypeScript default dirs plus cyoda-manifest.json at the project root, then registers in the canonical order (import sample, unique keys if any, lock, changeLevel if any, import workflow) through cyoda-call.sh, re-lists the models and ends with what it registered and wrote. No typed command.",
+      "expected_output": "Checks the connection with cyoda-status.sh, lists models with cyoda-call.sh GET /model/ (empty), reads cyoda help models LIFECYCLE/ENDPOINTS and workflows WORKFLOW SCHEMA, reads the schema version from cyoda-help.sh workflows schema-version versions at run time, asks for unique keys and the changeLevel, shows the three files and the calls, then writes order-v1-sample.json / order-v1-workflow.json / order-v1-config.json in the TypeScript default dirs plus cyoda-manifest.json at the project root, then registers in the canonical order (import sample, unique keys if any, lock, changeLevel if any, import workflow) through cyoda-call.sh, re-lists the models and ends with what it registered and wrote. No typed command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
@@ -19,7 +19,7 @@
         { "id": "asks-change-level", "text": "Asks which changeLevel the developer wants and records the answer (null here) in order-v1-config.json", "type": "behavior" },
         { "id": "writes-three-files", "text": "Writes order-v1-sample.json, order-v1-workflow.json and order-v1-config.json in the TypeScript default dirs (src/data/, src/workflows/, src/config/)", "type": "behavior" },
         { "id": "writes-manifest", "text": "Creates cyoda-manifest.json at the project root with manifestVersion 1 and an entry {name: order, modelVersion: 1, sample, workflow, config} whose paths are relative to the project root", "type": "behavior" },
-        { "id": "confirm-before-register", "text": "Shows the generated files and waits for the developer's yes before registering", "type": "behavior" },
+        { "id": "shows-before-register", "text": "Shows the generated files and the API calls before registering, then registers without waiting for a yes", "type": "behavior" },
         { "id": "no-discover-mode", "text": "Does not say the schema stays unlocked or in a 'discover mode'; the model is locked before the workflow import", "type": "behavior" },
         { "id": "no-typed-command", "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
@@ -44,14 +44,14 @@
         { "id": "best-practices", "text": "Applies the terminal-states best practice itself, having consulted design/resources/best-practices.md (or the help topic once #684-L ships)", "type": "behavior" },
         { "id": "same-version", "text": "Keeps model version 1: a workflow-only change needs no new model version, no unlock and no sample re-import, even though entities exist", "type": "behavior" },
         { "id": "edits-file-in-place", "text": "Updates src/workflows/order-v1-workflow.json and leaves the manifest entry for order v1 unchanged", "type": "behavior" },
-        { "id": "reimports-workflow", "text": "Re-imports the workflow with cyoda-call.sh POST /model/order/1/workflow/import after confirmation, with the schema version substituted from `workflows schema-version versions`", "type": "behavior" },
+        { "id": "reimports-workflow", "text": "Re-imports the workflow with cyoda-call.sh POST /model/order/1/workflow/import after showing the changed workflow, with the schema version substituted from `workflows schema-version versions`", "type": "behavior" },
         { "id": "no-typed-command", "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },
     {
       "id": 3,
       "prompt": "/cyoda:build — Order now needs a discountCode field",
-      "expected_output": "Sees order v1 LOCKED, checks the entity count with GET /entity/stats/order/1 (12 entities), reads cyoda help models LIFECYCLE, explains that a locked model with entities cannot be unlocked (MODEL_HAS_ENTITIES), proposes model version 2, writes order-v2-* files alongside the untouched v1 files, adds an order v2 manifest entry next to v1, and registers v2 in the canonical order.",
+      "expected_output": "Sees order v1 LOCKED, checks the entity count with GET /entity/stats/order/1 (12 entities), reads cyoda help models LIFECYCLE, explains that a locked model with entities cannot be unlocked (MODEL_HAS_ENTITIES), states that it registers model version 2, writes order-v2-* files alongside the untouched v1 files, adds an order v2 manifest entry next to v1, and registers v2 in the canonical order.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "package.json": "{\"name\":\"shop\"}",
@@ -65,7 +65,7 @@
       "assertions": [
         { "id": "consults-help", "text": "Names `cyoda-help.sh models --section LIFECYCLE` (or `errors MODEL_HAS_ENTITIES`) as the source for why the locked model cannot change in place", "type": "behavior" },
         { "id": "checks-entities", "text": "Checks whether order v1 has entities (GET /entity/stats/order/1, or a MODEL_HAS_ENTITIES response) before deciding", "type": "behavior" },
-        { "id": "proposes-new-version", "text": "Proposes model version 2 because v1 has entities, and does not re-import the sample into the locked v1", "type": "behavior" },
+        { "id": "proposes-new-version", "text": "Goes to model version 2 because v1 has entities, says so in a line without waiting for a yes, and does not re-import the sample into the locked v1", "type": "behavior" },
         { "id": "v1-untouched", "text": "Writes order-v2-sample.json, order-v2-workflow.json and order-v2-config.json and leaves the v1 files unchanged", "type": "behavior" },
         { "id": "manifest-adds-v2", "text": "Adds an {name: order, modelVersion: 2, ...} entry to cyoda-manifest.json and keeps the v1 entry", "type": "behavior" },
         { "id": "canonical-order-v2", "text": "Registers v2 as import sample, lock, (changeLevel), workflow import, all on /model/.../order/2", "type": "behavior" },
@@ -95,7 +95,7 @@
     {
       "id": 5,
       "prompt": "/cyoda:build — register this workflow for Ticket v1; I exported it from my other instance (file: ticket-export.json). Sample and lock are already done.",
-      "expected_output": "Before posting, consults `cyoda-help.sh workflows --section \"IMPORT REQUEST\"`, explains that the import is strictly decoded and an export cannot be re-posted verbatim (#684-I), reshapes the body to {importMode, workflows}, shows the exact body and calls, and imports to /model/ticket/1/workflow/import only after confirmation. If a 400 BAD_REQUEST ('unknown field \"entityName\"') does occur, it reads `cyoda-help.sh errors BAD_REQUEST` / IMPORT REQUEST and fixes the body instead of trying other URLs.",
+      "expected_output": "Before posting, consults `cyoda-help.sh workflows --section \"IMPORT REQUEST\"`, explains that the import is strictly decoded and an export cannot be re-posted verbatim (#684-I), reshapes the body to {importMode, workflows}, shows the exact body and calls, and imports to /model/ticket/1/workflow/import after showing it. If a 400 BAD_REQUEST ('unknown field \"entityName\"') does occur, it reads `cyoda-help.sh errors BAD_REQUEST` / IMPORT REQUEST and fixes the body instead of trying other URLs.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "ticket-export.json": "{\"entityName\":\"ticket\",\"modelVersion\":1,\"workflows\":[{\"version\":\"1.4\",\"name\":\"ticket\",\"initialState\":\"open\",\"active\":true,\"states\":{\"open\":{\"transitions\":[{\"name\":\"close\",\"next\":\"closed\",\"manual\":true}]},\"closed\":{}}}]}",
@@ -105,7 +105,7 @@
         { "id": "consults-help", "text": "Either before posting, consults `cyoda-help.sh workflows --section \"IMPORT REQUEST\"` and reshapes to {importMode, workflows}; or, if a 400 occurs, reads `cyoda-help.sh errors <CODE>` / IMPORT REQUEST and fixes the body instead of trying other URLs. Names the help consulted rather than explaining from memory", "type": "behavior" },
         { "id": "no-path-guessing", "text": "Does not retry with a different or guessed URL; the retry goes to the same /model/ticket/1/workflow/import path", "type": "behavior" },
         { "id": "explains-strict-import", "text": "Explains that the export shape {entityName, modelVersion, workflows} is rejected by the strict import and cites #684-I", "type": "behavior" },
-        { "id": "reshapes", "text": "Reshapes to {importMode, workflows} (e.g. with jq) and shows the corrected body for confirmation before re-importing", "type": "behavior" },
+        { "id": "reshapes", "text": "Reshapes to {importMode, workflows} (e.g. with jq) and shows the corrected body before re-importing", "type": "behavior" },
         { "id": "saves-project-file", "text": "Saves the corrected workflow as a project file ticket-v1-workflow.json (with the other files and the manifest entry, or offers to)", "type": "behavior" },
         { "id": "no-typed-command", "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
@@ -113,7 +113,7 @@
     {
       "id": 6,
       "prompt": "/cyoda:build — RiskAssessment needs an `approved` state reached when a function criterion on our scoring node passes; if the node keeps timing out, does the transition fail or retry?",
-      "expected_output": "Lists models (riskassessment v1 LOCKED) and reads the project's riskassessment-v1-workflow.json. Reads `workflows` CRITERIA and PROCESSORS itself (and the function condition shape in `search`, or `errors DISPATCH_TIMEOUT`). Says what help states, naming the sections (a `function` criterion is dispatched to a compute member and must be the whole criterion; its `responseTimeoutMs` defaults to 30000; a dispatch that times out is DISPATCH_TIMEOUT, a retryable 503; the cyoda-go dispatcher is single-shot, so the engine does not retry) and that help doesn't settle how a timed-out criterion on an automated transition plays out, then asks whether to spike it on a throwaway cyoda-go (in-memory with mock auth, or the stack in Docker). The developer says no, so it starts nothing and carries on from help: adds `approved` and an automated submitted → approved transition whose criterion is the whole `function` criterion (name risk-score-passes, calculationNodesTags scoring), edits riskassessment-v1-workflow.json in place (same model version, no sample re-import), shows it, and after the developer's yes re-imports the workflow via cyoda-call.sh POST /model/riskassessment/1/workflow/import, then reports the result. No typed command.",
+      "expected_output": "Lists models (riskassessment v1 LOCKED) and reads the project's riskassessment-v1-workflow.json. Reads `workflows` CRITERIA and PROCESSORS itself (and the function condition shape in `search`, or `errors DISPATCH_TIMEOUT`). Says what help states, naming the sections (a `function` criterion is dispatched to a compute member and must be the whole criterion; its `responseTimeoutMs` defaults to 30000; a dispatch that times out is DISPATCH_TIMEOUT, a retryable 503; the cyoda-go dispatcher is single-shot, so the engine does not retry) and that help doesn't settle how a timed-out criterion on an automated transition plays out, then asks whether to spike it on a throwaway cyoda-go (in-memory with mock auth, or the stack in Docker). The developer says no, so it starts nothing and carries on from help: adds `approved` and an automated submitted → approved transition whose criterion is the whole `function` criterion (name risk-score-passes, calculationNodesTags scoring), edits riskassessment-v1-workflow.json in place (same model version, no sample re-import), shows it, and re-imports the workflow via cyoda-call.sh POST /model/riskassessment/1/workflow/import, then reports the result. No typed command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "package.json": "{\"name\":\"risk\"}",
@@ -132,7 +132,7 @@
         { "id": "names-open-question", "text": "Names what help leaves open (e.g. whether the triggering write fails or the transition counts as not matched, leaving the entity in `submitted`) instead of presenting it as settled; an inference marked as such is fine", "type": "behavior" },
         { "id": "function-criterion", "text": "Proceeds with the increment: adds `approved` and an automated (`manual: false`) submitted → approved transition whose criterion is the whole `function` criterion (`type: function`, `function.name` risk-score-passes, `function.config.calculationNodesTags` scoring), not nested in a `group`", "type": "behavior" },
         { "id": "same-version", "text": "Edits src/workflows/riskassessment-v1-workflow.json in place and keeps model version 1: no new model version, no unlock, no sample re-import; the manifest entry is unchanged", "type": "behavior" },
-        { "id": "reimports-workflow", "text": "After the developer's yes, re-imports with cyoda-call.sh POST /model/riskassessment/1/workflow/import with the schema version substituted from `workflows schema-version versions`, and the real response in the transcript is a success", "type": "behavior" },
+        { "id": "reimports-workflow", "text": "After showing the changed workflow, re-imports with cyoda-call.sh POST /model/riskassessment/1/workflow/import with the schema version substituted from `workflows schema-version versions`, and the real response in the transcript is a success", "type": "behavior" },
         { "id": "no-typed-command", "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },

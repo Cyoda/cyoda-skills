@@ -6,7 +6,7 @@ allowed-tools: Bash(*cyoda-help.sh *) Read Bash(cyoda *) Bash(docker *) Bash(kil
 
 # Cyoda application design
 
-Turn an app idea into entities and workflows, review them against the Cyoda best practices, and hand a summary to `/cyoda:build`. This skill writes no project files and calls no project instance.
+Turn an app idea into entities and workflows, review them against the Cyoda best practices, and end with a design summary. This skill writes no project files and calls no project instance.
 
 **Facts come from `cyoda help`, not from this file or from memory.** Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> [--section "<NAME>"]`. It prints the topic or section body, and stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2 means unknown topic; exit 6 means unknown section (stderr lists the sections that exist). With no binary installed it falls back to the web help mirror by itself. The mirror ignores `--section` and prints the whole page, so find the section by its heading there. If a topic you know exists still exits 2 (offline), carry on with the design and tell the developer which facts you couldn't check.
 
@@ -124,13 +124,7 @@ Review: <each checklist line changed, one line each; the rest ok or n/a>
 First increment: <Entity> with <minimal workflow>
 ```
 
-Ask: *"Does this match what you want? (yes, or tell me what to change)"*
-
-Then hand off:
-- If `cyoda-help.sh` reported `SOURCE=instance`: "Next, type `/cyoda:build` to turn the first increment into project files and register it on your instance."
-- `SOURCE=binary`: "Next, type `/cyoda:setup` to start cyoda-go locally, then `/cyoda:build` to register the first increment."
-- `SOURCE=web`: "Next, type `/cyoda:setup` to install and start cyoda-go, then `/cyoda:build` to register the first increment."
-- If the developer already has an instance running, `/cyoda:build` alone.
+The summary is the end of the reply.
 
 ## Common mistakes
 

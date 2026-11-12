@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks that Cloud is removed from the dev plugin and side-effect flags are enforced.
+# Checks that Cloud is removed from the dev plugin and every skill is agent-loadable.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
@@ -12,17 +12,11 @@ test_no_migrate_skill() {
 }
 
 test_flags() {
-  local s f
-  for s in app build test deploy auth; do
-    f="$ROOT/cyoda/skills/$s/SKILL.md"
-    if [ ! -f "$f" ]; then
-      [ "$s" = deploy ] && continue
-      _bad "$s: SKILL.md missing"; continue
-    fi
-    has_flag "$f"; assert_status 0 $? "$s has disable-model-invocation"
-  done
-  for s in setup docs design compute debug; do
-    f="$ROOT/cyoda/skills/$s/SKILL.md"
+  local s f names=""
+  for f in "$ROOT"/cyoda/skills/*/; do names="$names $(basename "$f")"; done
+  assert_eq "$names" " auth build compute debug deploy design docs setup test" "skill set"
+  for f in "$ROOT"/cyoda/skills/*/SKILL.md; do
+    s="$(basename "$(dirname "$f")")"
     has_flag "$f"; assert_status 1 $? "$s has no disable-model-invocation"
   done
 }

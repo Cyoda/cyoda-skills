@@ -1,7 +1,7 @@
 ---
 name: debug
 description: Use when a cyoda-go call returns an error code, a transition doesn't fire or fails, an entity is stuck or in an unexpected state or has disappeared, a processor, criterion or compute node fails or times out, the instance seems unreachable, or the developer asks for an entity's history, audit trail or state at a past time.
-allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
+allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-config-write.sh *) Bash(*get-token.sh*) Bash(ls *) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(mkdir *) Bash(find *) Bash(grep *)
 ---
 
 # Cyoda debugging and observation
@@ -15,21 +15,21 @@ Two modes: **debugging** (something failed or looks wrong) and **observation** (
 | Exit | Meaning | What you do |
 |---|---|---|
 | 0 | 2xx | continue |
-| 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr, stop, and say "next, type `/cyoda:setup`" |
-| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error and say "next, type `/cyoda:auth`". Otherwise the error is evidence: read it (Path A) |
-| 4 | the profile's tokenCommand failed | show stderr and say "next, type `/cyoda:auth`" |
-| 5 | no endpoint configured | "next, type `/cyoda:setup`" |
+| 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr and stop; the plugin config is covered by `cyoda:setup` |
+| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error and carry out `cyoda:auth`'s procedure yourself (read `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md`); once a call succeeds, re-run the failed call and go on. Otherwise the error is evidence: read it (Path A) |
+| 4 | the profile's tokenCommand failed | show stderr and carry out `cyoda:auth`'s procedure, as for a 401 |
+| 5 | no endpoint configured | say so; starting or linking an instance is covered by `cyoda:setup` |
 | 64 | usage error (a leading `-` or a missing method/path) | fix the call form |
 
-Diagnose with GETs and query POSTs, then repair:
-- A model or workflow change (new state, criterion, transition, changeLevel, new model version): "Next, type `/cyoda:build` to make this change: <one line>."
+**Repair.** Diagnose with GETs and query POSTs, then repair:
+- A model or workflow change (new state, criterion, transition, changeLevel, new model version): state it in one line. When the request asks for the change, carry out `cyoda:build`'s procedure yourself (read `${CLAUDE_PLUGIN_ROOT}/skills/build/SKILL.md`); otherwise name `cyoda:build` as where it is made.
 - A change to one entity (a loopback to re-evaluate, firing a transition): send it through `cyoda-call.sh`, then show the exact call you made and its response.
 
 ## Step 0 — Connection
 
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and every `WARN=` line.
-- `STATUS=not_configured`: "next, type `/cyoda:setup`". Stop.
-- `STATUS=unreachable`: the endpoint didn't answer. Read `run --section "HEALTH PROBES"`: the API port serves `GET /api/health` (`{"status":"UP"}`, or 503 `DOWN` after a recovered panic, latched until the node is replaced); `/livez` and `/readyz` are only on the admin listener (`127.0.0.1:9091` by default), and `cyoda health` checks the local one. Ask whether the server is running and the profile's endpoint is right; switching profiles is "next, type `/cyoda:setup`".
+- `STATUS=not_configured`: say no instance is configured; starting or linking one is covered by `cyoda:setup`. Stop.
+- `STATUS=unreachable`: the endpoint didn't answer. Read `run --section "HEALTH PROBES"`: the API port serves `GET /api/health` (`{"status":"UP"}`, or 503 `DOWN` after a recovered panic, latched until the node is replaced); `/livez` and `/readyz` are only on the admin listener (`127.0.0.1:9091` by default), and `cyoda health` checks the local one. Ask whether the server is running and the profile's endpoint is right; switching profiles or starting an instance is covered by `cyoda:setup`.
 
 ## Debugging
 
@@ -62,13 +62,13 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
 5. Evaluate the criterion against the entity's data yourself (`workflows --section CRITERIA`, `search --section "CONDITION DSL"`) and say which field fails.
 6. Two common causes, from the best practices (`cyoda-help.sh workflows best-practices`, else `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md`):
    - **The data was fixed, but the held transition never ran again.** Automated transitions are evaluated only when the entity is written. Best practice *Re-trigger evaluation with a loopback, not by firing an automated transition*: `PATCH /entity/JSON/{id}` with `{}` (or the corrected fields), `-H 'Content-Type: application/merge-patch+json' -H 'If-Match: *'`. Smoke-tested example: [../build/examples/loopback/](../build/examples/loopback/) (scenario `02-loopback`).
-   - **A cycle hit the per-state visit limit** (`workflows --section "ENGINE EXECUTION"`). The fix is a workflow change: "next, type `/cyoda:build`".
+   - **A cycle hit the per-state visit limit** (`workflows --section "ENGINE EXECUTION"`). The fix is a workflow change (see Repair above).
 7. When help doesn't settle how the engine features involved combine (e.g. a cascade through several automated transitions), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
 
 ### Path C — a processor, function criterion or compute node
 
 1. Read `grpc --section "TAG ROUTING"` for routing. A processor reaches a member whose tags **overlap** its `calculationNodesTags` (one shared tag is enough); several matches are picked at random; empty tags match any member of the tenant. `workflows` PROCESSORS says "all required tags"; that's wrong (#684-B). Tags are matched as exact, case-sensitive strings.
-2. Timeout: `DISPATCH_TIMEOUT` means no answer within `responseTimeoutMs`. Unset or `0` is the server default of 30 s, not a node default (#684-J). For slow work: raise `responseTimeoutMs` and consider `executionMode: COMMIT_BEFORE_DISPATCH`, whose processor must be idempotent (`workflows --section PROCESSORS`). Changing either is a workflow change: "next, type `/cyoda:build`".
+2. Timeout: `DISPATCH_TIMEOUT` means no answer within `responseTimeoutMs`. Unset or `0` is the server default of 30 s, not a node default (#684-J). For slow work: raise `responseTimeoutMs` and consider `executionMode: COMMIT_BEFORE_DISPATCH`, whose processor must be idempotent (`workflows --section PROCESSORS`). Changing either is a workflow change (see Repair above).
 3. Eviction: read `grpc --section KEEPALIVE` and `cyoda help config grpc` for `CYODA_KEEPALIVE_INTERVAL` / `CYODA_KEEPALIVE_TIMEOUT` (defaults 10 s / 30 s). A member that stops reading or answering for the timeout is evicted, and its in-flight calls fail with `COMPUTE_MEMBER_DISCONNECTED`.
 4. Join failures (`grpc --section ERRORS`): `PermissionDenied` means the token lacks `ROLE_M2M` or the tenant doesn't match `joinedLegalEntityId`.
 5. There is no endpoint that lists connected members. The evidence is the 503 code, the server log (raise it with `CYODA_LOG_LEVEL=debug`, or `POST /admin/log-level` from `admin --section ENDPOINTS`), and `cyoda_dispatch_*` metrics on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
@@ -79,9 +79,9 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
 ### Path D — schema and model lifecycle
 
 Read `models --section LIFECYCLE` and `models --section ERRORS`.
-- Entities need a LOCKED model, and the workflow must be imported before the first entity. Finishing that is "next, type `/cyoda:build`".
+- Entities need a LOCKED model, and the workflow must be imported before the first entity. Finishing that is `cyoda:build`'s registration (canonical order).
 - Dry-run a payload with `POST /model/validate/{e}/{v}` (`models --section ENDPOINTS`). It answers 200 either way: `.success` is the verdict and `.message` names each rejected field.
-- A new field on a locked model needs a `changeLevel` that allows it. A locked model takes no new sample import (`MODEL_ALREADY_LOCKED`) and can't be unlocked while it has entities (`MODEL_HAS_ENTITIES`): a bigger schema change is a new model version, via `/cyoda:build`.
+- A new field on a locked model needs a `changeLevel` that allows it. A locked model takes no new sample import (`MODEL_ALREADY_LOCKED`) and can't be unlocked while it has entities (`MODEL_HAS_ENTITIES`): a bigger schema change is a new model version (`cyoda:build`).
 
 ### Path E — entities in an Errored state
 

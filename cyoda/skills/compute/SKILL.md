@@ -23,7 +23,7 @@ Many workflows need none. Read `workflows --section CRITERIA` and `workflows --s
 | Calling another system, computing and writing data | - | Processor |
 | Moving a linked entity when this one changes | - | Processor that fires the linked entity's transition |
 
-If none apply, say so and stop. Wiring a processor or criterion into the workflow is a workflow change: "next, type `/cyoda:build` to add it".
+If none apply, say so and stop. Wiring a processor or criterion into the workflow is a workflow change, covered by `cyoda:build`.
 
 ## Step 1 — Get the contract
 
@@ -89,7 +89,7 @@ A processor may read or write other entities over REST (`CYODA_COMPUTE_HTTP_BASE
 - **Joining the transaction.** Each dispatched request carries a signed token in the CloudEvent extension `cyodatxtoken`. Echo it as the `X-Tx-Token` HTTP header or `tx-token` gRPC metadata, and the callback runs inside the originating transaction: it sees the cascade's uncommitted writes and commits or rolls back with it (`cluster --section "COMPUTE CALLBACK TRANSACTION ROUTING"`). Without the echo, the callback is a standalone transaction. Which modes supply a usable transaction is in `workflows` PROCESSORS (`startNewTxOnDispatch`).
 - **Don't write the entity you're processing**; return its changes (best practice *Let the engine save the anchor*; `workflows` PROCESSORS).
 - **Moving a linked entity (event cascade).** Keep the linked entity's id in this entity's data. The processor fires a transition on it: `PATCH <http-base>/api/entity/JSON/{linkedId}/{transition}` with `Content-Type: application/merge-patch+json`, `If-Match: *` and body `{}` (`crud --section ENDPOINTS`). Mark that transition `manual: true` in the linked workflow. With the tx-token the two moves commit together; without it they commit separately. Best practice *Use manual transitions for external triggers*.
-- **Worked cascade:** [examples/cascade/](examples/cascade/) holds the workflow side only. An `order`'s manual `confirm` carries the function criterion `has-address` and the processor `create-shipment`, tagged `smoke-compute`. The processor creates a `shipment` linked by `$.orderId`, stores its id in `$.shipmentId` and fires the shipment's manual `dispatch`. The files keep `"version": "${SCHEMA_VERSION}"`; importing them is a workflow change: "next, type `/cyoda:build`". No node code is included; write it in the developer's language from Steps 1–7. The order sample declares `shipmentId`, so the processor's returned data passes the locked (strict) model.
+- **Worked cascade:** [examples/cascade/](examples/cascade/) holds the workflow side only. An `order`'s manual `confirm` carries the function criterion `has-address` and the processor `create-shipment`, tagged `smoke-compute`. The processor creates a `shipment` linked by `$.orderId`, stores its id in `$.shipmentId` and fires the shipment's manual `dispatch`. The files keep `"version": "${SCHEMA_VERSION}"`; importing them is a workflow change (`cyoda:build`). No node code is included; write it in the developer's language from Steps 1–7. The order sample declares `shipmentId`, so the processor's returned data passes the locked (strict) model.
 
 ## Node checklist
 

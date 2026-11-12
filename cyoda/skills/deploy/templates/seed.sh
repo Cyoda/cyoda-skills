@@ -6,7 +6,7 @@
 #
 # Usage: seed.sh --manifest <path/to/cyoda-manifest.json> --env <name>
 #
-# Source: the files `/cyoda:build` keeps, listed in cyoda-manifest.json (paths
+# Source: the files `cyoda:build` keeps, listed in cyoda-manifest.json (paths
 # relative to the manifest's directory). First, with no write to the instance,
 # every entity's files are checked, its changeLevel is validated and its
 # workflow import body is built. Then per entity, in canonical order

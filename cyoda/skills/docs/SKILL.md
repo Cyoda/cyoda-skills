@@ -22,7 +22,7 @@ stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2: unknown topic
 
 ## SOURCE=web
 
-The first time, run `command -v cyoda`. It finds nothing: say "`cyoda` isn't installed, so this is from the web help mirror (v`<VERSION>`). Next, type `/cyoda:setup` to install cyoda-go locally." It finds `cyoda`: say only that the answer is from the web help mirror (v`<VERSION>`). Then answer from the mirror, which differs from the binary:
+The first time, run `command -v cyoda`. It finds nothing: say "`cyoda` isn't installed, so this is from the web help mirror (v`<VERSION>`)." It finds `cyoda`: say only that the answer is from the web help mirror (v`<VERSION>`). Then answer from the mirror, which differs from the binary:
 
 - It returns the whole page and ignores `--section`: find the section by its heading.
 - It serves no actions (exit 2): `cloudevents json`, `grpc proto`, `openapi …`, `workflows schema-version versions`.

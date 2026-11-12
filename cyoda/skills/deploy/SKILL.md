@@ -1,8 +1,7 @@
 ---
 name: deploy
-description: Use when the developer types /cyoda:deploy to move a working local cyoda-go app to a self-hosted cyoda-go instance (Docker Compose, Helm on Kubernetes, Terraform), or needs a seed script, verify script, compose file or secrets checklist for one.
+description: Use when a working local cyoda-go app is to be deployed to a self-hosted cyoda-go instance (Docker Compose, Helm on Kubernetes, Terraform; dev, staging or prod stages), or a seed script, verify script, compose file, Helm values or secrets checklist for one is needed.
 allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-help.sh *) Bash(*cyoda-call.sh GET *) Bash(jq *) Bash(find *) Bash(ls *) Bash(mkdir *) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(cat *) Bash(mv *) Bash(grep *)
-disable-model-invocation: true
 ---
 
 # Cyoda deploy (self-hosted cyoda-go)
@@ -18,18 +17,18 @@ Writes the files that deploy and seed a cyoda-go instance into the developer's p
 ## Step 0 — Connection
 
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show every `WARN=` line.
-- `STATUS=not_configured` or `unreachable`: "Deploy starts from a working app on a running cyoda-go. Next, type `/cyoda:setup` to connect to it." Stop.
+- `STATUS=not_configured` or `unreachable`: "Deploy starts from a working app on a running cyoda-go; starting or linking it is covered by `cyoda:setup`." Stop.
 - Note `VERSION`: the image tag must match it.
 
 Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh GET /model/` (help: `models --section ENDPOINTS`) and show each model's name, version and `currentState`. This skill makes no other API call.
 
 ## Step 1 — Project files
 
-The seed loads the files `/cyoda:build` keeps, never live exports: model import accepts only sample data, so a model export can't be re-imported.
+The seed loads the files `cyoda:build` keeps, never live exports: model import accepts only sample data, so a model export can't be re-imported.
 
 1. Read `cyoda-manifest.json` at the project root. Check that every `sample`, `workflow` and `config` path it lists exists (paths are relative to the manifest's dir).
 2. **No manifest:** find `{entity}-v{version}-{sample,workflow,config}.json` files (`build`'s naming) and ask whether to write `cyoda-manifest.json` from them: `{"manifestVersion":1,"entities":[{name, modelVersion, sample, workflow, config}, ...]}` (schema: `${CLAUDE_PLUGIN_ROOT}/skills/build/templates/cyoda-manifest.json`; `modelVersion` is an integer).
-3. **Nothing found:** "Deploy seeds the new instance from the versioned model and workflow files that `/cyoda:build` writes, and this project has none. Next, type `/cyoda:build`: it creates them, or exports the models already on your instance." Stop.
+3. **Nothing found:** "Deploy seeds the new instance from the versioned model and workflow files that `cyoda:build` writes (it creates them, or exports the models already on the instance), and this project has none." Stop.
 4. A manifest entity that isn't LOCKED on the local instance hasn't been registered and tested yet: name it and ask whether to continue.
 
 ## Step 2 — Target
@@ -159,7 +158,7 @@ kill "$PF_ADMIN" ${PF_API:+"$PF_API"}
 Upgrades: `helm upgrade cyoda cyoda/cyoda --version <new chart> -f <DIR>/values.yaml -n <NAMESPACE>` reruns the migration Job first (help: `helm --section "INSTALL / UPGRADE / UNINSTALL"`).
 
 Then, briefly:
-- Seeding again after a workflow change re-imports the workflows. A sample or unique-key change on a LOCKED model needs a new model version from `/cyoda:build`: the seed skips locked models.
+- Seeding again after a workflow change re-imports the workflows. A sample or unique-key change on a LOCKED model needs a new model version (`cyoda:build`): the seed skips locked models.
 - Compute nodes: `CYODA_COMPUTE_GRPC_ENDPOINT` and the token source are in the checklist (help: `config grpc --section OPTIONS`). Processors are only exercised once a compute node runs against the new instance.
 
 ## Known upstream issues

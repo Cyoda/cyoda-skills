@@ -1,7 +1,7 @@
 ---
 name: setup
 description: Use when a cyoda-go instance is needed or asked about — starting or finding one for this project, whether Cyoda is connected, which instance, project binding, profile or version is active, why the connection fails, connecting to a self-hosted cyoda-go, or linking or unlinking a project.
-allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-local.sh *) Bash(*cyoda-ports.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*cyoda-config-write.sh *) Bash(*cyoda-help.sh *) Bash(cyoda *) Bash(brew *) Bash(docker compose *) Bash(curl *) Bash(jq *) Bash(command -v *) Bash(git rev-parse *) Bash(pwd *)
+allowed-tools: Bash(*cyoda-status.sh*) Bash(*cyoda-local.sh *) Bash(*cyoda-ports.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*cyoda-config-write.sh *) Bash(*cyoda-help.sh *) Bash(cyoda *) Bash(brew *) Bash(docker compose *) Bash(curl *) Bash(jq *) Bash(command -v *) Bash(git rev-parse *) Bash(pwd *) Bash(cd * && pwd -P) Bash(sh)
 ---
 
 # Cyoda setup
@@ -56,9 +56,11 @@ Then [Finish](#finish). A `WARN=` from the first status run that this procedure 
 
 | Exit | Then |
 |---|---|
+| 1 | invalid plugin config: show stderr, stop |
 | 3 | no free port block: show stderr, stop |
 | 4 | did not become healthy (it cleaned up): show stderr, stop |
 | 5 | `cyoda` missing → [install](#install) and run it again; `docker` or `lsof` missing → show stderr, stop |
+| 64 | usage error (a missing or wrong argument, no such directory): fix the call |
 
 - A busy port belongs to someone else: the script takes the next block. Never stop, kill or reconfigure a process or container to free a port.
 - `start-repo` whose `HTTP` differs from the host port the repo's file publishes: say in one line that those ports were taken, so the stack runs on `<HTTP>`/`<GRPC>`/`<ADMIN>` through an override file in the project's data dir and the repo's files are unchanged.
@@ -127,13 +129,3 @@ Every change goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh '
 ## Finish
 
 Run `cyoda-status.sh` again and report as in [Status](#status). After `cyoda-local.sh` started or reused the instance: mock auth, no token needed. After connect while `SOURCE=project`: "This project is bound to `<ENDPOINT>` (its `projects` entry), which takes precedence here; the profile applies in other directories."
-
-## Common mistakes
-
-| Mistake | Fix |
-|---|---|
-| `docker compose up`, `docker run` or `cyoda` started by hand | `cyoda-local.sh start` / `start-repo` |
-| Killing whatever holds 8080 | The script picks the next free block |
-| A file written into the repo (`.cyoda/`, a compose override, `.gitignore`) | Everything lives in the plugin config and the project's data dir |
-| A second entry for a re-linked project | Reuse the `PROJECT` key |
-| `brew tap cyoda-platform/...` or another formula name | Exactly `brew install cyoda/cyoda-go/cyoda` |
