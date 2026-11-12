@@ -250,6 +250,137 @@ YAML
   docker compose -p extrepo -f "$d/compose.yaml" down >/dev/null 2>&1
 }
 
+# PATH with every dir holding `cyoda` replaced by a mirror without it
+nocyoda_path() {
+  local out="" i=0 d m f dirs
+  IFS=: read -r -a dirs <<<"$PATH"
+  for d in "${dirs[@]}"; do
+    if [ -n "$d" ] && [ -e "$d/cyoda" ]; then
+      i=$((i + 1)); m="$T/nocyoda-$i"; rm -rf "$m"; mkdir -p "$m"
+      for f in "$d"/*; do [ "$(basename "$f")" = cyoda ] || ln -s "$f" "$m/"; done
+      d="$m"
+    fi
+    out="${out:+$out:}$d"
+  done
+  printf '%s\n' "$out"
+}
+
+test_local_missing_cyoda_keeps_entry() {
+  local d rc before np; d="$(mkproj nocyoda)"; np="$(nocyoda_path)"
+  printf '%s\n' "{\"projects\":{\"$d\":{\"endpoint\":\"http://localhost:1\",\"tokenCommand\":\"x\"}}}" >"$CYODA_PLUGIN_CONFIG"
+  before="$(jq -c . "$CYODA_PLUGIN_CONFIG")"
+  PATH="$np" bash "$LOCAL" start "$d" --run binary >/dev/null 2>&1; rc=$?
+  assert_status 5 "$rc" "cyoda missing: exit 5"
+  assert_eq "$(jq -c . "$CYODA_PLUGIN_CONFIG")" "$before" "cyoda missing: entry untouched"
+  rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
+test_local_health_needs_launched_listener() {
+  # a launched process whose child answers /api/health is not a healthy instance
+  local d rc dd; d="$(mkproj imposter)"; rm -f "$CYODA_PLUGIN_CONFIG"
+  mkdir -p "$T/imposter"
+  cat >"$T/imposter/cyoda" <<'SH'
+#!/bin/sh
+mkdir -p "$HOME/srv/api"; echo '{"status":"UP"}' >"$HOME/srv/api/health"
+python3 -m http.server --bind 127.0.0.1 --directory "$HOME/srv" "$CYODA_HTTP_PORT" >/dev/null 2>&1 &
+echo $! >"$HOME/child.pid"
+exec sleep 300
+SH
+  chmod +x "$T/imposter/cyoda"
+  PATH="$T/imposter:$PATH" CYODA_LOCAL_HEALTH_TIMEOUT=3 bash "$LOCAL" start "$d" --run binary >/dev/null 2>&1; rc=$?
+  assert_status 4 "$rc" "UP from a process other than the launched one: exit 4"
+  dd="$T/data/$(bash "$S/cyoda-ports.sh" name "$d")"
+  kill "$(cat "$dd/home/child.pid" 2>/dev/null)" 2>/dev/null
+  rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
+test_local_sqlite_in_data_dir() {
+  local d out dd; d="$(mkproj sqlite)"; STARTED+=("$d"); rm -f "$CYODA_PLUGIN_CONFIG"
+  mkdir -p "$T/xdg"
+  out="$(XDG_DATA_HOME="$T/xdg" bash "$LOCAL" start "$d" --run binary --storage sqlite)"
+  assert_contains "$(health "$(field "$out" ENDPOINT)")" UP "sqlite healthy"
+  dd="$(entry "$d" dataDir)"
+  assert_eq "$(find "$T/xdg" -type f | wc -l | tr -d ' ')" 0 "nothing under the developer's XDG_DATA_HOME"
+  if [ -n "$(find "$dd" -name '*.db' -type f)" ]; then _ok; else _bad "sqlite db file in the data dir"; fi
+  bash "$LOCAL" stop "$d"
+}
+
+test_local_stop_dir_gone() {
+  local d out rc; d="$(mkproj vanish)"; STARTED+=("$d")
+  out="$(bash "$LOCAL" start "$d" --run binary)"
+  assert_contains "$(health "$(field "$out" ENDPOINT)")" UP "healthy before"
+  rm -rf "$d"
+  bash "$LOCAL" stop "$d" >/dev/null 2>&1; rc=$?
+  assert_status 0 "$rc" "stop by key with the directory gone"
+  assert_eq "$(health "$(field "$out" ENDPOINT)")" "" "stopped though the directory is gone"
+}
+
+compose_file() { # dir host-http [name]
+  { [ -z "${3:-}" ] || echo "name: $3"
+    cat <<YAML
+services:
+  cyoda:
+    image: ghcr.io/cyoda/cyoda:0.8.4
+    ports:
+      - "127.0.0.1:$2:8080"
+    environment:
+      CYODA_STORAGE_BACKEND: memory
+      CYODA_IAM_MODE: mock
+YAML
+  } >"$1/compose.yaml"
+}
+
+test_local_repo_own_project_name() {
+  docker_ok || { _ok; echo "  docker unavailable: skipped test_local_repo_own_project_name"; return 0; }
+  local d o out inst; d="$(mkproj named)"; o="$(mkproj named-other)"; STARTED+=("$d"); rm -f "$CYODA_PLUGIN_CONFIG"
+  compose_file "$d" 31000 fixedname
+  out="$(bash "$LOCAL" start-repo "$d" "$d/compose.yaml")"
+  inst="$(entry "$d" instance)"
+  assert_eq "$(field "$out" HTTP)" 31000 "free published port kept"
+  assert_eq "$(entry "$d" composeProject)" "$inst" "launched under the instance name, not the file's name:"
+  assert_eq "$(entry "$d" managed)" true "managed"
+  assert_contains "$(docker ps --filter "label=com.docker.compose.project=$inst" --format '{{.Names}}')" "$inst" "compose project is the instance"
+  if [ ! -f "$T/data/$inst/compose.override.yaml" ]; then _ok; else _bad "no override without a clash"; fi
+  # another clone with the same file: its own stack, on another block (31000 is recorded and busy)
+  compose_file "$o" 31000 fixedname; STARTED+=("$o")
+  out="$(bash "$LOCAL" start-repo "$o" "$o/compose.yaml")"
+  assert_eq "$(field "$out" STATE)" started "the clone starts its own stack"
+  if [ "$(field "$out" HTTP)" != 31000 ]; then _ok; else _bad "the clone runs on another block" "$out"; fi
+  bash "$LOCAL" stop "$o"
+  assert_contains "$(health http://localhost:31000)" UP "stopping the clone leaves the first stack"
+  bash "$LOCAL" stop "$d"
+  assert_eq "$(docker ps -q --filter "label=com.docker.compose.project=$inst")" "" "first stack down"
+}
+
+test_local_repo_clash_with_recorded() {
+  docker_ok || { _ok; echo "  docker unavailable: skipped test_local_repo_clash_with_recorded"; return 0; }
+  local d o out inst; d="$(mkproj recclash)"; o="$(mkproj recclash-owner)"; STARTED+=("$d")
+  compose_file "$d" 31000
+  # another project records 31000 (stopped, nothing listens)
+  printf '%s\n' "{\"projects\":{\"$o\":{\"run\":\"existing\",\"endpoint\":\"http://localhost:31000\"}}}" >"$CYODA_PLUGIN_CONFIG"
+  out="$(bash "$LOCAL" start-repo "$d" "$d/compose.yaml")"
+  inst="$(entry "$d" instance)"
+  if [ "$(field "$out" HTTP)" != 31000 ] && [ -n "$(field "$out" HTTP)" ]; then _ok; else _bad "a port another project records is a clash" "$out"; fi
+  if [ -f "$T/data/$inst/compose.override.yaml" ]; then _ok; else _bad "override written for a recorded port"; fi
+  bash "$LOCAL" stop "$d"
+  rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
+test_local_repo_stop_checks_workdir() {
+  docker_ok || { _ok; echo "  docker unavailable: skipped test_local_repo_stop_checks_workdir"; return 0; }
+  local d b inst out; d="$(mkproj wd-mine)"; b="$(mkproj wd-theirs)"
+  compose_file "$d" 31000; compose_file "$b" 31000
+  inst="$(bash "$S/cyoda-ports.sh" name "$d")"
+  # a stack under this project's instance name, started from another directory
+  docker compose -p "$inst" -f "$b/compose.yaml" up -d >/dev/null 2>&1
+  for _ in $(seq 1 60); do [ -n "$(health http://localhost:31000)" ] && break; sleep 0.5; done
+  printf '%s\n' "{\"projects\":{\"$d\":{\"run\":\"repo\",\"instance\":\"$inst\",\"dataDir\":\"$T/data/$inst\",\"compose\":\"$d/compose.yaml\",\"composeProject\":\"$inst\",\"managed\":true,\"ports\":{\"http\":31000,\"grpc\":32010,\"admin\":32011},\"endpoint\":\"http://localhost:31000\"}}}" >"$CYODA_PLUGIN_CONFIG"
+  out="$(bash "$LOCAL" stop "$d" 2>&1)"
+  assert_contains "$(health http://localhost:31000)" UP "a stack started from another directory is left running"
+  docker compose -p "$inst" -f "$b/compose.yaml" down >/dev/null 2>&1
+  rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
 test_local_usage
 test_local_stop_nothing_running
 test_local_unhealthy_cleans_up
@@ -265,4 +396,11 @@ test_local_docker
 test_local_repo_override
 test_local_docker_unhealthy_cleans_up
 test_local_repo_unmanaged_left_running
+test_local_missing_cyoda_keeps_entry
+test_local_health_needs_launched_listener
+test_local_sqlite_in_data_dir
+test_local_stop_dir_gone
+test_local_repo_own_project_name
+test_local_repo_clash_with_recorded
+test_local_repo_stop_checks_workdir
 report

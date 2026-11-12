@@ -83,9 +83,36 @@ test_pick_skips_busy() {
 }
 
 test_pick_skips_other_project_block() {
-  local d; d="$(mkproj mine)"
-  config '{"projects":{"/nonexistent/other":{"endpoint":"http://localhost:31000","ports":{"http":31000,"grpc":32010,"admin":32011}}}}'
+  local d o; d="$(mkproj mine)"; o="$(mkproj other)"
+  config "$(jq -n --arg o "$o" '{projects:{($o):{endpoint:"http://localhost:31000",ports:{http:31000,grpc:32010,admin:32011}}}}')"
   assert_eq "$(pick "$d")" "HTTP=31100 GRPC=32110 ADMIN=32111 STATE=free" "other project's recorded block skipped"
+}
+
+test_pick_dead_entry_ignored() {
+  local d; d="$(mkproj alive)"
+  config '{"projects":{"/nonexistent/gone":{"endpoint":"http://localhost:31000","ports":{"http":31000,"grpc":32010,"admin":32011}},"rel/key":{"endpoint":"http://localhost:31000"}}}'
+  assert_eq "$(pick "$d")" "HTTP=31000 GRPC=32010 ADMIN=32011 STATE=free" "an entry whose directory is gone holds no block"
+}
+
+test_pick_counts_recorded_endpoints() {
+  local d o; d="$(mkproj ep-mine)"; o="$(mkproj ep-other)"
+  # another project bound to an instance it didn't start; an old default profile; a remote profile
+  config "$(jq -n --arg o "$o" '{profiles:{default:{endpoint:"http://127.0.0.1:31100"},team:{endpoint:"https://localhost.example.com:31200"}},
+    projects:{($o):{run:"existing",endpoint:"http://localhost:31000"}}}')"
+  assert_eq "$(pick "$d")" "HTTP=31200 GRPC=32210 ADMIN=32211 STATE=free" "localhost endpoints of other entries and profiles count as recorded"
+  assert_eq "$(bash "$S/cyoda-ports.sh" recorded "$d" | tr '\n' ' ')" "31000 31100 32010 32011 32110 32111 " "recorded lists them (derived blocks)"
+  assert_eq "$(bash "$S/cyoda-ports.sh" recorded "$o" | tr '\n' ' ')" "31100 32110 32111 " "a project's own entry is not listed for it"
+}
+
+test_pick_recorded_ours_beats_profile() {
+  # this project's own running instance on a block an old profile also names: still ours
+  local d n dd; d="$(mkproj ours-prof)"; n="$(bash "$S/cyoda-ports.sh" name "$d")"; dd="$T/data/$n"
+  mkdir -p "$dd"
+  listen 31200; local p=$LPID
+  echo "$p" >"$dd/cyoda.pid"
+  config "$(jq -n --arg k "$d" --arg dd "$dd" --arg n "$n" '{profiles:{default:{endpoint:"http://localhost:31200"}},projects:{($k):{endpoint:"http://localhost:31200",run:"binary",instance:$n,dataDir:$dd,ports:{http:31200,grpc:32210,admin:32211}}}}')"
+  assert_eq "$(pick "$d")" "HTTP=31200 GRPC=32210 ADMIN=32211 STATE=ours" "evidence of ours wins over a profile naming the block"
+  unlisten "$p"
 }
 
 test_pick_recorded_ours_binary() {
@@ -136,7 +163,8 @@ SH
 test_pick_none_free() {
   local d rc entries="{" k; d="$(mkproj full)"
   for k in $(seq 0 19); do
-    entries+="\"/x/p$k\":{\"endpoint\":\"e\",\"ports\":{\"http\":$((31000 + 100 * k)),\"grpc\":$((32010 + 100 * k)),\"admin\":$((32011 + 100 * k))}},"
+    mkdir -p "$T/x/p$k"
+    entries+="\"$T/x/p$k\":{\"endpoint\":\"e\",\"ports\":{\"http\":$((31000 + 100 * k)),\"grpc\":$((32010 + 100 * k)),\"admin\":$((32011 + 100 * k))}},"
   done
   config "{\"projects\":${entries%,}}}"
   pick "$d" >/dev/null 2>&1; rc=$?
@@ -185,6 +213,9 @@ test_pick_free_default
 test_pick_no_config_file
 test_pick_skips_busy
 test_pick_skips_other_project_block
+test_pick_dead_entry_ignored
+test_pick_counts_recorded_endpoints
+test_pick_recorded_ours_beats_profile
 test_pick_recorded_ours_binary
 test_pick_stale_pid_not_ours
 test_pick_recorded_ours_docker

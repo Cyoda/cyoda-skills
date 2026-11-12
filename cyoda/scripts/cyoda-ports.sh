@@ -2,8 +2,11 @@
 # Name a project's cyoda-go instance and pick a free port block for it.
 #   cyoda-ports.sh name <root>  -> <basename>-<hash6>  (sanitised basename, sha256 of the real path)
 #   cyoda-ports.sh pick <root>  -> HTTP=<p> GRPC=<p> ADMIN=<p> STATE=ours|free
+#   cyoda-ports.sh recorded <root> -> the ports others record, one per line (sorted)
 # Blocks k=0..19: HTTP=B+100k, GRPC=B+1010+100k, ADMIN=B+1011+100k, B=${CYODA_PORT_BASE:-8080}.
-# Free: no port of the block listens and no other project's entry records one.
+# Free: no port of the block listens and none is recorded. Recorded: the ports of every other
+# project entry whose directory still exists, and the block (HTTP, HTTP+1010, HTTP+1011) of the
+# localhost endpoint of each such entry and of every profile.
 # The project's recorded block comes first; STATE=ours needs evidence (binary: dataDir/cyoda.pid
 # is a live process listening on the HTTP port; docker: a cyoda-docker-instances.sh line with
 # COMPOSE_PROJECT=<instance> WORKDIR=<dataDir> on that HTTP port). Otherwise a busy block is skipped.
@@ -16,7 +19,7 @@ CONFIG="${CYODA_PLUGIN_CONFIG:-$HOME/.config/cyoda/cyoda-plugin-config.json}"
 BASE="${CYODA_PORT_BASE:-8080}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-usage() { echo "usage: cyoda-ports.sh name|pick <root>" >&2; exit 64; }
+usage() { echo "usage: cyoda-ports.sh name|pick|recorded <root>" >&2; exit 64; }
 [ $# -eq 2 ] || usage
 CMD="$1"
 ROOT="$(cd "$2" 2>/dev/null && pwd -P)" || { echo "no such directory: $2" >&2; exit 64; }
@@ -44,12 +47,28 @@ listening() {
 
 have_config() { [ -f "$CONFIG" ]; }
 
-# Ports recorded by projects other than this one, one per line.
+# Ports recorded by other projects (whose directory exists) and by profiles, one per line.
 others_ports() {
   have_config || return 0
-  jq -r --arg k "$ROOT" '(.projects // {}) | to_entries[] | select(.key != $k)
-    | (.value.ports // {}) | select(type == "object" and ([.http, .grpc, .admin] | all(type == "number")))
-    | [.http, .grpc, .admin][]' "$CONFIG"
+  local port key
+  jq -r --arg k "$ROOT" '
+    def block: [., . + 1010, . + 1011][];
+    def lport: if type == "string" then
+        [capture("^(?<s>https?)://(localhost|127\\.0\\.0\\.1|\\[::1\\]|0\\.0\\.0\\.0)(:(?<p>[0-9]+))?(/|$)"; "i")] | first
+        | if . == null then empty elif .p != null then (.p | tonumber) elif (.s | ascii_downcase) == "https" then 443 else 80 end
+      else empty end;
+    ((.projects // {}) | if type == "object" then to_entries[] else empty end
+      | select(.key != $k and (.key | test("\n") | not) and (.value | type) == "object")
+      | .key as $key
+      | (((.value.ports // {}) | select(type == "object" and ([.http, .grpc, .admin] | all(type == "number"))) | .http, .grpc, .admin),
+         (.value.endpoint | lport | block))
+      | "\(.)\t\($key)"),
+    ((.profiles // {}) | if type == "object" then .[] else empty end
+      | select(type == "object") | .endpoint | lport | block | "\(.)\t")' "$CONFIG" \
+  | while IFS=$'\t' read -r port key; do
+      if [ -z "$key" ]; then echo "$port"
+      elif [ "${key#/}" != "$key" ] && [ -d "$key" ]; then echo "$port"; fi
+    done | sort -n -u
 }
 
 entry() { # field -> value of this project's entry or ""
@@ -100,17 +119,15 @@ pick() {
   for c in "${cand[@]}"; do
     read -r http grpc admin <<<"$c"
     [ -n "$http" ] && [ -n "$grpc" ] && [ -n "$admin" ] || continue
+    if [ "$http" = "$rh" ] && listening "$http" && is_ours "$http"; then
+      echo "HTTP=$http GRPC=$grpc ADMIN=$admin STATE=ours"; return 0
+    fi
     clash=""
     for p in $http $grpc $admin; do
       if grep -qx "$p" <<<"$others"; then clash=1; fi
     done
     [ -z "$clash" ] || continue
-    if listening "$http" || listening "$grpc" || listening "$admin"; then
-      if [ "$http" = "$rh" ] && is_ours "$http"; then
-        echo "HTTP=$http GRPC=$grpc ADMIN=$admin STATE=ours"; return 0
-      fi
-      continue
-    fi
+    if listening "$http" || listening "$grpc" || listening "$admin"; then continue; fi
     echo "HTTP=$http GRPC=$grpc ADMIN=$admin STATE=free"; return 0
   done
   echo "no free port block (base $BASE)" >&2
@@ -120,5 +137,10 @@ pick() {
 case "$CMD" in
   name) instance_name ;;
   pick) pick ;;
+  recorded)
+    if have_config && ! jq -e 'type == "object"' "$CONFIG" >/dev/null 2>&1; then
+      echo "invalid plugin config: $CONFIG" >&2; exit 1
+    fi
+    others_ports ;;
   *) usage ;;
 esac
