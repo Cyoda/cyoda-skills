@@ -36,7 +36,7 @@
     {
       "id": 3,
       "prompt": "/cyoda:setup — connect to our team's dev instance at https://cyoda-dev.internal.example.com/api/",
-      "expected_output": "Uses connect mode. Normalises the endpoint to https://cyoda-dev.internal.example.com (drops the trailing /api/), probes /api/health (UP), names the profile `cyoda-dev` after the host (says so, doesn't ask), writes {endpoint} to profile cyoda-dev and makes it active, probes GET /api/model/ without a token and gets 401, so it says the instance needs a token, which cyoda:auth sets up. No typed command.",
+      "expected_output": "Uses connect mode. Normalises the endpoint to https://cyoda-dev.internal.example.com (drops the trailing /api/), probes /api/health (UP), names the profile `cyoda-dev` after the host (says so, doesn't ask), writes {endpoint} to profile cyoda-dev and makes it active, probes GET /api/model/ without a token and gets 401, so it reports 'This instance needs a token; token setup for it is covered by `cyoda:auth`.' No typed or run command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "GET https://cyoda-dev.internal.example.com/api/health returns {\"status\":\"UP\"}. GET /api/help returns {\"version\":\"0.8.4\",...}. GET /api/model/ without an Authorization header returns 401. After the write, cyoda-status.sh prints `STATUS=connected PROFILE=cyoda-dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile`."
@@ -47,7 +47,7 @@
         { "id": "profile-fields", "text": "Names the profile after the host (`cyoda-dev`) without asking, and writes it with only endpoint (no env, no token, no secret, no tokenCommand) through ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh with values passed as --arg, keeps the existing `default` profile, and sets active to cyoda-dev", "type": "behavior" },
         { "id": "detects-auth", "text": "Detects that the instance is not mock auth from the 401 on an unauthenticated GET /api/model/", "type": "behavior" },
         { "id": "no-credentials", "text": "Does not ask for a client id, secret or token", "type": "behavior" },
-        { "id": "token-pointer", "text": "Says the instance needs a token and that cyoda:auth sets one up", "type": "behavior" },
+        { "id": "token-pointer", "text": "Says the instance needs a token and names `cyoda:auth` as where token setup is covered, without telling the developer to run or type anything", "type": "behavior" },
         { "id": "no-typed-command", "text": "Asks the developer to type no command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays", "type": "behavior" }
       ]
     },

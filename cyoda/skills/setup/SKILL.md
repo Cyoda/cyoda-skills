@@ -82,7 +82,7 @@ A machine-wide profile for a cyoda-go the developer names by URL (e.g. one made 
 2. `curl -sS --max-time 5 "<endpoint>/api/health"`; not `{"status":"UP"}`: show what came back and stop without writing.
 3. Name the profile after the host's first label (`cyoda-dev.internal.example.com` → `cyoda-dev`), adding `-2`, `-3`… when that name holds another endpoint; never `default` (reserved for the local default).
 4. [Write the profile](#changing-the-config) and make it active.
-5. `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<endpoint>/api/model/"` without a token: `200` mock auth; `401`/`403` the instance needs a token, which `cyoda:auth` sets up; anything else: show it, see `cyoda help errors --section "ERROR CODE INDEX"`.
+5. `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<endpoint>/api/model/"` without a token: `200` mock auth; `401`/`403` report "This instance needs a token; token setup for it is covered by `cyoda:auth`."; anything else: show it, see `cyoda help errors --section "ERROR CODE INDEX"`.
 6. [Finish](#finish).
 
 ## Link
@@ -97,7 +97,7 @@ Binds `<ROOT>` to an instance this plugin doesn't start (a running stack, a URL)
 3. **Probe:** `curl -sS --max-time 5 "<E>/api/health"` must return `{"status":"UP"}`; the version is `curl -s --max-time 5 "<E>/api/help" | jq -r .version`. Not UP: show what came back and stop without writing.
 4. **Tokens:** `curl -s -o /dev/null -w '%{http_code}' --max-time 5 "<E>/api/model/"` without a token.
    - `200`: mock auth, no `tokenCommand`.
-   - `401`/`403`: re-linking keeps the entry's `tokenCommand`; otherwise ask how the project gets tokens (`cyoda-help.sh auth --section "WHICH PATH DO I NEED?"`), e.g. `scripts/auth.sh token`. The plugin runs it from `<ROOT>` with `CYODA_ENDPOINT` set, so a project-relative path works; a secret enters through the `*_CMD` form (`CYODA_CLIENT_SECRET_CMD='security find-generic-password -s shop-cyoda -w' scripts/get-token.sh`), never as a literal. Run it that way once without showing the token; it becomes `tokenCommand` only if it exits 0 and prints three dot-separated parts. None yet: no `tokenCommand`; `cyoda:auth` sets one up.
+   - `401`/`403`: re-linking keeps the entry's `tokenCommand`; otherwise ask how the project gets tokens (`cyoda-help.sh auth --section "WHICH PATH DO I NEED?"`), e.g. `scripts/auth.sh token`. The plugin runs it from `<ROOT>` with `CYODA_ENDPOINT` set, so a project-relative path works; a secret enters through the `*_CMD` form (`CYODA_CLIENT_SECRET_CMD='security find-generic-password -s shop-cyoda -w' scripts/get-token.sh`), never as a literal. Run it that way once without showing the token; it becomes `tokenCommand` only if it exits 0 and prints three dot-separated parts. None yet: no `tokenCommand`; report "This instance needs a token; token setup for it is covered by `cyoda:auth`."
 5. **Write** `projects[<KEY>]` (`<CMD>` empty for no `tokenCommand`):
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh \
