@@ -1,7 +1,7 @@
 # Agent-Loaded Technique Skills, Parallel-Safe Local Instances
 
 **Date:** 2026-11-11
-**Status:** Draft, awaiting approval
+**Status:** Approved, implemented
 **Supersedes:** the `disable-model-invocation` rule and the typed hand-offs of `2026-10-17-cyoda-go-split-and-help-first-design.md`, the `app` skill, and the setup parts of `2026-11-07-dev-package-local-first-design.md`. Everything else in those documents stands.
 
 ## Intent
