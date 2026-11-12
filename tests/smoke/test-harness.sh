@@ -97,6 +97,7 @@ test_lint_every_rule_fires() {
   # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   lint_fires typed-handoff "$D" 'next, type `/cyoda:setup`'
   lint_fires typed-handoff "$D" 'then type /cyoda:setup in the prompt'
+  # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   lint_fires typed-handoff "$D" 'Type `/cyoda:build` to continue'
   # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
   lint_fires model-list-no-slash "$D" 'curl $BASE/api/model"'
