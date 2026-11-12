@@ -1,7 +1,7 @@
 ---
 name: compute
 description: Use when a cyoda-go workflow needs the developer's own code (a processor, a function criterion, or a schedule function served by a compute node over gRPC), when deciding whether a compute node is needed at all, or when a compute node won't connect, isn't routed requests, is evicted, or times out.
-allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(mktemp *) Bash(rm *)
 ---
 
 # Cyoda compute nodes

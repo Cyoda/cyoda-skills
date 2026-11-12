@@ -1,7 +1,7 @@
 ---
 name: build
 description: Use when a cyoda-go entity model or workflow is added, changed or registered on the instance (new entity, state, transition, criterion, processor, schedule, unique key, changeLevel, new model version), or kept as versioned project files (sample, workflow, config, manifest).
-allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(find *) Bash(grep *) Bash(ls *) Bash(mkdir *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-local.sh *) Bash(*cyoda-config-write.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*get-token.sh*) Bash(brew *) Bash(command -v *) Bash(git rev-parse *) Bash(pwd *) Bash(cd * && pwd -P) Bash(sh) Bash(cp *) Bash(chmod *) Bash(cmp *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(find *) Bash(grep *) Bash(ls *) Bash(mkdir *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-local.sh *) Bash(*cyoda-config-write.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*get-token.sh*) Bash(brew *) Bash(command -v *) Bash(git rev-parse *) Bash(pwd *) Bash(cd * && pwd -P) Bash(sh) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(mktemp *) Bash(rm *)
 ---
 
 # Cyoda incremental build

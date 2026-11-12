@@ -1,7 +1,7 @@
 ---
 name: debug
 description: Use when a cyoda-go call returns an error code, a transition doesn't fire or fails, an entity is stuck or in an unexpected state or has disappeared, a processor, criterion or compute node fails or times out, the instance seems unreachable, or the developer asks for an entity's history, audit trail or state at a past time.
-allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-config-write.sh *) Bash(*get-token.sh*) Bash(ls *) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(mkdir *) Bash(find *) Bash(grep *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-config-write.sh *) Bash(*get-token.sh*) Bash(ls *) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(mkdir *) Bash(find *) Bash(grep *) Bash(mktemp *) Bash(rm *)
 ---
 
 # Cyoda debugging and observation
