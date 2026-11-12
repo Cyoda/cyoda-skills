@@ -357,7 +357,7 @@ left_running() {
 
 cmd_stop() {
   [ $# -eq 0 ] || usage
-  local run dd http pid cf cp
+  local run dd http pid cf cp ids
   run="$(entry run)"; dd="$(entry dataDir)"; http="$(rec_port http)"
   [ -n "$dd" ] || exit 0
   DD="$dd"
@@ -388,7 +388,13 @@ cmd_stop() {
       need_docker
       left_running "$cp" ${cf:+"$(dirname "$cf")"} "$DD"
       if [ ! -f "$cf" ]; then
-        docker compose -p "$cp" down >&2 || die 5 "docker compose down failed"
+        # no file to hand Compose (without -f it may read one from the caller's cwd): remove by label
+        ids="$(docker ps -aq --filter "label=com.docker.compose.project=$cp")"
+        # shellcheck disable=SC2086
+        [ -z "$ids" ] || docker rm -f $ids >&2 || die 5 "docker rm failed"
+        ids="$(docker network ls -q --filter "label=com.docker.compose.project=$cp")"
+        # shellcheck disable=SC2086
+        [ -z "$ids" ] || docker network rm $ids >&2 || die 5 "docker network rm failed"
       elif [ -f "$DD/compose.override.yaml" ]; then
         docker compose -p "$cp" -f "$cf" -f "$DD/compose.override.yaml" down >&2 || die 5 "docker compose down failed"
       else

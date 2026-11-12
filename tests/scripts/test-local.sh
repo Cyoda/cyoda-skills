@@ -381,6 +381,41 @@ test_local_repo_stop_checks_workdir() {
   rm -f "$CYODA_PLUGIN_CONFIG"
 }
 
+test_local_repo_stop_compose_gone_calls() {
+  local d w fd log; d="$(mkproj gone-calls)"; w="$(mkproj gone-calls-cwd)"; fd="$T/fakedocker"; log="$T/docker.log"
+  mkdir -p "$fd"; : >"$log"
+  cat >"$fd/docker" <<SH
+#!/usr/bin/env bash
+echo "\$*" >>"$log"
+case "\$1 \$2" in "ps -aq"|"network ls") echo fakeid ;; esac
+exit 0
+SH
+  chmod +x "$fd/docker"
+  printf '%s\n' "{\"projects\":{\"$d\":{\"run\":\"repo\",\"instance\":\"gonecalls\",\"dataDir\":\"$T/data/gonecalls\",\"compose\":\"$d/compose.yaml\",\"composeProject\":\"gonecalls\",\"managed\":true,\"ports\":{\"http\":31000,\"grpc\":32010,\"admin\":32011},\"endpoint\":\"http://localhost:31000\"}}}" >"$CYODA_PLUGIN_CONFIG"
+  echo 'services: {decoy: {image: busybox}}' >"$w/compose.yaml"
+  (cd "$w" && PATH="$fd:$PATH" bash "$LOCAL" stop "$d" >/dev/null 2>&1)
+  assert_eq "$(grep '^compose ' "$log" | grep -cv -- ' -f ')" 0 "no compose call without -f when the file is gone"
+  assert_contains "$(cat "$log")" "rm -f fakeid" "containers removed by label"
+  assert_contains "$(cat "$log")" "network rm fakeid" "network removed by label"
+  rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
+test_local_repo_stop_compose_gone() {
+  docker_ok || { _ok; echo "  docker unavailable: skipped test_local_repo_stop_compose_gone"; return 0; }
+  local d w inst rc; d="$(mkproj gone-file)"; w="$(mkproj gone-cwd)"; STARTED+=("$d"); rm -f "$CYODA_PLUGIN_CONFIG"
+  compose_file "$d" 31000
+  bash "$LOCAL" start-repo "$d" "$d/compose.yaml" >/dev/null
+  inst="$(entry "$d" instance)"
+  rm -f "$d/compose.yaml"
+  # a Compose file in the caller's working directory must not be picked up (this one doesn't load)
+  echo 'services: [not, a, map]' >"$w/compose.yaml"
+  (cd "$w" && bash "$LOCAL" stop "$d" >/dev/null 2>&1); rc=$?
+  assert_status 0 "$rc" "stop with the compose file gone"
+  assert_eq "$(docker ps -aq --filter "label=com.docker.compose.project=$inst")" "" "containers removed by label"
+  assert_eq "$(docker network ls -q --filter "label=com.docker.compose.project=$inst")" "" "network removed by label"
+  rm -f "$CYODA_PLUGIN_CONFIG"
+}
+
 test_local_usage
 test_local_stop_nothing_running
 test_local_unhealthy_cleans_up
@@ -403,4 +438,6 @@ test_local_stop_dir_gone
 test_local_repo_own_project_name
 test_local_repo_clash_with_recorded
 test_local_repo_stop_checks_workdir
+test_local_repo_stop_compose_gone_calls
+test_local_repo_stop_compose_gone
 report
