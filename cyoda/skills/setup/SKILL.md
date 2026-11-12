@@ -30,7 +30,7 @@ A question about the connection (is it connected, which instance, binding, profi
 
 ## Getting an instance
 
-A request to connect to a named URL, to link, re-link or unlink this project goes to [Connect](#connect), [Link](#link) or [Unlink](#unlink). For every other request (an instance is needed, `/cyoda:setup`, "get cyoda running"), go by the status line. Say in one line what you start or bind and why, then do it.
+A request to connect to a named URL, to link, re-link or unlink this project goes to [Connect](#connect), [Link](#link) or [Unlink](#unlink). For every other request (an instance is needed, `/cyoda:setup`, "get cyoda running"), go by the status line. Say in one line what you start or bind and why, then do it. `SOURCE=profile` with `PROFILE=default` is the old machine-wide local default: treat it as `SOURCE=default`.
 
 1. **Bound and answering:** `STATUS=connected` with `SOURCE=project` or `SOURCE=profile` → use it; [Finish](#finish). `SOURCE=profile` not answering (or `not_configured`): the profile stays as it is; say so in one line and go on with step 3, which gives this project its own entry.
 2. **This project's entry, not answering** (`SOURCE=project`, `STATUS=unreachable`; the entry is `jq --arg k '<PROJECT>' '.projects[$k]' "$CONFIG"`):
@@ -39,7 +39,7 @@ A request to connect to a named URL, to link, re-link or unlink this project goe
    - otherwise (`existing`, or a link to an instance that runs elsewhere): report it and stop; [Link](#link) re-binds it when asked.
 3. **Defined by the project:** `<ROOT>` has a cyoda Compose stack → `cyoda-local.sh start-repo '<ROOT>' '<ROOT>/<file>'`. A Makefile or script target, or README instructions, that run cyoda-go → run it that way, poll `<endpoint>/api/health` every second for up to 30 s until `{"status":"UP"}`, and [record](#changing-the-config) `{run: "existing", endpoint}` for `<ROOT>`.
 4. **Not defined:** ask once, the only question:
-   - `SOURCE=default`, `STATUS=connected` and `VERSION` not `unknown`: "Use the cyoda-go already running on localhost:8080, or start one for this project from the command line or in Docker?"
+   - `SOURCE=default`, `STATUS=connected` and `VERSION` not `unknown`: "Use the cyoda-go already running on localhost:8080, or start one for this project from the command line or in Docker?" (with `<E>`'s host and port in place of localhost:8080)
    - otherwise: "Run cyoda-go for local development and testing from the command line or in Docker?"
 
    Then:
@@ -52,7 +52,7 @@ Then [Finish](#finish). A `WARN=` from the first status run that this procedure 
 
 ### `cyoda-local.sh`
 
-`${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> [--run binary|docker] [--storage memory|sqlite]`, `start-repo <root> <compose-file>`, `stop <root>`. It picks a free port block (HTTP, gRPC, admin; `cyoda help run --section "PORT LAYOUT"`), names the instance after the project, keeps its data, config, pid file, log and Compose files under `~/.local/share/cyoda/projects/<instance>` (never in the repo), runs mock auth, waits for `/api/health` and records the project's entry (`run`, `instance`, `dataDir`, `ports`, `storage` or `compose`, `endpoint`). It prints `ENDPOINT=<url> HTTP=<p> GRPC=<p> ADMIN=<p> RUN=<run> STATE=started|ours` (`ours`: this project's instance already runs and is reused).
+`${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> [--run binary|docker] [--storage memory|sqlite]`, `start-repo <root> <compose-file>`, `stop <root>`. It picks a free port block (HTTP, gRPC, admin; `cyoda help run --section "PORT LAYOUT"`), names the instance after the project, keeps its data, config, pid file, log and Compose files under `~/.local/share/cyoda/projects/<instance>` (never in the repo), runs `start` with mock auth, waits for `/api/health` and records the project's entry (`run`, `instance`, `dataDir`, `ports`, `storage` or `compose`, `endpoint`). It prints `ENDPOINT=<url> HTTP=<p> GRPC=<p> ADMIN=<p> RUN=<run> STATE=started|ours` (`ours`: this project's instance already runs and is reused).
 
 | Exit | Then |
 |---|---|
@@ -128,4 +128,4 @@ Every change goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-config-write.sh '
 
 ## Finish
 
-Run `cyoda-status.sh` again and report as in [Status](#status). After `cyoda-local.sh` started or reused the instance: mock auth, no token needed. After connect while `SOURCE=project`: "This project is bound to `<ENDPOINT>` (its `projects` entry), which takes precedence here; the profile applies in other directories."
+Run `cyoda-status.sh` again and report as in [Status](#status). After `cyoda-local.sh start` started or reused the instance: mock auth, no token needed. After `start-repo`: tokens as in [Link](#link) step 4. After connect while `SOURCE=project`: "This project is bound to `<ENDPOINT>` (its `projects` entry), which takes precedence here; the profile applies in other directories."

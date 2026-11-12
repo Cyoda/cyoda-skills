@@ -1,7 +1,7 @@
 ---
 name: compute
 description: Use when a cyoda-go workflow needs the developer's own code (a processor, a function criterion, or a schedule function served by a compute node over gRPC), when deciding whether a compute node is needed at all, or when a compute node won't connect, isn't routed requests, is evicted, or times out.
-allowed-tools: Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-help.sh *) Bash(cyoda help *) Bash(jq *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *)
 ---
 
 # Cyoda compute nodes
@@ -81,7 +81,7 @@ Read `workflows --section PROCESSORS`. `executionMode` is set per processor in t
 
 **Timeout.** `responseTimeoutMs` on the processor's config. Unset or `0` means the server default of 30 s, not a node default (#684-J). A miss is `DISPATCH_TIMEOUT` (503). Prefer raising `responseTimeoutMs` with `COMMIT_BEFORE_DISPATCH` over long `SYNC` calls.
 
-**Behaviour help doesn't settle.** When help doesn't settle how the execution mode, timeout and callbacks combine (e.g. what a `COMMIT_BEFORE_DISPATCH` replay re-runs), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
+**Behaviour help doesn't settle.** When help doesn't settle how the execution mode, timeout and callbacks combine (e.g. what a `COMMIT_BEFORE_DISPATCH` replay re-runs), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
 
 ## Step 7 — Calling back into Cyoda
 

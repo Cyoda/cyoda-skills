@@ -1,7 +1,7 @@
 ---
 name: build
 description: Use when a cyoda-go entity model or workflow is added, changed or registered on the instance (new entity, state, transition, criterion, processor, schedule, unique key, changeLevel, new model version), or kept as versioned project files (sample, workflow, config, manifest).
-allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(find *) Bash(grep *) Bash(ls *) Bash(mkdir *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-local.sh *) Bash(*cyoda-config-write.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*get-token.sh*) Bash(brew *) Bash(command -v *) Bash(git rev-parse *) Bash(pwd *) Bash(cd * && pwd -P) Bash(sh) Bash(cp *) Bash(chmod *) Bash(cmp *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(find *) Bash(grep *) Bash(ls *) Bash(mkdir *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-local.sh *) Bash(*cyoda-config-write.sh *) Bash(*cyoda-docker-instances.sh*) Bash(*get-token.sh*) Bash(brew *) Bash(command -v *) Bash(git rev-parse *) Bash(pwd *) Bash(cd * && pwd -P) Bash(sh) Bash(cp *) Bash(chmod *) Bash(cmp *)
 ---
 
 # Cyoda incremental build
@@ -38,7 +38,7 @@ Run `cyoda-call.sh GET /model/` (help: `models --section ENDPOINTS`). Show each 
 
 Then read the project's `cyoda-manifest.json` at the project root, if there is one, and the files it lists. These files are the source of truth for what `build` has written. If a model the increment touches is on the instance but has no project files, export its workflow (`GET /model/{e}/{v}/workflow/export`) and save it, reshaped as in Step 6.
 
-Fresh instance and empty project: the starting increment is hello-world ([examples/hello-world.md](examples/hello-world.md)).
+Fresh instance and empty project and no change requested: the starting increment is hello-world ([examples/hello-world.md](examples/hello-world.md)).
 
 ## Step 2 — Agree the increment
 
@@ -55,7 +55,7 @@ Judgment calls (read the named section before proposing):
 | Time-based moves | `workflows --section "SCHEDULED TRANSITIONS"` | A `schedule` object on an automated transition, not a separate processor. Best practice *Never put an automated transition with no criterion beside a scheduled transition* |
 | Loop limits | `workflows --section "ENGINE EXECUTION"` | Best practice *Build explicit validation cycles* |
 
-When help doesn't settle how the behaviour you're building plays out (e.g. what a timed-out function criterion does to its transition), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker) before writing files; `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance. On no, carry on with the increment from help.
+When help doesn't settle how the behaviour you're building plays out (e.g. what a timed-out function criterion does to its transition), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range) before writing files; `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance. On no, carry on with the increment from help.
 
 The workflow you generate follows the shared best practices. Probe the help topic first: `cyoda-help.sh workflows best-practices`, then `cyoda-help.sh design` (both exit 2 until #684-L ships). Fall back to `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md` and name the practices you applied. Every transition carries `annotations.roles` (best practice *Declare who may fire a transition in its annotations*): ask who fires each transition the developer hasn't covered; `[]` for system-only transitions.
 

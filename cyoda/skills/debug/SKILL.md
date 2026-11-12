@@ -1,7 +1,7 @@
 ---
 name: debug
 description: Use when a cyoda-go call returns an error code, a transition doesn't fire or fails, an entity is stuck or in an unexpected state or has disappeared, a processor, criterion or compute node fails or times out, the instance seems unreachable, or the developer asks for an entity's history, audit trail or state at a past time.
-allowed-tools: Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-config-write.sh *) Bash(*get-token.sh*) Bash(ls *) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(mkdir *) Bash(find *) Bash(grep *)
+allowed-tools: Bash(*cyoda-ports.sh *) Bash(*cyoda-call.sh *) Bash(*cyoda-help.sh *) Bash(*cyoda-status.sh*) Bash(jq *) Bash(cat *) Bash(cyoda *) Bash(docker *) Bash(kill *) Bash(curl *) Bash(*cyoda-config-write.sh *) Bash(*get-token.sh*) Bash(ls *) Bash(cp *) Bash(chmod *) Bash(cmp *) Bash(mkdir *) Bash(find *) Bash(grep *)
 ---
 
 # Cyoda debugging and observation
@@ -63,7 +63,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
 6. Two common causes, from the best practices (`cyoda-help.sh workflows best-practices`, else `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md`):
    - **The data was fixed, but the held transition never ran again.** Automated transitions are evaluated only when the entity is written. Best practice *Re-trigger evaluation with a loopback, not by firing an automated transition*: `PATCH /entity/JSON/{id}` with `{}` (or the corrected fields), `-H 'Content-Type: application/merge-patch+json' -H 'If-Match: *'`. Smoke-tested example: [../build/examples/loopback/](../build/examples/loopback/) (scenario `02-loopback`).
    - **A cycle hit the per-state visit limit** (`workflows --section "ENGINE EXECUTION"`). The fix is a workflow change (see Repair above).
-7. When help doesn't settle how the engine features involved combine (e.g. a cascade through several automated transitions), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
+7. When help doesn't settle how the engine features involved combine (e.g. a cascade through several automated transitions), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
 
 ### Path C — a processor, function criterion or compute node
 
@@ -74,7 +74,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
 5. There is no endpoint that lists connected members. The evidence is the 503 code, the server log (raise it with `CYODA_LOG_LEVEL=debug`, or `POST /admin/log-level` from `admin --section ENDPOINTS`), and `cyoda_dispatch_*` metrics on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
 6. `success: false` from the processor, or returned data that the schema rejects, is `WORKFLOW_FAILED` and rolls back (`workflows --section PROCESSORS`).
 7. Writing or changing the compute node itself: the `cyoda:compute` skill.
-8. When help doesn't settle how dispatch behaves here (e.g. what a timed-out processor leaves behind), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
+8. When help doesn't settle how dispatch behaves here (e.g. what a timed-out processor leaves behind), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
 
 ### Path D — schema and model lifecycle
 
