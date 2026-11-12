@@ -95,7 +95,7 @@
     {
       "id": 3,
       "prompt": "/cyoda:test",
-      "expected_output": "Runs cyoda-status.sh (connected, profile default). Asks automated or guided; the developer says automated. Lists models with cyoda-call.sh GET /model/: orders v1 LOCKED, invoice v2 UNLOCKED. Reads models --section LIFECYCLE and lists invoice v2 as skipped: not locked yet, so it can't hold entities; next, type /cyoda:build to finish registering it. Tests orders v1: reads its workflow export, creates an entity from the manifest's sample, reports the state after create (draft), fires submit with PATCH {} (merge-patch, If-Match: *), checks the state (submitted), and prints the summary table with orders v1 PASS. Creates no invoice entity.",
+      "expected_output": "Runs cyoda-status.sh (connected, profile default). Asks automated or guided; the developer says automated. Lists models with cyoda-call.sh GET /model/: orders v1 LOCKED, invoice v2 UNLOCKED. Reads models --section LIFECYCLE and lists invoice v2 as skipped: not locked yet, so it can't hold entities (no typed command). Tests orders v1: reads its workflow export, creates an entity from the manifest's sample, reports the state after create (draft), fires submit with PATCH {} (merge-patch, If-Match: *), checks the state (submitted), and prints the summary table with orders v1 PASS. Creates no invoice entity.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"},{\"name\":\"invoice\",\"modelVersion\":2,\"sample\":\"src/data/invoice-v2-sample.json\",\"workflow\":\"src/workflows/invoice-v2-workflow.json\",\"config\":\"src/config/invoice-v2-config.json\"}]}",
@@ -123,8 +123,8 @@
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:build`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         }
       ]
@@ -132,35 +132,45 @@
     {
       "id": 4,
       "prompt": "/cyoda:test",
-      "expected_output": "cyoda-call.sh GET /model/ exits 22 with HTTP_STATUS=401 after the script's own token retry. The skill shows the error and says 'next, type /cyoda:auth'. It doesn't re-run the tokenCommand and runs no further calls.",
+      "expected_output": "cyoda-call.sh GET /model/ exits 4: the profile's token command failed. The skill shows the error and carries out auth's procedure itself: runs the token command /home/dev/shop/scripts/get-token.sh once with CYODA_ENDPOINT set, without showing a token; it exits 1 with 'get-token: … HTTP 401 … invalid_client', which it explains as the client id or secret being rejected (wrong env or keychain value, or the client deleted or its secret rotated; `auth clients`). The developer corrects the value in the shell Claude Code is started from and restarts the session. It never asks for the secret, leaves the tokenCommand as it is, runs no test calls while the token command fails, and asks the developer to type no command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev VERSION=0.8.4. cyoda-call.sh GET /model/ exits 22, stderr HTTP_STATUS=401, body {\"error\":\"invalid_token\"} (already retried once with a fresh token)."
+        "_simulated/instance.md": "Project root is /home/dev/shop. cyoda-status.sh: STATUS=connected PROFILE=dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile. Every cyoda-call.sh call exits 4 with stderr 'token command failed: /home/dev/shop/scripts/get-token.sh'. An unauthenticated GET https://cyoda-dev.internal.example.com/api/model/ returns 401. Running /home/dev/shop/scripts/get-token.sh with CYODA_ENDPOINT set exits 1 with stderr: get-token: token request to https://cyoda-dev.internal.example.com/api/oauth/token failed: HTTP 401 {\"error\":\"invalid_client\",\"error_description\":\"invalid_client\"}"
       },
       "assertions": [
         {
           "id": "consults-help",
-          "text": "Follows the call script's exit-code contract (exit 22 with 401) instead of guessing; if it explains the error further, it names `cyoda-help.sh errors UNAUTHORIZED` or an `auth` help section",
+          "text": "Follows the call script's exit-code contract (exit 4: the token command failed) instead of guessing; when it explains the token error it names an `auth` help section (e.g. `auth clients` REQUEST FLOW) or `cyoda-help.sh errors UNAUTHORIZED`",
           "type": "behavior"
         },
         {
           "id": "surface-error",
-          "text": "Shows the 401 error to the developer",
+          "text": "Shows the token-command error to the developer",
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Any hand-off to a side-effecting skill says 'next, type `/cyoda:auth`' (with a one-line reason) and never says it will invoke or run that skill itself",
+          "id": "carries-out-auth",
+          "text": "Carries out auth's procedure itself: runs /home/dev/shop/scripts/get-token.sh once with CYODA_ENDPOINT set, without showing a token, and explains its `invalid_client` error as the client id or secret being rejected",
+          "type": "behavior"
+        },
+        {
+          "id": "developer-fix",
+          "text": "Says the developer corrects the client id or secret (env var or keychain entry) in the shell Claude Code is started from and restarts the session; does not ask for the secret in the conversation and writes no secret or token to any file",
           "type": "behavior"
         },
         {
           "id": "no-manual-retry",
-          "text": "Does not re-run the tokenCommand (the script already retried once with a fresh token)",
+          "text": "Runs the token command at most once itself, does not change the profile's tokenCommand, and does not loop",
           "type": "behavior"
         },
         {
           "id": "stops",
-          "text": "Runs no further API calls after the 401",
+          "text": "Runs no test calls (no entity create, no transition) while the token command fails",
+          "type": "behavior"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         }
       ]
@@ -193,6 +203,52 @@
         {
           "id": "no-secret",
           "text": "Puts no token or secret value in the command or the script",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Smoke-test this project's order workflow now.",
+      "expected_output": "REAL run (CYODA_PORT_BASE=46000, CYODA_LOCAL_DATA_ROOT=<outputs>/data, no plugin config, CYODA_DEFAULT_ENDPOINT=http://localhost:1). <root> is the real path of outputs/project (its own git repo). cyoda-status.sh: STATUS=unreachable SOURCE=default. Instead of stopping, test carries out setup's procedure: nothing in the repo says how to run cyoda-go, so it asks once, exactly: 'Run cyoda-go for local development and testing from the command line or in Docker?'. The developer answers command line. It runs `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> --run binary` (ENDPOINT=http://localhost:46000 HTTP=46000 GRPC=47010 ADMIN=47011 RUN=binary STATE=started), which records projects[<root>]. The fresh instance has no models (GET /model/ is []), so it registers order v1 from the manifest's files in the canonical order (sample import, lock, workflow import with the schema version from `workflows schema-version versions`), then creates an order from the manifest's sample (state draft), fires submit with PATCH {} (merge-patch, If-Match: *), checks submitted and prints the summary table with order v1 PASS. No typed command.",
+      "files": {
+        "README.md": "# shop\n\nOrder service built on cyoda-go.\n",
+        "package.json": "{\"name\":\"shop\",\"version\":\"0.1.0\"}",
+        "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"order\",\"modelVersion\":1,\"sample\":\"src/data/order-v1-sample.json\",\"workflow\":\"src/workflows/order-v1-workflow.json\",\"config\":\"src/config/order-v1-config.json\"}]}",
+        "src/data/order-v1-sample.json": "{\"orderId\":\"ORD-1\",\"customer\":\"ACME Ltd\",\"amount\":250}",
+        "src/workflows/order-v1-workflow.json": "{\"workflows\":[{\"version\":\"${SCHEMA_VERSION}\",\"name\":\"order\",\"initialState\":\"draft\",\"active\":true,\"states\":{\"draft\":{\"transitions\":[{\"name\":\"submit\",\"next\":\"submitted\",\"manual\":true}]},\"submitted\":{}}}]}",
+        "src/config/order-v1-config.json": "{\"uniqueKeys\":[],\"changeLevel\":null,\"env\":{}}",
+        "_simulated/developer.md": "A fresh checkout of the project; the `cyoda` binary is installed. The developer runs local tools straight from the shell rather than in containers. To anything else, a short yes."
+      },
+      "assertions": [
+        {
+          "id": "run-question",
+          "text": "With no instance answering, asks exactly once, in these words: 'Run cyoda-go for local development and testing from the command line or in Docker?' (not the localhost:8080 wording), and before the summary asks the developer nothing else",
+          "type": "format"
+        },
+        {
+          "id": "starts-binary",
+          "text": "Starts the instance with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-local.sh start <root> --run binary` (no `--storage`, or `--storage memory`), whose real output is ENDPOINT=http://localhost:46000 … RUN=binary STATE=started; starts no `cyoda` process by hand and runs no docker",
+          "type": "behavior"
+        },
+        {
+          "id": "entry-recorded",
+          "text": "Afterwards outputs/plugin-config.json has projects[<real path of outputs/project>] with run `binary`, ports {http 46000, grpc 47010, admin 47011}, storage `memory` and endpoint http://localhost:46000",
+          "type": "behavior"
+        },
+        {
+          "id": "registers-from-project",
+          "text": "Finding order v1 from cyoda-manifest.json missing on the fresh instance, registers it from the project's files in the canonical order (sample import, lock, workflow import with the schema version substituted), with real 2xx responses, and changes no project file",
+          "type": "behavior"
+        },
+        {
+          "id": "smoke-test-runs",
+          "text": "Creates an order from src/data/order-v1-sample.json, fires `submit` with PATCH `{}` (merge-patch, `If-Match: *`), reports the state `submitted` against the workflow with real responses, and prints the summary table with order v1 PASS",
+          "type": "behavior"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         }
       ]

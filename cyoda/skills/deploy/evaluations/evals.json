@@ -55,8 +55,8 @@
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         },
         {
@@ -110,8 +110,8 @@
           "type": "format"
         },
         {
-          "id": "no-invoke",
-          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         },
         {
@@ -166,8 +166,8 @@
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         },
         {
@@ -180,7 +180,7 @@
     {
       "id": 4,
       "prompt": "/cyoda:deploy — deploy this to docker",
-      "expected_output": "Status is connected but the project has no cyoda-manifest.json and the scan finds no *-v*-sample.json files. The skill explains that deploy seeds from the versioned files /cyoda:build writes, that none exist, and hands off with 'next, type `/cyoda:build`' (it can create them or export existing models). It writes no deployment files and doesn't fall back to exporting live models itself.",
+      "expected_output": "Status is connected but the project has no cyoda-manifest.json and the scan finds no *-v*-sample.json files. The skill explains that deploy seeds from the versioned files `cyoda:build` writes (it can create them or export existing models) and that none exist. It writes no deployment files, doesn't fall back to exporting live models itself, and asks the developer to type no command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -189,12 +189,12 @@
       "assertions": [
         {
           "id": "explains-missing",
-          "text": "Explains that the seed needs the versioned model and workflow files written by /cyoda:build and that none were found",
+          "text": "Explains that the seed needs the versioned model and workflow files written by `cyoda:build` and that none were found",
           "type": "behavior"
         },
         {
-          "id": "build-handoff",
-          "text": "Hands off with 'next, type `/cyoda:build`'",
+          "id": "build-pointer",
+          "text": "Names `cyoda:build` as where the versioned files come from, without telling the developer to type or run anything",
           "type": "behavior"
         },
         {
@@ -208,8 +208,8 @@
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         },
         {
@@ -293,8 +293,8 @@
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         },
         {
@@ -369,8 +369,8 @@
           "type": "behavior"
         },
         {
-          "id": "no-invoke",
-          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself",
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
           "type": "behavior"
         },
         {
@@ -415,9 +415,9 @@
           "text": "The hand-over lists seed.sh and verify.sh for each of int, uat and prod, each with CYODA_ENDPOINT set to that stage's API URL (http://<stage>.shop.example.com:18080), and each seed with --env set to that stage (--env int, --env uat, --env prod)"
         },
         {
-          "id": "no-invoke",
-          "type": "behavior",
-          "text": "Every hand-off is phrased 'next, type `/cyoda:<skill>`' with a reason; it never says it will invoke or run another skill itself"
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
+          "type": "behavior"
         },
         {
           "id": "writes-only",
