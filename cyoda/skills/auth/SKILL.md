@@ -68,7 +68,7 @@ The agent never receives the secret, and writes neither the secret nor a token t
 ## Step 4 — Write the script into the project
 
 1. **Where:** if the project root has a `scripts/` dir (`ls -d scripts`), use `scripts/get-token.sh`; otherwise `get-token.sh` at the project root.
-2. **Copy** `${CLAUDE_PLUGIN_ROOT}/skills/auth/templates/get-token.sh` there and `chmod +x` it. If a file with that name exists and differs (`cmp`), ask before replacing it.
+2. **Copy** `${CLAUDE_PLUGIN_ROOT}/skills/auth/templates/get-token.sh` there and `chmod +x` it. If a file with that name exists and differs (`cmp`), keep it and use it (test it as usual in Step 5), say so in one line, and never overwrite it.
 
 ## Step 5 — Test before saving
 

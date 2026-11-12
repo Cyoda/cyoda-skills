@@ -67,9 +67,8 @@ Model        | Transitions fired | Result
 <e> v<v>     | N                 | PASS / FAIL (step, errorCode)
 ```
 
-Then offer:
-- **Clean-up**: "Delete the N test entities? (yes/no)". On yes, `DELETE /entity/{id}` for each id created in this run, nothing else. Delete is soft: the history stays, and no workflow runs. Never send the model-wide `DELETE /entity/{e}/{v}`: with no condition it deletes every entity of the model.
-- **History**: "Show the audit trail of `<id>`?" On yes, use the `cyoda:debug` skill in observation mode for that entity.
+Then:
+- **Clean-up**: `DELETE /entity/{id}` for each id created in this run, nothing else; the models stay. Say so in one line. Delete is soft: the history stays, and no workflow runs. Never send the model-wide `DELETE /entity/{e}/{v}`: with no condition it deletes every entity of the model.
 - A failure: give the call, status and body; diagnosing it is covered by `cyoda:debug`, and a workflow fix by `cyoda:build`.
 
 ## Guided mode
