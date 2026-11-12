@@ -16,7 +16,7 @@ Two modes: **debugging** (something failed or looks wrong) and **observation** (
 |---|---|---|
 | 0 | 2xx | continue |
 | 1 | invalid config file, or `CYODA_PROFILE` names a profile that doesn't exist | show stderr and stop; the plugin config is covered by `cyoda:setup` |
-| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error and carry out `cyoda:auth`'s procedure yourself (read `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md`); once a call succeeds, re-run the failed call and go on. Otherwise the error is evidence: read it (Path A) |
+| 22 | HTTP ≥ 400, or `HTTP_STATUS=000` | `000` means curl never got a response (bad `@file` path, connection refused): fix the call, it isn't server evidence. 401/403: the script already retried once with a fresh token. Show the error and carry out `cyoda:auth`'s procedure yourself (read `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md`), explaining the error from `auth tokens --section ERRORS` (and `auth clients --section "REQUEST FLOW"` for a rejected client) with the section named; once a call succeeds, re-run the failed call and go on. Otherwise the error is evidence: read it (Path A) |
 | 4 | the profile's tokenCommand failed | show stderr and carry out `cyoda:auth`'s procedure, as for a 401 |
 | 5 | no endpoint configured | say so; starting or linking an instance is covered by `cyoda:setup` |
 | 64 | usage error (a leading `-` or a missing method/path) | fix the call form |

@@ -30,7 +30,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. `STATUS=connected`: show an
 ### No instance or no token
 
 - **Get an instance** (`STATUS` not `connected`, or exit 5): carry out `cyoda:setup`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/setup/SKILL.md` and follow its *Getting an instance* for this project. Then go on with the increment.
-- **Get a token** (401/403, or exit 4): carry out `cyoda:auth`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md` and follow it for the bound instance. Once a call succeeds, re-run the failed call and go on. While the token can't be had (credentials only the developer holds), register nothing further.
+- **Get a token** (401/403, or exit 4): carry out `cyoda:auth`'s procedure yourself: read `${CLAUDE_PLUGIN_ROOT}/skills/auth/SKILL.md` and follow it for the bound instance. Explain the error from help: read `cyoda-help.sh auth tokens --section ERRORS` (and `auth clients --section "REQUEST FLOW"` for a rejected client) and name the section next to the fact. Once a call succeeds, re-run the failed call and go on. While the token can't be had (credentials only the developer holds), register nothing further.
 
 ## Step 1 — Inspect
 
@@ -87,7 +87,7 @@ Count entities with `cyoda-call.sh GET /entity/stats/{e}/{v}` (`.count`; help: `
 Take each answer from the request, plan or design; ask only those it leaves open. Record them in the entity's `-config.json` (schema: [templates/entity-config.json](templates/entity-config.json)):
 
 1. **Unique keys**: any field or field combination that must be unique? Shape and limits: `models --section ENDPOINTS` (unique-keys). Record them in `uniqueKeys` (`[]` for none).
-2. **changeLevel**: read the values from `models --section ENDPOINTS` (changeLevel) and `models --section LIFECYCLE`. Then ask: "Which changeLevel do you want? None keeps the schema strict: entities and processor output may only use the sample's fields. Or one of the values listed there, from least to most permissive." Ask whether any processor writes fields that aren't in the sample, because a strict schema rejects them. Record the choice in `changeLevel`, or `null` for none.
+2. **changeLevel**: read the values from `models --section ENDPOINTS` (changeLevel) and `models --section LIFECYCLE`. Choose `null` (strict: entities and processor output may only use the sample's fields) unless the requirement says the schema must grow or a processor writes fields that aren't in the sample; then the least permissive value listed there that allows it. State the choice in one line, naming the section, and record it in `changeLevel`.
 3. Leave `env` as `{}`.
 
 ## Step 5 — Generate and show
