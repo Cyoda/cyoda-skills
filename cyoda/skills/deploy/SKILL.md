@@ -110,6 +110,8 @@ Both compose files publish host ports 18080 (API), 19090 (gRPC) and 19091 (admin
 
 List what was written, one line per file (a `get-token.sh` copied in Step 5: its path, marked as new), then what the pipeline runs, per stage: the commands below in this order, with the real paths, namespace, hosts and `VERSION` filled in (from the project root). For several stages, write the commands out in full for each stage, each with that stage's `<API_URL>` and `--env <stage>`.
 
+Single-user: the hand-over also says, in one line, that it runs mock auth on `127.0.0.1`, so anyone who can reach the ports is admin.
+
 **Compose** (for single-user, skip 1 and leave out every `CYODA_TOKEN_COMMAND` and `CYODA_CLIENT_*`):
 
 ```bash
