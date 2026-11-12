@@ -109,7 +109,7 @@
         },
         {
           "id": "overlap-routing",
-          "text": "Says routing needs only one overlapping tag and that the workflows PROCESSORS 'all tags' wording is wrong (#684-B)",
+          "text": "Says routing needs only one overlapping tag between the processor's calculationNodesTags and the node's tags (naming the #684-B help discrepancy is optional unless the developer cites the 'all tags' wording)",
           "type": "behavior"
         },
         {
