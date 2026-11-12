@@ -29,7 +29,7 @@ The seed loads the files `cyoda:build` keeps, never live exports: model import a
 1. Read `cyoda-manifest.json` at the project root. Check that every `sample`, `workflow` and `config` path it lists exists (paths are relative to the manifest's dir).
 2. **No manifest:** find `{entity}-v{version}-{sample,workflow,config}.json` files (`build`'s naming) and write `cyoda-manifest.json` from them, saying so in one line: `{"manifestVersion":1,"entities":[{name, modelVersion, sample, workflow, config}, ...]}` (schema: `${CLAUDE_PLUGIN_ROOT}/skills/build/templates/cyoda-manifest.json`; `modelVersion` is an integer).
 3. **Nothing found:** "Deploy seeds the new instance from the versioned model and workflow files that `cyoda:build` writes (it creates them, or exports the models already on the instance), and this project has none." Stop.
-4. A manifest entity that isn't LOCKED on the local instance hasn't been registered and tested yet: name it and ask whether to continue.
+4. A manifest entity that isn't LOCKED on the local instance: continue, and say in one line that `seed.sh` registers it from the project files.
 
 ## Step 2 — Target
 
@@ -71,7 +71,7 @@ jq --arg st '<stage>' --argjson cl '<null or "VALUE">' '.env = ((.env // {}) + {
 
 ## Step 4 — Output dir
 
-If `deploy/` exists use `deploy/cyoda/`; else if `ops/` exists use `ops/cyoda/`; else `deploy/cyoda/`. If a file to write already exists there and differs (`cmp`), ask before replacing it.
+If `deploy/` exists use `deploy/cyoda/`; else if `ops/` exists use `ops/cyoda/`; else `deploy/cyoda/`. If a file to write already exists there and differs (`cmp`), keep it, write the generated one beside it as `<name>.new`, say so in one line, and never overwrite it.
 
 ## Step 5 — Write the artifacts
 
