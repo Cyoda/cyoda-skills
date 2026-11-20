@@ -84,7 +84,12 @@ test_lint_flags_stale_strings() {
 test_lint_every_rule_fires() {
   local D=cyoda/skills/design/SKILL.md C=cyoda/skills/compute/SKILL.md
   lint_fires stale-tap "$D" 'brew tap cyoda-platform/cyoda-go'
-  lint_fires stale-org-url "$D" 'see https://github.com/Cyoda-platform/foo'
+  lint_fires stale-org "$D" 'see https://github.com/Cyoda-platform/foo'
+  lint_fires stale-org "$D" 'see https://github.com/cyoda-platform/foo'
+  lint_fires stale-org "$D" 'curl -O https://raw.githubusercontent.com/Cyoda-platform/foo/main/x.sh'
+  lint_fires stale-org "$D" 'docker pull ghcr.io/cyoda-platform/cyoda:0.8.4'
+  lint_fires stale-org "$D" 'helm repo add cyoda https://cyoda-platform.github.io/cyoda-go'
+  lint_fires stale-org "$D" 'brew install cyoda-platform/cyoda/cyoda'
   lint_fires workflow-version-1 "$D" '  "version": "1",'
   lint_fires readyz-api-port "$D" 'curl localhost:8080/readyz'
   lint_fires discover-mode "$D" 'use Discover mode here'
@@ -106,7 +111,7 @@ test_lint_every_rule_fires() {
 
 test_lint_clean_lines_pass() {
   local D=cyoda/skills/design/SKILL.md
-  lint_quiet "$D" 'brew install cyoda-platform/cyoda/cyoda'
+  lint_quiet "$D" 'brew install cyoda/cyoda-go/cyoda'
   lint_quiet "$D" '"version": "2"'
   lint_quiet "$D" 'curl localhost:9091/readyz'
   lint_quiet "$D" 'admin port serves /readyz'

@@ -46,7 +46,9 @@ scan() {
 }
 
 scan stale-tap 'cyoda-platform/cyoda-go' ${FILES[@]+"${FILES[@]}"}
-scan stale-org-url 'github\.com/Cyoda-platform' ${FILES[@]+"${FILES[@]}"}
+# The old GitHub org name is unowned: anything that reaches it (repo, raw
+# file, image, Pages site, tap) can be served by whoever registers it.
+scan stale-org '[Cc][Yy][Oo][Dd][Aa]-[Pp][Ll][Aa][Tt][Ff][Oo][Rr][Mm]' ${FILES[@]+"${FILES[@]}"}
 scan workflow-version-1 '"version": *"1"' ${FILES[@]+"${FILES[@]}"}
 if [ ${#FILES[@]} -gt 0 ]; then
   grep -nHE -e '/readyz' "${FILES[@]}" 2>/dev/null \
