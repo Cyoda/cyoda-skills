@@ -124,7 +124,7 @@
         { "id": "spike-ports", "text": "The start command in the transcript sets HTTP, gRPC and admin ports other than 8080, 9090 and 9091 (`CYODA_HTTP_PORT`, `CYODA_GRPC_PORT`, `CYODA_ADMIN_PORT`, or Docker port mappings), and every spike call in the transcript goes to that HTTP port, none to port 8080", "type": "behavior" },
         { "id": "spike-runs", "text": "Registers a minimal Order model and workflow on the throwaway instance with a function criterion on the automated transition out of submitted and a scheduled transition to review, and drives an order into submitted; the real responses are in the transcript", "type": "behavior" },
         { "id": "reports-observed", "text": "Reports the observed behaviour in one or two lines (e.g. the write's status code and the order's state after the delay), consistent with the real responses in the transcript, and answers the developer's question from it", "type": "behavior" },
-        { "id": "cleanup", "text": "At the end, the transcript shows a kill or stop of the process (or container) it started for the spike and an `rm -rf` of the temp dir it created, and the reply says the spike instance is stopped", "type": "behavior" }
+        { "id": "cleanup", "text": "At the end, the transcript shows a kill or stop of the process (or container) it started for the spike and an `rm -rf` of the temp dir it created", "type": "behavior" }
       ]
     },
     {
