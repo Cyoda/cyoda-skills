@@ -10,7 +10,9 @@ scenario_main() {
   mk() { printf '{"orderRef":"ORD-%s","amount":5000}' "$1"; }
   for i in 1 2 3; do body="$(mk "$i")"; ids+=("$(create_entity orders 1 "$body")"); done
   sleep 0.3
-  pit="$(python3 -c 'import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]+"Z")')"
+  # The instant comes from the server: a client-clock "now" can be later than the
+  # consistency time and is then refused (`cyoda help crud`, POINT-IN-TIME SEMANTICS).
+  pit="$(curl -s "$BASE/entity/consistency-time" | jq -r .consistencyTime)"
   sleep 0.3
   for i in 4 5; do body="$(mk "$i")"; ids+=("$(create_entity orders 1 "$body")"); done
   # entities 4 and 5 -> submitted; 1-3 stay draft

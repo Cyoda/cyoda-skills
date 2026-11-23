@@ -32,7 +32,7 @@ start_server() {
   env CYODA_STORAGE_BACKEND=memory CYODA_IAM_MODE=mock \
       CYODA_HTTP_PORT="$SMOKE_HTTP_PORT" CYODA_GRPC_PORT="$SMOKE_GRPC_PORT" \
       CYODA_ADMIN_PORT="$SMOKE_ADMIN_PORT" "$@" \
-      cyoda >"$SMOKE_TMP/server.log" 2>&1 &
+      cyoda serve >"$SMOKE_TMP/server.log" 2>&1 &
   SMOKE_PID=$!
 
   local _

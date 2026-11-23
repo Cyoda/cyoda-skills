@@ -156,12 +156,14 @@ test_local_repo_override() {
   cat >"$d/compose.yaml" <<'YAML'
 services:
   cyoda:
-    image: ghcr.io/cyoda/cyoda:0.8.4
+    image: ghcr.io/cyoda/cyoda:0.9.0
     ports:
       - "127.0.0.1:31000:8080"
     environment:
       CYODA_STORAGE_BACKEND: memory
       CYODA_IAM_MODE: mock
+      CYODA_HTTP_BIND_ADDRESS: 0.0.0.0
+      CYODA_GRPC_BIND_ADDRESS: 0.0.0.0
 YAML
   sum="$(shasum "$d/compose.yaml")"
   rm -f "$CYODA_PLUGIN_CONFIG"; listen 31000; p=$LPID
@@ -232,12 +234,14 @@ test_local_repo_unmanaged_left_running() {
   cat >"$d/compose.yaml" <<'YAML'
 services:
   cyoda:
-    image: ghcr.io/cyoda/cyoda:0.8.4
+    image: ghcr.io/cyoda/cyoda:0.9.0
     ports:
       - "127.0.0.1:31000:8080"
     environment:
       CYODA_STORAGE_BACKEND: memory
       CYODA_IAM_MODE: mock
+      CYODA_HTTP_BIND_ADDRESS: 0.0.0.0
+      CYODA_GRPC_BIND_ADDRESS: 0.0.0.0
 YAML
   docker compose -p extrepo -f "$d/compose.yaml" up -d >/dev/null 2>&1
   for _ in $(seq 1 60); do [ -n "$(health http://localhost:31000)" ] && break; sleep 0.5; done
@@ -320,12 +324,14 @@ compose_file() { # dir host-http [name]
     cat <<YAML
 services:
   cyoda:
-    image: ghcr.io/cyoda/cyoda:0.8.4
+    image: ghcr.io/cyoda/cyoda:0.9.0
     ports:
       - "127.0.0.1:$2:8080"
     environment:
       CYODA_STORAGE_BACKEND: memory
       CYODA_IAM_MODE: mock
+      CYODA_HTTP_BIND_ADDRESS: 0.0.0.0
+      CYODA_GRPC_BIND_ADDRESS: 0.0.0.0
 YAML
   } >"$1/compose.yaml"
 }
