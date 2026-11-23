@@ -48,9 +48,14 @@ The plugin keeps its connections in `~/.config/cyoda/cyoda-plugin-config.json`: 
 
 The plugin's MAJOR.MINOR follows the cyoda-go release line it targets: plugin 0.8.x is written for cyoda-go 0.8.x, and its patch number counts the plugin's own revisions. `/cyoda:setup` warns when the instance (or, without one, the local `cyoda`) runs a different line.
 
-## Release notes — 0.9.0 (unreleased, needs cyoda-go 0.9.0)
+## Release notes — 0.9.0
 
-- Workflow best practices updated for cyoda-go 0.9.0: function conditions may nest (*Put the cheap test before the callout*), `idempotent: true` processors, scheduled-transition `timeoutMs` retries, `WORKFLOW_SKIP`.
+- Targets cyoda-go 0.9.0. Its breaking changes are in the [cyoda-go 0.9.0 release notes](https://github.com/Cyoda/cyoda-go/releases/tag/v0.9.0); the skills follow them.
+- `auth`: no bootstrap client and no OIDC. Tokens come from an M2M client of a tenant (`get-token.sh` now needs `CYODA_TENANT`) or, for whoever holds the signing key, from `cyoda token`.
+- `deploy`: seed and verify get their token from `cyoda token` in the container or pod, so no deployer secret is stored; the checklist creates the app's and compute nodes' clients. Compose files bind the listeners to `0.0.0.0`; Helm values follow chart 0.9.0.
+- `compute` and `debug`: a compute node connects with its own client's token; explicit `success: false`, required `matches`, `idempotent: true`, callout failover, callback rules, the consistency time and scheduled tasks that end `FAILED`.
+- `design` and `build` read the practices in `cyoda help design`; the bundled file keeps only the ones help doesn't have.
+- The workarounds for `cyoda help` errors are gone: cyoda-go 0.9.0 fixed them.
 - Run `/plugin marketplace update cyoda` to pick up this release.
 
 ## Release notes — 0.8.1
