@@ -110,14 +110,14 @@ Then verify with `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh GET /model/`. Exit
 
 ## Step 7 — The developer's own app
 
-Read `cyoda-help.sh auth integration` (the steps for its parts: backend acting for users, jobs, compute nodes; ERRORS AND RETRIES), and `auth tokens --section "REQUEST FLOW"`, then explain for the app's parts:
-- One client per part. A part acting for its signed-in users uses an on-behalf-of client and a trusted key, and exchanges a user assertion per user; jobs and compute nodes use plain clients with `client_credentials`. A compute node can't open its stream with any other token.
-- **No refresh token.** Mint again with the same grant when less than about 60 s remain (`expires_in`), and once more on a 401.
+Read `cyoda-help.sh auth tokens --section "REQUEST FLOW"` and `--section TOKEN`, then explain (the step-by-step for each part is `auth integration`):
+- **No refresh token.** The app's own code mints again with the same grant when less than about 60 s remain (`expires_in`), and once more on a 401; `get-token.sh` only serves the plugin's calls.
+- One client per part of the app. A part acting for its signed-in users uses an on-behalf-of client and a trusted key, and exchanges a user assertion per user; jobs and compute nodes use plain clients with `client_credentials`. A compute node can't open its stream with any other token.
 - `Authorization: Bearer <token>` on REST; a compute node sends it in gRPC metadata (`grpc --section CONNECTION`).
 
 ## Finish
 
-Report: the script's path, the profile (or project entry) and its `tokenCommand`, and the verify result.
+Report: the script's path, the profile (or project entry) and its `tokenCommand`, the verify result, and the Step 7 points for the app.
 
 ## Common mistakes
 

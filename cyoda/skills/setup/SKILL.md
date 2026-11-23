@@ -58,7 +58,7 @@ Then [Finish](#finish). A `WARN=` from the first status run that this procedure 
 |---|---|
 | 1 | invalid plugin config: show stderr, stop |
 | 3 | no free port block: show stderr, stop |
-| 4 | did not become healthy (it cleaned up): show stderr, stop. For `start-repo`, a cyoda-go service whose environment doesn't set `CYODA_HTTP_BIND_ADDRESS` and `CYODA_GRPC_BIND_ADDRESS` to `0.0.0.0` can't be reached through its published ports (`cyoda-help.sh run --section "RUN MODES"`, Docker): say so |
+| 4 | did not become healthy (it cleaned up): show stderr, stop. For `start-repo`, a cyoda-go service whose environment doesn't set `CYODA_HTTP_BIND_ADDRESS` and `CYODA_GRPC_BIND_ADDRESS` to `0.0.0.0` can't be reached through its published ports (`cyoda-help.sh run --section "RUN MODES"`, Docker): say so, and offer to run `start-repo` again once they've added them |
 | 5 | `cyoda` missing → [install](#install) and run it again; `docker` or `lsof` missing → show stderr, stop |
 | 64 | usage error (a missing or wrong argument, no such directory): fix the call |
 
