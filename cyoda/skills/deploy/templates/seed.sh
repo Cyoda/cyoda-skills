@@ -140,7 +140,7 @@ while [ "$i" -lt "$COUNT" ]; do
     *) fail "$E v$V: changeLevel '$CL' for env '$ENV_NAME' is not one of ARRAY_LENGTH, ARRAY_ELEMENTS, TYPE, STRUCTURAL or null ($CONFIG); nothing was written" ;;
   esac
 
-  # Strict import (#684-I): only importMode + workflows; an export's other fields are dropped.
+  # Strict import (`cyoda help workflows`, EXPORT RESPONSE): only importMode + workflows.
   jq --arg v "$SCHEMA_VERSION" '{importMode: "REPLACE",
       workflows: [.workflows[] | if (.version == null or .version == "${SCHEMA_VERSION}") then .version = $v else . end]}' \
     "$WORKFLOW" > "$TMP/workflow-$i.json" 2>/dev/null \

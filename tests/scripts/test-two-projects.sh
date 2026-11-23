@@ -37,7 +37,9 @@ export CYODA_PLUGIN_CONFIG="$T/global.json"
 unset CYODA_PROFILE
 # Project A's token script reads the client credentials from the environment,
 # as /cyoda:auth sets it up; the project entry holds only the relative command.
-export CYODA_CLIENT_ID=evalclient CYODA_CLIENT_SECRET=evalsecret
+# start.sh created client evalclient in tenant eval; its secret is in client.json.
+export CYODA_TENANT=eval CYODA_CLIENT_ID=evalclient
+CYODA_CLIENT_SECRET="$(jq -r .client_secret "$EV/.state/s401/client.json")"; export CYODA_CLIENT_SECRET
 
 PA="$HOME/work/alpha"; PB="$HOME/work/beta"
 mkdir -p "$PA/scripts" "$PA/src" "$PB/src"

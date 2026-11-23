@@ -2,9 +2,8 @@
 # Keep every port on 127.0.0.1. For a team or any shared host, use
 # compose.shared.yaml (JWT mode) instead.
 #
-# Based on deploy/docker/compose.yaml at cyoda-go tag v0.8.4, with the image
-# pinned and the upstream commented "production" block removed (it enables
-# CYODA_REQUIRE_JWT without CYODA_IAM_MODE=jwt and passes the PEM inline).
+# Based on deploy/docker/compose.yaml at cyoda-go tag v0.9.0, with the image
+# pinned and the commented "production" block removed (compose.shared.yaml is that).
 # Facts: cyoda help run (RUN MODES: Docker Compose; HEALTH PROBES; PORT LAYOUT).
 #
 #   docker compose -f compose.yaml up -d
@@ -15,7 +14,7 @@
 # cyoda-go already holds 8080/9090/9091; override with CYODA_HOST_*_PORT.
 services:
   cyoda:
-    image: ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4}
+    image: ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.9.0}
     ports:
       - "127.0.0.1:${CYODA_HOST_HTTP_PORT:-18080}:8080"
       - "127.0.0.1:${CYODA_HOST_GRPC_PORT:-19090}:9090"
@@ -24,7 +23,10 @@ services:
       CYODA_STORAGE_BACKEND: sqlite
       CYODA_SQLITE_PATH: /var/lib/cyoda/cyoda.db
       CYODA_IAM_MODE: mock
-      # Needed in a container so the healthcheck and port 9091 can reach the probes.
+      # Listeners bind 127.0.0.1 by default; in a container they must bind every
+      # interface for the published ports (and the healthcheck) to reach them.
+      CYODA_HTTP_BIND_ADDRESS: 0.0.0.0
+      CYODA_GRPC_BIND_ADDRESS: 0.0.0.0
       CYODA_ADMIN_BIND_ADDRESS: 0.0.0.0
     volumes:
       - cyoda-data:/var/lib/cyoda

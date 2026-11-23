@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Print a fresh cyoda-go access token (JWT) on stdout, nothing else.
-# M2M client_credentials grant: POST <endpoint>/api/oauth/token with HTTP
-# Basic auth (see `cyoda help auth tokens`, REQUEST FLOW). cyoda-go issues no
-# refresh token: run this again whenever you need a token.
+# M2M client_credentials grant: POST <endpoint>/api/tenants/<tenant>/oauth/token
+# with HTTP Basic auth (see `cyoda help auth tokens`, REQUEST FLOW). cyoda-go
+# issues no refresh token: run this again whenever you need a token.
 #
 # Environment:
 #   CYODA_ENDPOINT           instance base URL, e.g. http://localhost:8080
 #                            (the cyoda plugin sets it from the profile)
+#   CYODA_TENANT             the client's tenant
 #   CYODA_CLIENT_ID          M2M client id
 #   CYODA_CLIENT_SECRET      M2M client secret, or instead:
 #   CYODA_CLIENT_SECRET_CMD  command that prints the secret, e.g.
@@ -24,6 +25,9 @@ endpoint="${CYODA_ENDPOINT:-}"
 endpoint="${endpoint%/}"
 endpoint="${endpoint%/api}"
 
+tenant="${CYODA_TENANT:-}"
+[ -n "$tenant" ] || fail "CYODA_TENANT is not set (the client's tenant)"
+
 client_id="${CYODA_CLIENT_ID:-}"
 [ -n "$client_id" ] || fail "CYODA_CLIENT_ID is not set"
 
@@ -35,7 +39,7 @@ else
   [ -n "$secret" ] || fail "set CYODA_CLIENT_SECRET or CYODA_CLIENT_SECRET_CMD"
 fi
 
-url="$endpoint/api/oauth/token"
+url="$endpoint/api/tenants/$tenant/oauth/token"
 basic="$(printf '%s:%s' "$client_id" "$secret" | base64 | tr -d '\n')"
 
 # The Authorization header goes in on stdin (-H @-) so the secret stays out of `ps`.

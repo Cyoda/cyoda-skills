@@ -152,28 +152,33 @@ scenario_main() {
   assert_eq "$(grep -c -e '-H @' -e 'Authorization' "$tmp/curl-argv.log")" 0 "no auth header when CYODA_TOKEN_COMMAND is unset"
   unset -f entry manifest model_state post_code
 
-  # 14. JWT-mode server configured like compose.shared.yaml (key and bootstrap
-  #    secret from files): no token -> 401 and exit 1; get-token.sh -> seeded.
+  # 14. JWT-mode server configured like compose.shared.yaml (key from a file):
+  #    no token -> 401 and exit 1; an admin-only `cyoda token` -> 403; the deploy
+  #    skill's token command (`cyoda token --roles ROLE_M2M`, here run locally
+  #    with the same key instead of in the container) -> seeded.
   stop_server
   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$tmp/signing.pem" 2>/dev/null \
     || { _bad "openssl genpkey"; rm -rf "$tmp"; return 1; }
-  printf 'smoke-only-secret\n' > "$tmp/bootstrap-client-secret"
   start_server CYODA_IAM_MODE=jwt CYODA_REQUIRE_JWT=true CYODA_JWT_SIGNING_KEY_FILE="$tmp/signing.pem" \
-    CYODA_BOOTSTRAP_CLIENT_ID=seed-ci CYODA_BOOTSTRAP_CLIENT_SECRET_FILE="$tmp/bootstrap-client-secret" \
     || { _bad "start JWT-mode server"; rm -rf "$tmp"; return 1; }
   out="$(CYODA_ENDPOINT="$ep" bash "$tpl/seed.sh" --manifest "$fx/cyoda-manifest.json" --env production 2>&1)"; rc=$?
   assert_status 1 "$rc" "JWT server, no token command: seed exits 1"
   assert_contains "$out" "401" "JWT server, no token command: 401 shown"
   local tokcmd
-  tokcmd="bash $(printf %q "$root/cyoda/skills/auth/templates/get-token.sh")"
-  out="$(CYODA_ENDPOINT="$ep" CYODA_TOKEN_COMMAND="$tokcmd" CYODA_CLIENT_ID=seed-ci CYODA_CLIENT_SECRET=smoke-only-secret \
+  tokcmd="cd $(printf %q "$tmp") && CYODA_JWT_SIGNING_KEY_FILE=signing.pem cyoda token --tenant shop --user shop-deploy"
+  out="$(CYODA_ENDPOINT="$ep" CYODA_TOKEN_COMMAND="$tokcmd" \
     bash "$tpl/seed.sh" --manifest "$fx/cyoda-manifest.json" --env production 2>&1)"; rc=$?
-  assert_status 0 "$rc" "JWT server, get-token.sh: seed exits 0"
+  assert_status 1 "$rc" "JWT server, cyoda token without ROLE_M2M: seed exits 1"
+  assert_contains "$out" "403" "JWT server, cyoda token without ROLE_M2M: 403 shown"
+  tokcmd="$tokcmd --roles ROLE_M2M"
+  out="$(CYODA_ENDPOINT="$ep" CYODA_TOKEN_COMMAND="$tokcmd" \
+    bash "$tpl/seed.sh" --manifest "$fx/cyoda-manifest.json" --env production 2>&1)"; rc=$?
+  assert_status 0 "$rc" "JWT server, cyoda token --roles ROLE_M2M: seed exits 0"
   assert_contains "$out" "SEEDED order v1" "JWT server: order seeded"
   assert_eq "$(grep -c '^WORKFLOW ' <<<"$out")" 2 "JWT server: 2 workflows imported"
-  out="$(CYODA_ENDPOINT="$ep" CYODA_TOKEN_COMMAND="$tokcmd" CYODA_CLIENT_ID=seed-ci CYODA_CLIENT_SECRET=smoke-only-secret \
+  out="$(CYODA_ENDPOINT="$ep" CYODA_TOKEN_COMMAND="$tokcmd" \
     bash "$tpl/verify.sh" --manifest "$fx/cyoda-manifest.json" 2>&1)"; rc=$?
-  assert_status 0 "$rc" "JWT server, get-token.sh: verify exits 0"
+  assert_status 0 "$rc" "JWT server, cyoda token --roles ROLE_M2M: verify exits 0"
 
   rm -rf "$tmp"
 }
