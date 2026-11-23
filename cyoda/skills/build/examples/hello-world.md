@@ -1,6 +1,6 @@
 # Hello world: the first increment
 
-A walkthrough of [hello-world/](hello-world/), the smallest entity that runs end to end on cyoda-go. Smoke scenario `01-hello-world` loads exactly these files, so they're known to work on v0.8.4.
+A walkthrough of [hello-world/](hello-world/), the smallest entity that runs end to end on cyoda-go. Smoke scenario `01-hello-world` loads exactly these files, so they're known to work on v0.9.0.
 
 ## The three files
 

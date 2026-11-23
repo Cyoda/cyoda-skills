@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Renders cyoda/skills/deploy/templates/values.yaml against the published chart
-# (cyoda/cyoda 0.8.4 from https://cyoda.github.io/cyoda-go) with `helm template`
+# (cyoda/cyoda 0.9.0 from https://cyoda.github.io/cyoda-go) with `helm template`
 # only: no cluster, no kubectl. Helm's repo config, cache, config and data dirs
 # are redirected to a temp dir, so the user's helm setup is untouched.
 # Needs helm and network access to the chart repo. DEPLOY_VALUES=<file> renders
@@ -11,7 +11,7 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 # shellcheck source=../lib/assert.sh
 . "$ROOT/tests/lib/assert.sh"
 
-CHART_VERSION=0.8.4
+CHART_VERSION=0.9.0
 VALUES="${DEPLOY_VALUES:-$ROOT/cyoda/skills/deploy/templates/values.yaml}"
 
 command -v helm >/dev/null 2>&1 || { echo "helm is required" >&2; exit 2; }
@@ -49,10 +49,11 @@ test_gateway_render() {
   y="$(cat "$out")"
   assert_contains "$y" "kind: StatefulSet" "renders the StatefulSet"
   assert_contains "$y" "image: ghcr.io/cyoda/cyoda:$CHART_VERSION" "image is ghcr.io/cyoda/cyoda:$CHART_VERSION"
-  # #684-D: a bootstrap client is always set, its secret from a pre-created Secret.
-  assert_contains "$y" "CYODA_BOOTSTRAP_CLIENT_ID:" "ConfigMap sets CYODA_BOOTSTRAP_CLIENT_ID"
-  assert_contains "$y" "CYODA_BOOTSTRAP_CLIENT_SECRET_FILE" "StatefulSet reads the bootstrap secret file"
-  assert_eq "$(next_line_after "$out" 'name: cyoda-bootstrap$' | head -n1)" "items:" "projected volume references Secret cyoda-bootstrap"
+  # 0.9.0: no bootstrap client (the first admin token comes from `cyoda token`).
+  case "$y" in *BOOTSTRAP*|*cyoda-bootstrap*) _bad "no bootstrap client env or Secret" ;; *) _ok ;; esac
+  grep -q '^bootstrap:' "$VALUES"
+  assert_status 1 $? "values.yaml sets no bootstrap key (removed in chart 0.9.0)"
+  assert_contains "$y" "terminationGracePeriodSeconds: 390" "chart default termination grace (scheduler drain)"
   # Every credential comes from a Secret the developer pre-creates: the chart
   # renders none of its own (so helm template and GitOps work, no lookup needed).
   assert_eq "$(grep -c '^kind: Secret$' "$out")" 0 "chart renders no Secret of its own"

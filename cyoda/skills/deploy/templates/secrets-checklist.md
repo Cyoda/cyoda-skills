@@ -26,16 +26,12 @@ readable by that user (for example `chown 65532:65532` and `chmod 0400`).
 | # | Secret | Create it as | Read by | How |
 |---|---|---|---|---|
 | 1 | JWT signing key (RSA, PEM, ≥ 2048 bits) | `<DEPLOY_DIR>/secrets/signing.pem` | `CYODA_JWT_SIGNING_KEY_FILE` (mounted `:ro`) | `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out <DEPLOY_DIR>/secrets/signing.pem` |
-| 2 | Bootstrap M2M client id | `CYODA_BOOTSTRAP_CLIENT_ID` in your shell or `<DEPLOY_DIR>/.env` | `CYODA_BOOTSTRAP_CLIENT_ID` | any name, e.g. `<APP>-deployer` (not secret, but keep it with the secret) |
-| 3 | Bootstrap M2M client secret | `<DEPLOY_DIR>/secrets/bootstrap-client-secret` (one line) | `CYODA_BOOTSTRAP_CLIENT_SECRET_FILE` (mounted `:ro`) | a random value: `openssl rand -hex 32 > <DEPLOY_DIR>/secrets/bootstrap-client-secret` |
-| 4 | Postgres password | `<DEPLOY_DIR>/secrets/postgres-password` | `POSTGRES_PASSWORD_FILE` (postgres service) | a random value: `openssl rand -hex 32 > <DEPLOY_DIR>/secrets/postgres-password` (hex keeps the URL below valid) |
-| 5 | Postgres URL | `<DEPLOY_DIR>/secrets/postgres-url` | `CYODA_POSTGRES_URL_FILE` | `postgres://cyoda:<password from 4>@postgres:5432/cyoda?sslmode=disable`: `printf 'postgres://cyoda:%s@postgres:5432/cyoda?sslmode=disable\n' "$(cat <DEPLOY_DIR>/secrets/postgres-password)" > <DEPLOY_DIR>/secrets/postgres-url` |
+| 2 | Postgres password | `<DEPLOY_DIR>/secrets/postgres-password` | `POSTGRES_PASSWORD_FILE` (postgres service) | a random value: `openssl rand -hex 32 > <DEPLOY_DIR>/secrets/postgres-password` (hex keeps the URL below valid) |
+| 3 | Postgres URL | `<DEPLOY_DIR>/secrets/postgres-url` | `CYODA_POSTGRES_URL_FILE` | `postgres://cyoda:<password from 2>@postgres:5432/cyoda?sslmode=disable`: `printf 'postgres://cyoda:%s@postgres:5432/cyoda?sslmode=disable\n' "$(cat <DEPLOY_DIR>/secrets/postgres-password)" > <DEPLOY_DIR>/secrets/postgres-url` |
 
-- [ ] 1–5 created; `git status` shows none of them.
-- [ ] Store the client id and secret (2, 3) where the people and pipelines that seed and
-      call this instance can read them: a password manager, keychain or CI secret store.
-- [ ] Rotation: the signing key and bootstrap secret are read at startup; restart the
-      `cyoda` service after replacing them. See `cyoda help auth clients` for other clients.
+- [ ] 1–3 created; `git status` shows none of them.
+- [ ] The signing key (1) is the root credential: whoever holds it can sign any token
+      (`cyoda help cli token`). Keep a copy only where the operator's secrets live.
 - [ ] Cluster mode (more than one node) is out of scope for this file. It needs an HMAC
       secret too: `cyoda help config auth`, "HMAC secret".
 
@@ -58,42 +54,52 @@ exist yet (`cyoda help helm`, SECRETS PROVISIONING).
 | # | Secret | Kubernetes Secret (key) | Read by | How |
 |---|---|---|---|---|
 | 1 | JWT signing key (RSA, PEM, ≥ 2048 bits) | `cyoda-jwt` (`signing-key.pem`) | `jwt.existingSecret` → `CYODA_JWT_SIGNING_KEY_FILE` | `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \| kubectl create secret generic cyoda-jwt -n <NAMESPACE> --from-file=signing-key.pem=/dev/stdin` |
-| 2 | Bootstrap M2M client id | none: `bootstrap.clientId: <APP>-deployer` in `values.yaml` | `CYODA_BOOTSTRAP_CLIENT_ID` (ConfigMap) | already set; not secret |
-| 3 | Bootstrap M2M client secret | `cyoda-bootstrap` (`secret`) | `bootstrap.clientSecret.existingSecret` → `CYODA_BOOTSTRAP_CLIENT_SECRET_FILE` | `openssl rand -hex 32 \| tr -d '\n' \| kubectl create secret generic cyoda-bootstrap -n <NAMESPACE> --from-file=secret=/dev/stdin` |
-| 4 | Postgres DSN (your database; the chart runs none) | `cyoda-pg` (`dsn`) | `postgres.existingSecret` → `CYODA_POSTGRES_URL_FILE` (pods and migration Job) | `printf 'DSN: '; read -rs PG_DSN; echo; printf '%s' "$PG_DSN" \| kubectl create secret generic cyoda-pg -n <NAMESPACE> --from-file=dsn=/dev/stdin; unset PG_DSN`, typing `postgres://user:pass@host:5432/db?sslmode=require` |
-| 5 | HMAC secret (cluster mode is always on) | `cyoda-hmac` (`secret`) | `cluster.hmacSecret.existingSecret` → `CYODA_HMAC_SECRET_FILE` | `openssl rand -hex 32 \| tr -d '\n' \| kubectl create secret generic cyoda-hmac -n <NAMESPACE> --from-file=secret=/dev/stdin` |
-| 6 | Metrics bearer token (admin port 9091) | `cyoda-metrics-bearer` (`bearer`) | `monitoring.metricsBearer.existingSecret` → `CYODA_METRICS_BEARER_FILE` | `openssl rand -hex 24 \| tr -d '\n' \| kubectl create secret generic cyoda-metrics-bearer -n <NAMESPACE> --from-file=bearer=/dev/stdin` |
+| 2 | Postgres DSN (your database; the chart runs none) | `cyoda-pg` (`dsn`) | `postgres.existingSecret` → `CYODA_POSTGRES_URL_FILE` (pods and migration Job) | `printf 'DSN: '; read -rs PG_DSN; echo; printf '%s' "$PG_DSN" \| kubectl create secret generic cyoda-pg -n <NAMESPACE> --from-file=dsn=/dev/stdin; unset PG_DSN`, typing `postgres://user:pass@host:5432/db?sslmode=require` |
+| 3 | HMAC secret (cluster mode is always on) | `cyoda-hmac` (`secret`) | `cluster.hmacSecret.existingSecret` → `CYODA_HMAC_SECRET_FILE` | `openssl rand -hex 32 \| tr -d '\n' \| kubectl create secret generic cyoda-hmac -n <NAMESPACE> --from-file=secret=/dev/stdin` |
+| 4 | Metrics bearer token (admin port 9091) | `cyoda-metrics-bearer` (`bearer`) | `monitoring.metricsBearer.existingSecret` → `CYODA_METRICS_BEARER_FILE` | `openssl rand -hex 24 \| tr -d '\n' \| kubectl create secret generic cyoda-metrics-bearer -n <NAMESPACE> --from-file=bearer=/dev/stdin` |
 
-- [ ] 1–6 created: `kubectl get secret -n <NAMESPACE>` lists `cyoda-jwt`, `cyoda-bootstrap`,
-      `cyoda-pg`, `cyoda-hmac` and `cyoda-metrics-bearer`.
-- [ ] The people and pipelines that seed and call this instance can read the bootstrap
-      secret (3): with `kubectl get secret cyoda-bootstrap -n <NAMESPACE> -o jsonpath={.data.secret} | base64 -d`,
-      or from a password manager or CI secret store you copy it into.
+- [ ] 1–4 created: `kubectl get secret -n <NAMESPACE>` lists `cyoda-jwt`, `cyoda-pg`,
+      `cyoda-hmac` and `cyoda-metrics-bearer`.
 - [ ] Optional, two database roles: a second DSN Secret for the migration Job (the owner/DDL
-      role), set as `migrate.postgres.existingSecret` in `values.yaml`. That chart value is
-      missing from `cyoda help helm` VALUES (cyoda-go#684 item H).
+      role), set as `migrate.postgres.existingSecret` in `values.yaml`.
 - [ ] Rotation: secrets are read at startup; after replacing one, run
-      `kubectl rollout restart statefulset/cyoda -n <NAMESPACE>`. See `cyoda help auth clients`
-      for other clients.
+      `kubectl rollout restart statefulset/cyoda -n <NAMESPACE>`.
 
-## Tokens for seed.sh, verify.sh and your app
+## Tokens for seed.sh and verify.sh
 
 `seed.sh` and `verify.sh` run `CYODA_TOKEN_COMMAND` (with `CYODA_ENDPOINT` set) to get a
 JWT, and send no auth header when it's unset.
 
 - Single-user: leave `CYODA_TOKEN_COMMAND` unset.
-- Shared and Helm: `CYODA_TOKEN_COMMAND=<TOKEN_COMMAND>`, with `CYODA_CLIENT_ID` and
-  `CYODA_CLIENT_SECRET` (or `CYODA_CLIENT_SECRET_CMD`) set to the bootstrap client from
-  2 and 3.
+- Shared and Helm: `CYODA_TOKEN_COMMAND='<TOKEN_COMMAND>'`. It runs `cyoda token` where
+  the signing key is, for tenant `<TENANT>` with `ROLE_M2M` (`cyoda help cli token`): no
+  client and no stored secret.
+
+## Clients for your app and compute nodes
+
+Shared and Helm: your app and each compute-node service get an M2M client of their own in
+tenant `<TENANT>` (`cyoda help auth integration`, STEP 2). Create each once, with an admin
+token, and move `client_id` and `client_secret` into that part's secret store (the secret
+is shown once), then delete the file:
+
+```bash
+( umask 077; curl -sS --fail-with-body -o <APP>-compute.json -X POST "<API_URL>/api/clients?clientId=<APP>-compute" \
+    -H @<(printf 'Authorization: Bearer %s\n' "$(<ADMIN_TOKEN_COMMAND>)") )
+```
+
+`409 M2M_CLIENT_EXISTS`: the client exists; `PUT /api/clients/<id>/secret` issues a new
+secret (`cyoda help auth clients`). Tokens: `POST <API_URL>/api/tenants/<TENANT>/oauth/token`
+(`cyoda help auth tokens`).
 
 ## Compute nodes
 
-Compute nodes connect to the gRPC endpoint, not the REST port. Give each node:
+Compute nodes connect to the gRPC endpoint, not the REST port. Give each node (names as in
+`cyoda help config grpc`):
 
 | Variable | Value | Notes |
 |---|---|---|
 | `CYODA_COMPUTE_GRPC_ENDPOINT` | `<GRPC_ENDPOINT>` | host:port the node can reach |
-| `CYODA_COMPUTE_TOKEN` | single-user: none needed (mock auth); shared and Helm: a JWT from the token command above | tokens expire (`CYODA_JWT_EXPIRY_SECONDS`, default 1 h): fetch a fresh one on reconnect |
-| `CYODA_COMPUTE_HTTP_BASE` | `<API_URL>` | optional, for REST callbacks |
+| `CYODA_COMPUTE_TENANT_ID`, `CYODA_COMPUTE_CLIENT_ID`, `CYODA_COMPUTE_CLIENT_SECRET` | single-user: none needed (mock auth); shared and Helm: `<TENANT>` and the node's own client (above) | the stream opens only with that client's `client_credentials` token, never a `cyoda token` |
+| `CYODA_COMPUTE_HTTP_BASE` | `<API_URL>` | token endpoint and REST callbacks |
 
-Facts: `cyoda help config grpc`, `cyoda help grpc`.
+Facts: `cyoda help auth integration` (STEP 6), `cyoda help grpc`.

@@ -15,9 +15,9 @@ Facts: `cyoda help workflows` TRANSITIONS and CRITERIA. Closest smoke-tested sta
 
 After entering a waiting state, the entity moves on by itself after a delay if nothing else has moved it, e.g. `reserved` → `expired` after 15 minutes, or `errored` → `escalated` after 30 minutes.
 
-This is a `schedule` on an automated transition out of the waiting state: a fixed `delayMs`, or a per-entity time from a function. It isn't a processor, and it can't be fired by name. See the best practices *Expect frequent writes to postpone a scheduled transition* and *Poll for a condition that can become true without a write*.
+This is a `schedule` on an automated transition out of the waiting state: a fixed `delayMs`, or a per-entity time from a function. It isn't a processor, and it can't be fired by name. See the best practice *Give a scheduled transition a `timeoutMs`*.
 
-Facts: `cyoda help workflows` SCHEDULED TRANSITIONS (including "One-shot vs. polling"). Smoke-tested start: [build/examples/scheduled/](../../build/examples/scheduled/).
+Facts: `cyoda help workflows` SCHEDULED TRANSITIONS (including "Settled-interval reset" and "One-shot vs. polling"). Smoke-tested start: [build/examples/scheduled/](../../build/examples/scheduled/).
 
 ## Auto-Transition Cascade
 
@@ -26,11 +26,11 @@ Entity auto-advances through several states as soon as criteria are met, without
 States: `received` → `validated` → `enriched` → `ready`
 All transitions are automatic with criteria on each.
 
-Safety: cascades are bounded (depth and per-state visits, `CYODA_MAX_STATE_VISITS`). Exceeding a limit aborts and rolls back the write. Unguarded automated cycles are rejected at import unless the workflow allows cycles. Facts: `cyoda help workflows` ENGINE EXECUTION.
+Safety: cascades are bounded (depth and per-state visits, `CYODA_MAX_STATE_VISITS`). Exceeding a limit aborts and rolls back the write. Unguarded automated cycles are rejected at import unless the import sets `allowCycles: true`. Facts: `cyoda help workflows` ENGINE EXECUTION.
 
 ## Error State with Retry
 
-The straight-through path has an explicit error state. Its exit transition is held by a criterion, and a backward transition (or a loopback re-evaluation) retries. See the best practices *Model error states explicitly*, *Add backward transitions for retries and corrections* and *Re-trigger evaluation with a loopback, not by firing an automated transition*.
+The straight-through path has an explicit error state. Its exit transition is held by a criterion, and a backward transition (or a loopback re-evaluation) retries. See the best practices *Model error states*, *Add transitions back up the flow* and *Re-evaluate with a loopback, not by naming an automated transition*.
 
 Smoke-tested starts: [build/examples/error-states/](../../build/examples/error-states/) (errored state with a criterion-held retry), [build/examples/loopback/](../../build/examples/loopback/) (an update with no transition name re-evaluates a criterion-gated transition).
 
@@ -42,6 +42,6 @@ Cyoda has no built-in saga support. Implement it with compute-node processors th
 
 ## External Trigger
 
-An outside system (a webhook handler, a batch job, another service) moves an entity by calling the transition API on it. Model the transition as manual. See the best practice *Use manual transitions for external triggers*.
+An outside system (a webhook handler, a batch job, another service) moves an entity by calling the transition API on it. Model the transition as manual. See the best practice *Use manual transitions for steps the outside world triggers*.
 
 Edge messages (`cyoda help messages`) are a separate store and never fire a transition.

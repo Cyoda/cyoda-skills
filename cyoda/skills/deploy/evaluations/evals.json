@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "/cyoda:deploy — I want to run my shop app's cyoda on my laptop in Docker, just for me",
-      "expected_output": "Checks status and the local models, reads cyoda-manifest.json, recommends Docker Compose single-user (mock auth, loopback, labelled 'anyone who can reach these ports is admin'), writes deploy/cyoda/{compose.yaml, seed.sh, verify.sh, secrets-checklist.md} from the templates with image ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4} and host ports 127.0.0.1:18080/19090/19091 (not 8080/9090/9091, which the local cyoda-go holds), and ends with the ordered command list (up, health on http://localhost:18080, seed, verify with CYODA_ADMIN_URL=http://localhost:19091) without running any of them.",
+      "expected_output": "Checks status and the local models, reads cyoda-manifest.json, recommends Docker Compose single-user (mock auth, loopback, labelled 'anyone who can reach these ports is admin'), writes deploy/cyoda/{compose.yaml, seed.sh, verify.sh, secrets-checklist.md} from the templates with image ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.9.0} and host ports 127.0.0.1:18080/19090/19091 (not 8080/9090/9091, which the local cyoda-go holds), and ends with the ordered command list (up, health on http://localhost:18080, seed, verify with CYODA_ADMIN_URL=http://localhost:19091) without running any of them.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -16,7 +16,7 @@
         "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
         "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
         "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose single-user and says the stage is development and its schema isn't strict."
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0 BINARY_VERSION=0.9.0. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose single-user and says the stage is development and its schema isn't strict."
       },
       "assertions": [
         {
@@ -69,7 +69,7 @@
     {
       "id": 2,
       "prompt": "/cyoda:deploy — we need a shared cyoda instance for the team on our staging VM, staging.shop.example.com",
-      "expected_output": "Chooses Docker Compose shared: compose.yaml from compose.shared.yaml (Postgres, CYODA_IAM_MODE=jwt, CYODA_REQUIRE_JWT, CYODA_JWT_SIGNING_KEY_FILE mounted :ro, bootstrap client id from env and secret via _FILE), a filled secrets-checklist.md naming each secret and where it is read from with no values, a .gitignore for secrets/ and .env, and the ordered commands (secrets, up, health, seed with CYODA_TOKEN_COMMAND, verify). It uses <API_URL> http://staging.shop.example.com:18080 and records CYODA_COMPUTE_GRPC_ENDPOINT=staging.shop.example.com:19090 in the checklist (the compose host ports). It doesn't generate keys.",
+      "expected_output": "Chooses Docker Compose shared: compose.yaml from compose.shared.yaml (Postgres, CYODA_IAM_MODE=jwt, CYODA_REQUIRE_JWT, CYODA_JWT_SIGNING_KEY_FILE mounted :ro, listeners bound to 0.0.0.0, no bootstrap client), a filled secrets-checklist.md naming each secret and where it is read from with no values, a .gitignore for secrets/ and .env, and the ordered commands (secrets, up, health, seed and verify with CYODA_TOKEN_COMMAND='docker compose -f deploy/cyoda/compose.yaml exec -T cyoda /cyoda token --tenant shop --user shop-deploy --roles ROLE_M2M') and the step to create the app's and compute nodes' M2M clients in tenant shop with the admin token. It uses <API_URL> http://staging.shop.example.com:18080 and records CYODA_COMPUTE_GRPC_ENDPOINT=staging.shop.example.com:19090 in the checklist (the compose host ports). It doesn't generate keys.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -81,7 +81,7 @@
         "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
         "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
         "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared, says the stage is staging and its schema isn't strict. There is no token script yet."
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0 BINARY_VERSION=0.9.0. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared, says the stage is staging and its schema isn't strict. The tenant is shop."
       },
       "assertions": [
         {
@@ -90,8 +90,8 @@
           "type": "behavior"
         },
         {
-          "id": "bootstrap-client",
-          "text": "The compose file sets the bootstrap M2M client (CYODA_BOOTSTRAP_CLIENT_ID from the environment, the secret via CYODA_BOOTSTRAP_CLIENT_SECRET_FILE)",
+          "id": "token-command",
+          "text": "Seed and verify use CYODA_TOKEN_COMMAND = `docker compose -f deploy/cyoda/compose.yaml exec -T cyoda /cyoda token --tenant shop` with `--roles ROLE_M2M`; the compose file and checklist have no bootstrap client and no client secret for seeding",
           "type": "behavior"
         },
         {
@@ -136,7 +136,7 @@
         "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
         "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
         "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared and says the stage is prod and its schema is strict. For order: yes, a processor adds fulfilmentNotes; they choose STRUCTURAL. For customer: no. The project has a get-token.sh at the root.",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0 BINARY_VERSION=0.9.0. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared and says the stage is prod and its schema is strict. For order: yes, a processor adds fulfilmentNotes; they choose STRUCTURAL. For customer: no. The project has a get-token.sh at the root. The tenant is shop.",
         "get-token.sh": "#!/usr/bin/env bash\n# token script written by /cyoda:auth\n"
       },
       "assertions": [
@@ -184,7 +184,7 @@
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. find finds no *-v*-sample.json files and there is no cyoda-manifest.json."
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. find finds no *-v*-sample.json files and there is no cyoda-manifest.json."
       },
       "assertions": [
         {
@@ -222,7 +222,7 @@
     {
       "id": 5,
       "prompt": "/cyoda:deploy — put it on our Kubernetes cluster with Helm",
-      "expected_output": "Reads `cyoda help helm` (VALUES, SECRETS PROVISIONING, INSTALL / UPGRADE / UNINSTALL) and asks namespace, Postgres and routing. Installs from the published repo (helm repo add cyoda https://cyoda.github.io/cyoda-go), not ./deploy/helm/cyoda, noting help's 'unpublished, 0.1.0' is outdated (cyoda-go#684 item A). Writes deploy/cyoda/values.yaml from the template: postgres/jwt/hmac/metrics/bootstrap existingSecrets, bootstrap.clientId shop-deployer (#684 item D), gateway.parentRefs prod-gateway in gateway-system with hostnames api.shop.example.com and grpc.shop.example.com (#684 item G), ingress block removed, replicas/HPA/migrate at chart defaults, no placeholders left. Writes seed.sh, verify.sh and a Helm secrets checklist (cyoda-jwt, cyoda-bootstrap, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer in namespace shop, no values, CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443). Ends with the ordered commands: namespace + secrets, helm repo add/update and the chart whose appVersion is 0.8.4 via helm search | jq, helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n shop, health on https://api.shop.example.com/api/health, seed with --env staging, kubectl port-forward svc/cyoda 19091:9091 (not local 9091, which the local cyoda-go holds), a bounded wait, verify, then the forward stopped. Runs none of them.",
+      "expected_output": "Reads `cyoda help helm` (VALUES, SECRETS PROVISIONING, INSTALL / UPGRADE / UNINSTALL) and asks namespace, Postgres and routing. Installs from the published repo (helm repo add cyoda https://cyoda.github.io/cyoda-go), not ./deploy/helm/cyoda. Writes deploy/cyoda/values.yaml from the template: postgres/jwt/hmac/metrics existingSecrets, no bootstrap key, gateway.parentRefs prod-gateway in gateway-system with hostnames api.shop.example.com and grpc.shop.example.com, ingress block removed, replicas/HPA/migrate at chart defaults, no placeholders left. Writes seed.sh, verify.sh and a Helm secrets checklist (cyoda-jwt, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer in namespace shop, no values, client creation in tenant shop, CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443). Ends with the ordered commands: namespace + secrets, helm repo add/update and the chart whose appVersion is 0.9.0 via helm search | jq, helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n shop, health on https://api.shop.example.com/api/health, seed with --env staging and CYODA_TOKEN_COMMAND='kubectl exec -n shop cyoda-0 -- /cyoda token --tenant shop --user shop-deploy --roles ROLE_M2M', kubectl port-forward svc/cyoda 19091:9091 (not local 9091, which the local cyoda-go holds), a bounded wait, verify, then the forward stopped. Runs none of them.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -234,7 +234,7 @@
         "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
         "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
         "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Helm on Kubernetes, namespace shop, and says the stage is staging and its schema isn't strict. They have a managed Postgres the cluster can reach. The cluster runs Gateway API: Gateway prod-gateway in namespace gateway-system, which admits routes from all namespaces. API host api.shop.example.com, gRPC host grpc.shop.example.com. The project has no token script."
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0 BINARY_VERSION=0.9.0. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Helm on Kubernetes, namespace shop, and says the stage is staging and its schema isn't strict. They have a managed Postgres the cluster can reach. The cluster runs Gateway API: Gateway prod-gateway in namespace gateway-system, which admits routes from all namespaces. API host api.shop.example.com, gRPC host grpc.shop.example.com. The project has no token script. The tenant is shop."
       },
       "assertions": [
         {
@@ -244,22 +244,22 @@
         },
         {
           "id": "published-repo",
-          "text": "Uses the published chart: `helm repo add cyoda https://cyoda.github.io/cyoda-go` and `cyoda/cyoda`, not `./deploy/helm/cyoda` or a packaged 0.1.0 tgz, and does not repeat help's claim that the chart is unpublished",
+          "text": "Uses the published chart: `helm repo add cyoda https://cyoda.github.io/cyoda-go` and `cyoda/cyoda`, not `./deploy/helm/cyoda`",
           "type": "behavior"
         },
         {
           "id": "chart-by-appversion",
-          "text": "Picks the chart version as the one whose appVersion is 0.8.4 (helm search repo cyoda/cyoda --versions with jq), and the install is `helm install cyoda cyoda/cyoda --version <that version> -f deploy/cyoda/values.yaml -n shop`",
+          "text": "Picks the chart version as the one whose appVersion is 0.9.0 (helm search repo cyoda/cyoda --versions with jq), and the install is `helm install cyoda cyoda/cyoda --version <that version> -f deploy/cyoda/values.yaml -n shop`",
           "type": "behavior"
         },
         {
           "id": "values-secrets",
-          "text": "deploy/cyoda/values.yaml sets postgres.existingSecret and jwt.existingSecret, plus existingSecret for the HMAC, metrics bearer and bootstrap client secrets, and contains no secret value",
+          "text": "deploy/cyoda/values.yaml sets postgres.existingSecret and jwt.existingSecret, plus existingSecret for the HMAC and metrics bearer secrets, and contains no secret value",
           "type": "behavior"
         },
         {
-          "id": "bootstrap-set",
-          "text": "values.yaml sets bootstrap.clientId (e.g. shop-deployer), and the seed command uses that client id",
+          "id": "token-command",
+          "text": "values.yaml sets no bootstrap key, and seed and verify use CYODA_TOKEN_COMMAND = `kubectl exec -n shop cyoda-0 -- /cyoda token --tenant shop` with `--roles ROLE_M2M`",
           "type": "behavior"
         },
         {
@@ -274,7 +274,7 @@
         },
         {
           "id": "checklist-helm",
-          "text": "secrets-checklist.md keeps only the Helm section, naming each Kubernetes Secret (cyoda-jwt, cyoda-bootstrap, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer) in namespace shop and what reads it, with no values, and CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443",
+          "text": "secrets-checklist.md keeps only the Helm section, naming each Kubernetes Secret (cyoda-jwt, cyoda-pg, cyoda-hmac, cyoda-metrics-bearer, no cyoda-bootstrap) in namespace shop and what reads it, with no values, and CYODA_COMPUTE_GRPC_ENDPOINT grpc.shop.example.com:443",
           "type": "behavior"
         },
         {
@@ -307,7 +307,7 @@
     {
       "id": 6,
       "prompt": "/cyoda:deploy — Helm on our k8s cluster. We run ingress-nginx there, there's no Gateway API",
-      "expected_output": "Takes the Ingress route: values.yaml has gateway.enabled false (not left on with empty parentRefs, cyoda-go#684 item G) and ingress.enabled true with className nginx, http.host cyoda.internal.example.com, grpc.host cyoda-grpc.internal.example.com and TLS Secret internal-tls for both, keeping the chart's gRPC backend-protocol annotation. Sets bootstrap.clientId and every existingSecret. The checklist's Helm section uses namespace cyoda and CYODA_COMPUTE_GRPC_ENDPOINT cyoda-grpc.internal.example.com:443. Commands use the published repo, the chart whose appVersion is 0.8.4, helm install ... -n cyoda, health on https://cyoda.internal.example.com/api/health, seed, and verify with /readyz through kubectl port-forward from local 19091 to the admin port 9091. Runs none of them.",
+      "expected_output": "Takes the Ingress route: values.yaml has gateway.enabled false (not left on with empty parentRefs) and ingress.enabled true with className nginx, http.host cyoda.internal.example.com, grpc.host cyoda-grpc.internal.example.com and TLS Secret internal-tls for both, keeping the chart's gRPC backend-protocol annotation. Sets every existingSecret and no bootstrap key. The checklist's Helm section uses namespace cyoda and CYODA_COMPUTE_GRPC_ENDPOINT cyoda-grpc.internal.example.com:443. Commands use the published repo, the chart whose appVersion is 0.9.0, helm install ... -n cyoda, health on https://cyoda.internal.example.com/api/health, seed and verify with CYODA_TOKEN_COMMAND='kubectl exec -n cyoda cyoda-0 -- /cyoda token --tenant shop --user shop-deploy --roles ROLE_M2M' (not the project's get-token.sh), verify with /readyz through kubectl port-forward from local 19091 to the admin port 9091. Runs none of them.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\": \"default\", \"profiles\": {\"default\": {\"endpoint\": \"http://localhost:8080\"}}}",
         "package.json": "{\"name\": \"shop\", \"version\": \"0.1.0\"}",
@@ -320,7 +320,7 @@
         "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
         "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
         "get-token.sh": "#!/usr/bin/env bash\n# token script written by /cyoda:auth\n",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is a deploy/ dir with the developer's own manifests. docker, helm and kubectl are installed. The developer picks Helm, accepts namespace cyoda, says the stage is staging and its schema isn't strict, and has a Postgres the cluster can reach. The cluster has ingress-nginx with IngressClass nginx and no Gateway API CRDs. API host cyoda.internal.example.com, gRPC host cyoda-grpc.internal.example.com, TLS Secret internal-tls in namespace cyoda covers both. The project has get-token.sh at the root."
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0 BINARY_VERSION=0.9.0. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is a deploy/ dir with the developer's own manifests. docker, helm and kubectl are installed. The developer picks Helm, accepts namespace cyoda, says the stage is staging and its schema isn't strict, and has a Postgres the cluster can reach. The cluster has ingress-nginx with IngressClass nginx and no Gateway API CRDs. API host cyoda.internal.example.com, gRPC host cyoda-grpc.internal.example.com, TLS Secret internal-tls in namespace cyoda covers both. The project has get-token.sh at the root. The tenant is shop."
       },
       "assertions": [
         {
@@ -339,8 +339,8 @@
           "type": "behavior"
         },
         {
-          "id": "bootstrap-set",
-          "text": "values.yaml sets bootstrap.clientId and the bootstrap client secret comes from a pre-created Secret (bootstrap.clientSecret.existingSecret)",
+          "id": "no-bootstrap",
+          "text": "values.yaml sets no bootstrap key (the chart has none since 0.9.0) and every credential comes from a pre-created Secret",
           "type": "behavior"
         },
         {
@@ -350,7 +350,7 @@
         },
         {
           "id": "published-chart",
-          "text": "The command list uses `helm repo add cyoda https://cyoda.github.io/cyoda-go`, selects the chart whose appVersion is 0.8.4, and installs with `helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n cyoda`",
+          "text": "The command list uses `helm repo add cyoda https://cyoda.github.io/cyoda-go`, selects the chart whose appVersion is 0.9.0, and installs with `helm install cyoda cyoda/cyoda --version ... -f deploy/cyoda/values.yaml -n cyoda`",
           "type": "behavior"
         },
         {
@@ -359,8 +359,8 @@
           "type": "behavior"
         },
         {
-          "id": "token-script",
-          "text": "Seed and verify use CYODA_TOKEN_COMMAND pointing at get-token.sh with the bootstrap client id",
+          "id": "token-command",
+          "text": "Seed and verify use CYODA_TOKEN_COMMAND = `kubectl exec -n cyoda cyoda-0 -- /cyoda token --tenant shop` with `--roles ROLE_M2M`, not get-token.sh",
           "type": "behavior"
         },
         {
@@ -395,7 +395,7 @@
         "src/workflows/customer-v1-workflow.json": "{\n  \"workflows\": [\n    {\n      \"version\": \"${SCHEMA_VERSION}\",\n      \"name\": \"customer-lifecycle\",\n      \"initialState\": \"new\",\n      \"active\": true,\n      \"states\": {\n        \"new\": {\n          \"transitions\": [\n            {\n              \"name\": \"activate\",\n              \"next\": \"active\",\n              \"manual\": false\n            }\n          ]\n        },\n        \"active\": {}\n      }\n    }\n  ]\n}",
         "src/config/order-v1-config.json": "{\"uniqueKeys\": [{\"id\": \"by-order-id\", \"fields\": [\"$.orderId\"]}], \"changeLevel\": \"STRUCTURAL\", \"env\": {}}",
         "src/config/customer-v1-config.json": "{\"uniqueKeys\": [], \"changeLevel\": null, \"env\": {}}",
-        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4 BINARY_VERSION=0.8.4. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared, the same compose file on each stage's VM. The stages are int (int.shop.example.com), uat (uat.shop.example.com) and prod (prod.shop.example.com). prod's schema is strict; int's and uat's aren't. For order: yes, a processor adds fulfilmentNotes; they choose STRUCTURAL. For customer: no. The project has a get-token.sh at the root.",
+        "_simulated/instance.md": "Project root is /work/shop. cyoda-status.sh prints STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0 BINARY_VERSION=0.9.0. cyoda-call.sh GET /model/ returns [{\"modelName\":\"order\",\"modelVersion\":1,\"currentState\":\"LOCKED\"},{\"modelName\":\"customer\",\"modelVersion\":1,\"currentState\":\"LOCKED\"}]. There is no deploy/ or ops/ dir. docker, helm and kubectl are installed. The developer picks Docker Compose shared, the same compose file on each stage's VM. The stages are int (int.shop.example.com), uat (uat.shop.example.com) and prod (prod.shop.example.com). prod's schema is strict; int's and uat's aren't. For order: yes, a processor adds fulfilmentNotes; they choose STRUCTURAL. For customer: no. The project has a get-token.sh at the root. The tenant is shop.",
         "get-token.sh": "#!/usr/bin/env bash\n# token script written by /cyoda:auth\n"
       },
       "assertions": [

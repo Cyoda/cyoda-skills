@@ -24,11 +24,12 @@ function handleProcessorRequest(request, cloudEvent):
     http.patch(HTTP_BASE + "/api/entity/JSON/" + entity.<warehouseOrderId> + "/reserve",
                headers: { "Content-Type": "application/merge-patch+json",
                           "If-Match": "*",
-                          "Authorization": "Bearer " + token,
+                          "Authorization": "Bearer " + clientToken(),   // the node's own client token
                           "X-Tx-Token": cloudEvent.extension("cyodatxtoken") },
                body: "{}")
 
   response = {
+    <id>:        newUuid(),                     // the response event's own id
     <requestId>: request.<requestId>,
     <entityId>:  request.<entityId>,
     success: true,
@@ -41,6 +42,7 @@ function handleProcessorRequest(request, cloudEvent):
 ## Rules
 
 - Returned `payload.data` **replaces** the entity's data and is validated like a client write. A field the schema doesn't allow fails the transition with `WORKFLOW_FAILED` and rolls it back.
-- `success: false` or a timeout fails the transition (`SYNC`, `ASYNC_SAME_TX`, `COMMIT_BEFORE_DISPATCH`). In `ASYNC_NEW_TX` it's only logged, and returned data is discarded.
-- Either return data for the entity being processed, or write it yourself through a callback. Not both: the returned data overwrites the write.
+- Report a failure with an explicit `success: false` and an `error`; an omitted `success` is a success, also beside an `error`. A failure or a timeout fails the transition (`SYNC`, `ASYNC_SAME_TX`, `COMMIT_BEFORE_DISPATCH`). In `ASYNC_NEW_TX` it's only logged, and returned data is discarded.
+- Change the entity being processed only through the returned data. Never write or delete it through a callback, with or without the token (`workflows` PROCESSORS, *Design rule*).
+- A callback write refused with a non-retryable error fails the whole operation (`409 TRANSACTION_ROLLBACK_ONLY`). `410 CALLOUT_SUPERSEDED` on a callback means another member got the work: stop.
 - The linked entity's transition (`reserve` above) is `manual: true` in its own workflow. Without `X-Tx-Token`, the call runs as its own transaction and stays committed even if this transition fails.

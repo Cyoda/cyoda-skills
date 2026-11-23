@@ -1,11 +1,12 @@
 # shared: JWT auth and Postgres, for a team or shared host.
-# Every caller needs a JWT; the bootstrap M2M client below can issue them.
+# Every caller needs a JWT. The first admin token is signed in the container:
+#   docker compose -f compose.yaml exec -T cyoda /cyoda token --tenant <tenant>
+# (`cyoda help cli token`); create the app's M2M clients with it.
 #
 # Based on deploy/docker/compose.yaml and examples/compose-with-observability
-# at cyoda-go tag v0.8.4 (the otel-backend service is left out; add it from that
-# example if you want traces). Auth follows `cyoda help run` (RUN MODES: Docker,
-# Postgres + JWT; Docker Compose, file-mount approach) and `cyoda help config
-# auth`, not the commented "production" block in the upstream compose.yaml.
+# at cyoda-go tag v0.9.0 (the otel-backend service is left out; add it from that
+# example if you want traces). Auth follows `cyoda help run` (RUN MODES) and
+# `cyoda help config auth`.
 #
 # Before `docker compose up`, create every file and variable listed in
 # secrets-checklist.md. No secret value is written in this file.
@@ -35,7 +36,7 @@ services:
       retries: 10
 
   cyoda:
-    image: ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.8.4}
+    image: ghcr.io/cyoda/cyoda:${CYODA_VERSION:-0.9.0}
     ports:
       - "${CYODA_HOST_HTTP_PORT:-18080}:8080"
       - "${CYODA_HOST_GRPC_PORT:-19090}:9090"
@@ -48,14 +49,13 @@ services:
       # Refuse to start unless JWT mode and the signing key are configured.
       CYODA_REQUIRE_JWT: "true"
       CYODA_JWT_SIGNING_KEY_FILE: /run/secrets/signing.pem
-      # Bootstrap M2M client: the id comes from your shell or .env, the secret from a file.
-      CYODA_BOOTSTRAP_CLIENT_ID: ${CYODA_BOOTSTRAP_CLIENT_ID:?set CYODA_BOOTSTRAP_CLIENT_ID (see secrets-checklist.md)}
-      CYODA_BOOTSTRAP_CLIENT_SECRET_FILE: /run/secrets/bootstrap-client-secret
-      # Needed in a container so the healthcheck and port 9091 can reach the probes.
+      # Listeners bind 127.0.0.1 by default; in a container they must bind every
+      # interface for the published ports (and the healthcheck) to reach them.
+      CYODA_HTTP_BIND_ADDRESS: 0.0.0.0
+      CYODA_GRPC_BIND_ADDRESS: 0.0.0.0
       CYODA_ADMIN_BIND_ADDRESS: 0.0.0.0
     volumes:
       - ./secrets/signing.pem:/run/secrets/signing.pem:ro
-      - ./secrets/bootstrap-client-secret:/run/secrets/bootstrap-client-secret:ro
       - ./secrets/postgres-url:/run/secrets/postgres-url:ro
     depends_on:
       postgres:

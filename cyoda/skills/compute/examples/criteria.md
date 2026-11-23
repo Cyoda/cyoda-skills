@@ -4,7 +4,7 @@ Pseudocode for a criteria handler. Field names are placeholders: take the real o
 
 ## Workflow side
 
-A `function` criterion must be the whole criterion on a transition (or a workflow's selection criterion), not nested in a `group`. Its `function.name` arrives as the request's criteria id/name, and `function.config.calculationNodesTags` routes it by tag overlap.
+A `function` condition may sit at any depth of a transition's (or a workflow's selection) criterion. In a `group`, put in-memory conditions before it, or in its pre-check `function.criterion`, so the callout is made only when it can change the answer (best practice *Put the cheap test before the callout*). Its `function.name` arrives as the request's criteria id/name, and `function.config.calculationNodesTags` routes it by tag overlap.
 
 ## Handler
 
@@ -20,13 +20,14 @@ function handleCriteriaRequest(request):
   ok = entity.amount <= limit
 
   response = {
+    <id>:        newUuid(),                     // the response event's own id
     <requestId>: request.<requestId>,
     <entityId>:  request.<entityId>,
     success: true,
-    matches: ok
+    matches: ok                                 // required unless success is false
   }
   if not ok:
-    response.reason = "amount " + entity.amount + " exceeds credit limit " + limit   // ≤ 2 KiB
+    response.reason = "amount " + entity.amount + " exceeds credit limit " + limit   // Cyoda keeps the first 2048 characters
 
   cache.put(request.<requestId>, response)
   return response
@@ -37,5 +38,8 @@ function handleCriteriaRequest(request):
 - **Manual transition**: the caller gets `400 WORKFLOW_FAILED` with `detail` `transition "<name>" criterion not matched: <reason>`. The transaction rolls back, so this is the only place it appears.
 - **Automated transition, workflow selection**: the `TRANSITION_NOT_MATCH_CRITERION` or `WORKFLOW_SKIP` event in `GET /api/audit/entity/{id}` carries it as `data.reason`.
 - No `reason`: the audit says `criterion did not match`, and the 400 detail is the bare `criterion not matched`.
+- A function condition in a group, or with a pre-check: the reason lists each function condition reached and its answer (`cyoda help workflows` CRITERIA, *Function conditions*).
 
-`success: false` (as opposed to `matches: false`) means the criterion couldn't be evaluated. That fails the call rather than holding the entity.
+`success: false` (as opposed to `matches: false`) means the criterion couldn't be evaluated. It must be sent explicitly, and it fails the call rather than holding the entity. Any other answer without `matches` is unreadable and fails the call too.
+
+A criterion may be sent to another member and run twice for one callout: the handler must have no effects (`cyoda help workflows` PROCESSORS, **Repeating a processor**).

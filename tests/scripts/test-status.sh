@@ -8,6 +8,8 @@ S="$ROOT/cyoda/scripts"
 source "$ROOT/tests/lib/assert.sh"
 # shellcheck source=../lib/server.sh
 source "$ROOT/tests/lib/server.sh"
+# The cyoda-go release the smoke server runs (run.sh checks the binary against it).
+GV="$(cat "$ROOT/tests/smoke/cyoda-go.version")"
 trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
@@ -24,7 +26,7 @@ test_status_connected() {
   local out
   out="$(CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
   assert_contains "$(echo "$out" | head -n1)" "STATUS=connected" "connected"
-  assert_contains "$out" "VERSION=0.8.4" "version"
+  assert_contains "$out" "VERSION=$GV" "version"
   assert_contains "$out" "PROFILE=p" "profile"
   assert_contains "$(echo "$out" | head -n1)" "SOURCE=profile" "profile source"
   if [[ "$(echo "$out" | head -n1)" == *PROJECT=* ]]; then _bad "no PROJECT field for a profile"; else _ok; fi
@@ -51,7 +53,7 @@ test_status_no_config_local_up() {
   start_server || return
   local ep="http://localhost:${SMOKE_HTTP_PORT}" out
   out="$(CYODA_DEFAULT_ENDPOINT="$ep" CYODA_PLUGIN_CONFIG="$T/none.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=default ENDPOINT=$ep VERSION=0.8.4" "implicit default connected"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=default ENDPOINT=$ep VERSION=$GV" "implicit default connected"
   assert_contains "$(echo "$out" | head -n1)" "SOURCE=default" "implicit default source"
   assert_contains "$out" "WARN=no saved profile; using the default local instance $ep; cyoda:setup binds this project to one" "implicit default warn"
   stop_server
@@ -70,12 +72,12 @@ test_status_version_mismatch() {
   echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/i.json"
   mkdir -p "$T/shim"
   # shellcheck disable=SC2016 # literal text is intentional (written to a file/passed to envsubst/eval later)
-  printf '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "cyoda version 0.9.0 (commit x)"; fi\n' >"$T/shim/cyoda"
+  printf '#!/usr/bin/env bash\nif [ "$1" = "--version" ]; then echo "cyoda version 0.0.1 (commit x)"; fi\n' >"$T/shim/cyoda"
   chmod +x "$T/shim/cyoda"
   local out
   out="$(PATH="$T/shim:$PATH" CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$out" "WARN=local cyoda 0.9.0 differs from instance 0.8.4; help is read from the instance" "mismatch warn"
-  assert_contains "$out" "BINARY_VERSION=0.9.0" "binary version"
+  assert_contains "$out" "WARN=local cyoda 0.0.1 differs from instance $GV; help is read from the instance" "mismatch warn"
+  assert_contains "$out" "BINARY_VERSION=0.0.1" "binary version"
   stop_server
 }
 
@@ -98,10 +100,18 @@ test_status_plugin_version_matches() {
   start_server || return
   echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/i.json"
   local out
-  out="$(CYODA_PLUGIN_VERSION=0.8.7 CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
+  out="$(CYODA_PLUGIN_VERSION="${GV%.*}.7" CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
   if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "no plugin-version warning when MAJOR.MINOR match"; else _ok; fi
+  # The shipped plugin.json warns exactly when its MAJOR.MINOR differs from the running instance's.
   out="$(CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
-  if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "shipped plugin.json matches the 0.8 instance"; else _ok; fi
+  local pv iv
+  pv="$(jq -r .version "$ROOT/cyoda/.claude-plugin/plugin.json")"
+  iv="$(sed -n 's/.* VERSION=\([^ ]*\) .*/\1/p' <<<"$(head -n1 <<<"$out")")"
+  if [ "${pv%.*}" = "${iv%.*}" ]; then
+    if [[ "$out" == *"targets cyoda-go"* ]]; then _bad "shipped plugin.json matches the instance: no warning"; else _ok; fi
+  else
+    assert_contains "$out" "targets cyoda-go ${pv%.*}" "shipped plugin.json differs from the instance: warning"
+  fi
   stop_server
 }
 
@@ -109,8 +119,8 @@ test_status_plugin_version_mismatch_instance() {
   start_server || return
   echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\"}}}" >"$T/i.json"
   local out
-  out="$(CYODA_PLUGIN_VERSION=0.9.2 CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$out" "WARN=the cyoda plugin targets cyoda-go 0.9; this instance runs 0.8.4. Update the plugin, or run cyoda-go 0.9." "plugin vs instance warn"
+  out="$(CYODA_PLUGIN_VERSION=0.0.2 CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-status.sh")"
+  assert_contains "$out" "WARN=the cyoda plugin targets cyoda-go 0.0; this instance runs $GV. Update the plugin, or run cyoda-go 0.0." "plugin vs instance warn"
   stop_server
 }
 
@@ -136,7 +146,7 @@ test_status_project_binding() {
   pd="$(mkdir -p "$HOME/work/shop/src" && cd "$HOME/work/shop" && pwd -P)"
   pcfg "$T/g.json" "$pd" "$ep" production
   out="$(cd "$pd/src" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"
-  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=shop ENDPOINT=$ep VERSION=0.8.4" "project entry connected"
+  assert_contains "$(echo "$out" | head -n1)" "STATUS=connected PROFILE=shop ENDPOINT=$ep VERSION=$GV" "project entry connected"
   assert_contains "$(echo "$out" | head -n1)" "SOURCE=project PROJECT=$pd" "project source and dir"
   pcfg "$T/g.json" "$pd" "http://localhost:1"
   out="$(cd "$pd" && CYODA_PLUGIN_CONFIG="$T/g.json" bash "$S/cyoda-status.sh")"

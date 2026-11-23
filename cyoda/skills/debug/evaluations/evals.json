@@ -7,7 +7,7 @@
       "expected_output": "Checks the connection with cyoda-status.sh, then through cyoda-call.sh reads GET /entity/{id} (submitted, amount 5000), the workflow export (approve is automated, criterion amount <= 1000), GET /entity/{id}/transitions and the StateMachine audit (TRANSITION_NOT_MATCH_CRITERION for approve). Finds that the stored amount is still 5000 (the developer's update never landed), so the approve criterion still fails. Explains that automated transitions are evaluated only on a write, and that the fix is a loopback carrying the corrected field (PATCH /entity/JSON/{id} with {\"amount\":500}, merge-patch, If-Match *), which re-runs the cascade. Produces the loopback re-trigger itself, consistent with the smoke-tested loopback example, sends it through cyoda-call.sh without a confirmation round, and shows the exact call it made and its result (the cascade fires approve; state approved).",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.8.4. GET /entity/{id}: meta.state=submitted, data {orderRef: ORD-1, amount: 5000}: the developer's earlier update went to a different entity id. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion simple $.amount LESS_OR_EQUAL 1000)-> approved. GET /entity/{id}/transitions: [\"approve\"]. Audit StateMachine (newest first): STATE_MACHINE_FINISH; TRANSITION_NOT_MATCH_CRITERION {transition: approve, reason: \"criterion did not match\"}; TRANSITION_MAKE submit. Writes: a write to this entity that stores amount 500 returns 200 with a new transactionId; the cascade then fires approve (audit TRANSITION_MAKE approve) and GET /entity/{id} shows meta.state=approved, amount 500."
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0. GET /entity/{id}: meta.state=submitted, data {orderRef: ORD-1, amount: 5000}: the developer's earlier update went to a different entity id. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion simple $.amount LESS_OR_EQUAL 1000)-> approved. GET /entity/{id}/transitions: [\"approve\"]. Audit StateMachine (newest first): STATE_MACHINE_FINISH; TRANSITION_NOT_MATCH_CRITERION {transition: approve, reason: \"criterion did not match\"}; TRANSITION_MAKE submit. Writes: a write to this entity that stores amount 500 returns 200 with a new transactionId; the cascade then fires approve (audit TRANSITION_MAKE approve) and GET /entity/{id} shows meta.state=approved, amount 500."
       },
       "assertions": [
         {
@@ -96,7 +96,7 @@
     {
       "id": 3,
       "prompt": "Firing `pay` on invoice 9f... returns 503 DISPATCH_TIMEOUT. My payment node is connected with tags [\"payment\"] and the processor has calculationNodesTags \"payment,eu\". Should I add \"eu\" to the node? The node needs about 45 seconds per call.",
-      "expected_output": "Runs cyoda-help.sh errors DISPATCH_TIMEOUT. Reads grpc TAG ROUTING: one overlapping tag is enough, so the node is being routed the call and adding \"eu\" changes nothing (workflows PROCESSORS says all tags; wrong per #684-B). Timeout: responseTimeoutMs unset/0 means the 30 s server default (#684-J); 45 s needs a raised responseTimeoutMs and likely COMMIT_BEFORE_DISPATCH (workflows PROCESSORS); the node must keep acking within CYODA_KEEPALIVE_TIMEOUT (grpc KEEPALIVE). It may name `cyoda:build` for the workflow change and `cyoda:compute` for the node code. No typed command.",
+      "expected_output": "Runs cyoda-help.sh errors DISPATCH_TIMEOUT. Reads grpc TAG ROUTING: one overlapping tag is enough, so the node is being routed the call and adding \"eu\" changes nothing. Timeout: responseTimeoutMs unset/0 means the server's CYODA_CALLOUT_RESPONSE_TIMEOUT_MS (30 s by default); 45 s needs a raised responseTimeoutMs (at most CYODA_CALLOUT_RESPONSE_TIMEOUT_MAX_MS, 60 s by default) and likely COMMIT_BEFORE_DISPATCH (workflows PROCESSORS); the node must keep acking within CYODA_KEEPALIVE_TIMEOUT (grpc KEEPALIVE). It may name `cyoda:build` for the workflow change and `cyoda:compute` for the node code. No typed command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "Workflow export: transition pay has processor {name: charge, executionMode: SYNC, config: {calculationNodesTags: \"payment,eu\"}} with no responseTimeoutMs. Error body: {status: 503, properties: {errorCode: DISPATCH_TIMEOUT, retryable: true}}."
@@ -109,12 +109,12 @@
         },
         {
           "id": "overlap-routing",
-          "text": "Says routing needs only one overlapping tag between the processor's calculationNodesTags and the node's tags (naming the #684-B help discrepancy is optional unless the developer cites the 'all tags' wording)",
+          "text": "Says routing needs only one overlapping tag between the processor's calculationNodesTags and the node's tags, so adding \"eu\" changes nothing",
           "type": "behavior"
         },
         {
           "id": "timeout-30s",
-          "text": "Says the default response timeout is 30 s when responseTimeoutMs is unset or 0 (#684-J) and that 45 s calls need a raised responseTimeoutMs",
+          "text": "Says the default response timeout is 30 s when responseTimeoutMs is unset or 0 (the server's CYODA_CALLOUT_RESPONSE_TIMEOUT_MS) and that 45 s calls need a raised responseTimeoutMs",
           "type": "behavior"
         },
         {
@@ -132,7 +132,7 @@
     {
       "id": 4,
       "prompt": "Customer 5d2e... was there yesterday and now GET returns 404. Which transition removed it?",
-      "expected_output": "Delete is soft and bypasses the workflow (best practice 'End a lifecycle in a terminal state; never delete'), so no transition removed it. Evidence: a DELETE entry in GET /entity/{id}/changes and the audit EntityChange events; no StateMachine events at that time. A point-in-time read from before the delete still returns the entity. Cites the best practice 'End a lifecycle in a terminal state; never delete' and suggests terminal states.",
+      "expected_output": "Delete is soft and bypasses the workflow (best practice 'Prefer a ledger to deletion', `cyoda help design`), so no transition removed it. Evidence: a DELETE entry in GET /entity/{id}/changes and the audit EntityChange events; no StateMachine events at that time. A point-in-time read from before the delete still returns the entity. Cites the best practice 'End a lifecycle in a terminal state; never delete' and suggests terminal states.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "_simulated/instance.md": "GET /entity/{id}: 404 ENTITY_NOT_FOUND. GET /entity/{id}/changes: DELETE 2026-10-17T08:12Z; UPDATE ...; CREATE .... Audit: EntityChange DELETE at 08:12; last StateMachine event 2026-10-16."
@@ -160,7 +160,7 @@
         },
         {
           "id": "best-practice",
-          "text": "Names the best practice 'End a lifecycle in a terminal state; never delete' or recommends terminal states instead of deletes",
+          "text": "Names the best practice 'Prefer a ledger to deletion' (`cyoda help design`) or recommends ending the lifecycle in a final state instead of deleting",
           "type": "behavior"
         }
       ]
@@ -218,6 +218,47 @@
         {
           "id": "health-endpoints",
           "text": "Says the API-port health check is /api/health and that /livez and /readyz are on the admin listener (9091), not the API port",
+          "type": "behavior"
+        },
+        {
+          "id": "no-typed-command",
+          "text": "Continues without asking the developer to type a command: no 'type `/cyoda:…`' or 'next, type …', neither in its own words nor in a warning it relays",
+          "type": "behavior"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Ticket 3b9e0c1d-0000-4000-8000-000000000007 should have escalated automatically an hour after it was opened. It's still `open`. Why didn't it escalate?",
+      "expected_output": "Checks the connection with cyoda-status.sh, then through cyoda-call.sh reads GET /entity/{id} (open), the workflow export (open has a scheduled escalate transition whose processor notify-oncall is not declared idempotent), the StateMachine audit and GET /scheduled-tasks?entityId={id} (cyoda help scheduled-tasks). Finds the task FAILED with failureReason UNSAFE_WORK_NOT_COMPLETED and the SCHEDULED_TRANSITION_FAIL audit event: the processor may have reached a compute member, the run did not commit, and a processor not declared idempotent is never repeated, so the task will not run again and the entity stays open (workflows SCHEDULED TRANSITIONS). Says a write to the entity in its source state (e.g. a loopback) arms the task afresh, and that `idempotent: true` on the processor is a workflow change to make only if a repeat of the notification is harmless (`cyoda:build`); the compute node's failure itself is Path C. No typed command.",
+      "files": {
+        "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=default ENDPOINT=http://localhost:8080 VERSION=0.9.0. GET /entity/{id}: meta.state=open, data {title: \"Printer down\"}. Workflow export: open -escalate(manual false, schedule {delayMs: 3600000, timeoutMs: 600000}, processors [{name: notify-oncall, executionMode: SYNC, config: {calculationNodesTags: \"oncall\"}}])-> escalated. Audit StateMachine (newest first): SCHEDULED_TRANSITION_FAIL {transition: escalate, sourceState: open, reason: UNSAFE_WORK_NOT_COMPLETED, attempts: 1, lostOwners: 0}; SCHEDULED_TRANSITION_ARM {transition: escalate, sourceState: open}. GET /scheduled-tasks?entityId={id}: one item {transition: escalate, sourceState: open, status: FAILED, failureReason: UNSAFE_WORK_NOT_COMPLETED, attempts: 1, lastError: \"DISPATCH_TIMEOUT: compute member did not answer within 30000ms\"}."
+      },
+      "assertions": [
+        {
+          "id": "consults-help",
+          "text": "Reads or names `cyoda help scheduled-tasks` and/or `workflows --section \"SCHEDULED TRANSITIONS\"` for the task states and failure reasons",
+          "type": "behavior"
+        },
+        {
+          "id": "reads-tasks",
+          "text": "Calls GET /scheduled-tasks (filtered by entityId) and/or reads the SCHEDULED_TRANSITION_FAIL audit event through cyoda-call.sh",
+          "type": "behavior"
+        },
+        {
+          "id": "diagnosis",
+          "text": "Explains that the task ended FAILED with UNSAFE_WORK_NOT_COMPLETED because notify-oncall is not declared idempotent and may have reached a compute member, so the scheduler will not run it again",
+          "type": "behavior"
+        },
+        {
+          "id": "rearm",
+          "text": "Says a write to the entity in `open` (e.g. a loopback) arms the task afresh",
+          "type": "behavior"
+        },
+        {
+          "id": "idempotent-caution",
+          "text": "Recommends `idempotent: true` only if a repeat of the notification is harmless, as a workflow change (`cyoda:build`)",
           "type": "behavior"
         },
         {

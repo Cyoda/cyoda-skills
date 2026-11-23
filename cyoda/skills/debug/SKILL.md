@@ -36,7 +36,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
 ### Path A — a call returned an error
 
 1. Read `.properties.errorCode` and `.detail` from the body (RFC 9457 problem JSON; `errors --section DESCRIPTION`).
-2. Run `cyoda-help.sh errors <errorCode>`. Every code has its own page; `errors` ERROR CODE INDEX is incomplete (cyoda-go#684 item N), so a code missing from it isn't missing from help.
+2. Run `cyoda-help.sh errors <errorCode>`. Every code has its own page.
 3. Explain the cause from that page plus the `detail`, then take the matching path:
 
 | errorCode | Look at |
@@ -45,9 +45,11 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
 | `TRANSITION_NOT_FOUND` | `GET /entity/{id}/transitions`: the name isn't available from the current state |
 | `MODEL_NOT_FOUND` (404), `MODEL_NOT_LOCKED` (409) | Path D: the model lifecycle wasn't completed |
 | `VALIDATION_FAILED`, `INCOMPATIBLE_TYPE` (400) | Path D: the payload doesn't fit the locked schema |
-| `NO_COMPUTE_MEMBER_FOR_TAG`, `COMPUTE_MEMBER_DISCONNECTED`, `DISPATCH_TIMEOUT` (503) | Path C |
-| `ENTITY_MODIFIED` (412), `PRECONDITION_REQUIRED` (428), `CONFLICT` (409, retryable) | `crud --section "OPTIMISTIC CONCURRENCY"`: stale or missing `If-Match` |
-| `BAD_REQUEST` on `PUT /entity/JSON/{id}/{t}` with no body | An empty PUT is a 400 (#684-C). Fire it with PATCH `{}`, `If-Match: *`, `application/merge-patch+json` (`crud --section ENDPOINTS`) |
+| `NO_COMPUTE_MEMBER_FOR_TAG`, `COMPUTE_MEMBER_DISCONNECTED`, `DISPATCH_TIMEOUT`, `CALLOUT_FAILED` (503), `TRANSACTION_ROLLBACK_ONLY` (409) | Path C |
+| `ENTITY_MODIFIED` (412), `PRECONDITION_REQUIRED` (428), `CONFLICT` (409, retryable) | `crud --section "OPTIMISTIC CONCURRENCY"`: stale or missing `If-Match`; `CONFLICT` is a lost write race, so run the operation again |
+| `BAD_REQUEST` (400) | An unknown or misspelt body member or query parameter: `openapi --section "REQUEST BODIES"` / `"QUERY PARAMETERS"`. An empty `PUT /entity/JSON/{id}/{t}`: fire it with PATCH `{}`, `If-Match: *`, `application/merge-patch+json` (`crud --section ENDPOINTS`) |
+| `CONDITION_TYPE_MISMATCH`, `INVALID_CONDITION` (400) | The condition's operator doesn't fit the field's type, or its shape is wrong (`search --section ERRORS`). In a workflow criterion this surfaces as `WORKFLOW_FAILED` |
+| `POINT_IN_TIME_AFTER_CONSISTENCY_TIME` (400) | The `pointInTime` is later than the consistency time: read at or before `GET /entity/consistency-time` (`crud --section "POINT-IN-TIME SEMANTICS"`) |
 
 ### Path B — a transition didn't fire, or the entity is in the wrong state
 
@@ -56,25 +58,25 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-status.sh`. Show its status line and ev
 3. `GET /entity/{id}/transitions`: what can fire now. This read can itself fail with `WORKFLOW_FAILED` when the selected workflow doesn't declare the current state, or when a selection criterion can't be evaluated (`errors WORKFLOW_FAILED`).
 4. `GET '/audit/entity/{id}?eventType=StateMachine&limit=100'` (help: `audit --section ENDPOINTS`). Newest first. Look for:
    - `TRANSITION_NOT_MATCH_CRITERION`: `data.transition` was held by its criterion; `data.reason` says why (specific only for function criteria).
-   - `TRANSITION_ABORTED` (`data.reason`, expected vs actual tx), `WORKFLOW_SKIP`, `WORKFLOW_NOT_FOUND`.
-   - `TRANSITION_MAKE`: what did fire, in order.
-   - Scheduled transitions: the `SCHEDULED_TRANSITION_*` events. The `audit` list omits them (#684-F); read `workflows --section "SCHEDULED TRANSITIONS"`.
+   - `TRANSITION_ABORTED` (`data.transition`, `expectedTxId` vs `actualTxId`), `WORKFLOW_SKIP`.
+   - `TRANSITION_MAKE`: what did fire, in order. `STATE_MACHINE_FINISH` `data.stopReason` says why the run stopped.
+   - Scheduled transitions: the `SCHEDULED_TRANSITION_*` events (`audit` ENDPOINTS, *Event data*). A task that won't run again ends `FAILED` (`SCHEDULED_TRANSITION_FAIL`): `GET '/scheduled-tasks?entityId=<id>'` shows each task's `status`, `failureReason` and `lastError` (`cyoda help scheduled-tasks`). A write in the source state, e.g. a loopback (step 6), arms it afresh (`workflows --section "SCHEDULED TRANSITIONS"`).
 5. Evaluate the criterion against the entity's data yourself (`workflows --section CRITERIA`, `search --section "CONDITION DSL"`) and say which field fails.
-6. Two common causes, from the best practices (`cyoda-help.sh workflows best-practices`, else `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md`):
-   - **The data was fixed, but the held transition never ran again.** Automated transitions are evaluated only when the entity is written. Best practice *Re-trigger evaluation with a loopback, not by firing an automated transition*: `PATCH /entity/JSON/{id}` with `{}` (or the corrected fields), `-H 'Content-Type: application/merge-patch+json' -H 'If-Match: *'`. Smoke-tested example: [../build/examples/loopback/](../build/examples/loopback/) (scenario `02-loopback`).
+6. Two common causes:
+   - **The data was fixed, but the held transition never ran again.** Automated transitions are evaluated only when the entity is written. Best practice *Re-evaluate with a loopback, not by naming an automated transition* (`cyoda-help.sh design`): `PATCH /entity/JSON/{id}` with `{}` (or the corrected fields), `-H 'Content-Type: application/merge-patch+json' -H 'If-Match: *'`. Smoke-tested example: [../build/examples/loopback/](../build/examples/loopback/) (scenario `02-loopback`).
    - **A cycle hit the per-state visit limit** (`workflows --section "ENGINE EXECUTION"`). The fix is a workflow change (see Repair above).
 7. When help doesn't settle how the engine features involved combine (e.g. a cascade through several automated transitions), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
 
 ### Path C — a processor, function criterion or compute node
 
-1. Read `grpc --section "TAG ROUTING"` for routing. A processor reaches a member whose tags **overlap** its `calculationNodesTags` (one shared tag is enough); several matches are picked at random; empty tags match any member of the tenant. `workflows` PROCESSORS says "all required tags"; that's wrong (#684-B). Tags are matched as exact, case-sensitive strings.
-2. Timeout: `DISPATCH_TIMEOUT` means no answer within `responseTimeoutMs`. Unset or `0` is the server default of 30 s, not a node default (#684-J). For slow work: raise `responseTimeoutMs` and consider `executionMode: COMMIT_BEFORE_DISPATCH`, whose processor must be idempotent (`workflows --section PROCESSORS`). Changing either is a workflow change (see Repair above).
+1. Read `grpc --section "TAG ROUTING"` for routing. A processor reaches a member whose tags **overlap** its `calculationNodesTags` (one shared tag is enough); several matches are picked round robin; empty tags match any member of the tenant. Tags are matched as exact, case-sensitive strings.
+2. Timeout: `DISPATCH_TIMEOUT` means no answer within `responseTimeoutMs`; `CALLOUT_FAILED` means several tries failed, and its message lists them. Unset or `0` is the server's `CYODA_CALLOUT_RESPONSE_TIMEOUT_MS`, and import refuses a value above `CYODA_CALLOUT_RESPONSE_TIMEOUT_MAX_MS` (defaults in `config grpc --section OPTIONS`). For slow work: raise `responseTimeoutMs` and consider `executionMode: COMMIT_BEFORE_DISPATCH`, whose processor must be idempotent (`workflows --section PROCESSORS`). A processor that got no answer goes to another compute member only when it is declared `idempotent: true`; otherwise the callout fails. Changing either is a workflow change (see Repair above).
 3. Eviction: read `grpc --section KEEPALIVE` and `cyoda help config grpc` for `CYODA_KEEPALIVE_INTERVAL` / `CYODA_KEEPALIVE_TIMEOUT` (defaults 10 s / 30 s). A member that stops reading or answering for the timeout is evicted, and its in-flight calls fail with `COMPUTE_MEMBER_DISCONNECTED`.
-4. Join failures (`grpc --section ERRORS`): `PermissionDenied` means the token lacks `ROLE_M2M` or the tenant doesn't match `joinedLegalEntityId`.
-5. There is no endpoint that lists connected members. The evidence is the 503 code, the server log (raise it with `CYODA_LOG_LEVEL=debug`, or `POST /admin/log-level` from `admin --section ENDPOINTS`), and `cyoda_dispatch_*` metrics on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
-6. `success: false` from the processor, or returned data that the schema rejects, is `WORKFLOW_FAILED` and rolls back (`workflows --section PROCESSORS`).
+4. Join failures (`grpc --section ERRORS`, `auth integration --section "STEP 6 — CONNECT A COMPUTE NODE"`): `PermissionDenied` means the stream wasn't opened with the node's own M2M client's `client_credentials` token (an on-behalf-of token, a `cyoda token`, no `ROLE_M2M`; in mock mode `CYODA_IAM_MOCK_KIND` other than `service`) or `joinedLegalEntityId` isn't the token's tenant. `Unauthenticated` on an open stream: the client was deleted or its secret reset.
+5. There is no endpoint that lists connected members. The evidence is the 503 code, the server log (raise it with `CYODA_LOG_LEVEL=debug`, or `POST /admin/log-level` from `admin --section ENDPOINTS`), and `cyoda_dispatch_*` / `cyoda_callout_*` metrics on `:9091/metrics` when telemetry is on (`telemetry --section "METRICS ENDPOINT"`).
+6. `success: false` from the processor, an answer cyoda can't read (a criteria answer without `matches`, `"success": null`), or returned data that the schema rejects, is `WORKFLOW_FAILED` and rolls back (`workflows --section PROCESSORS`, `grpc --section "COMPUTE MEMBER PROTOCOL"`). An `error` object without `success: false` counts as success. `TRANSACTION_ROLLBACK_ONLY`: a callback write of the node was refused, which fails the operation whatever the node answered.
 7. Writing or changing the compute node itself: the `cyoda:compute` skill.
-8. When help doesn't settle how dispatch behaves here (e.g. what a timed-out processor leaves behind), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
+8. When help doesn't settle how dispatch behaves here, say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range, with a stub compute node); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance.
 
 ### Path D — schema and model lifecycle
 
@@ -85,13 +87,13 @@ Read `models --section LIFECYCLE` and `models --section ERRORS`.
 
 ### Path E — entities in an Errored state
 
-Count them per state, then list them and read each errored entity's audit: `GET '/audit/entity/<id>?eventType=StateMachine'` per id. [examples/queries.md](examples/queries.md) walks through [examples/queries/](examples/queries/) (grouped stats by state, a lifecycle-state search, point-in-time). Pass those files as `--data-binary @"${CLAUDE_PLUGIN_ROOT}/skills/debug/examples/queries/<file>"`. Best practice *Model error states explicitly*: the exit transition's criterion holds the entity until its data is fixed, then a loopback (Path B, step 6) lets it leave.
+Count them per state, then list them and read each errored entity's audit: `GET '/audit/entity/<id>?eventType=StateMachine'` per id. [examples/queries.md](examples/queries.md) walks through [examples/queries/](examples/queries/) (grouped stats by state, a lifecycle-state search, point-in-time). Pass those files as `--data-binary @"${CLAUDE_PLUGIN_ROOT}/skills/debug/examples/queries/<file>"`. Best practice *Model error states* (`cyoda-help.sh design`): the exit transition's criterion holds the entity until its data is fixed, then a loopback (Path B, step 6) lets it leave.
 
 ### Path F — an entity disappeared
 
 `GET /entity/{id}` returns 404 after a delete. The evidence is a `DELETE` entry in `GET /entity/{id}/changes` and in the audit's `EntityChange` events.
 
-Tell the developer: the delete is soft (history kept; `/changes` shows the DELETE; a point-in-time read from before the delete still returns the entity), it **bypassed the workflow** (no transition, criterion or processor ran, so no state records it), and it can't be undone through the API. Best practice *End a lifecycle in a terminal state; never delete*.
+Tell the developer: the delete is soft (history kept; `/changes` shows the DELETE; a point-in-time read from before the delete still returns the entity), it **bypassed the workflow** (no transition, criterion or processor ran, so no state records it), and it can't be undone through the API. Best practice *Prefer a ledger to deletion* (`cyoda-help.sh design`).
 
 ## Observation
 
@@ -99,9 +101,9 @@ Read `crud --section ENDPOINTS`, `crud --section "POINT-IN-TIME SEMANTICS"` and 
 
 | Question | Call |
 |---|---|
-| Every version: when and by whom | `GET /entity/{id}/changes`: newest first, `changeType` `CREATE`/`UPDATE`/`DELETE`, with `transactionId` |
+| Every version: when and by whom | `GET /entity/{id}/changes`: newest first, one entry per transaction, `changeType` `CREATE`/`UPDATE`/`DELETE`, with `transactionId`, `user` (for whom) and `executedBy` |
 | Which transitions, criteria and processors ran | `GET '/audit/entity/{id}?eventType=StateMachine'`. Filters: `severity`, `fromUtcTime`, `toUtcTime`, `transactionId`; `limit` up to 1000; follow `pagination.nextCursor` with `cursor` |
 | One transaction's outcome | `GET /audit/entity/{id}/workflow/{transactionId}/finished` |
-| The entity at a past time | `GET '/entity/{id}?pointInTime=<RFC 3339>'` (inclusive), or `?transactionId=<tx>`; never both |
+| The entity at a past time | `GET '/entity/{id}?pointInTime=<RFC 3339>'` (inclusive, at or before `GET /entity/consistency-time`), or `?transactionId=<tx>`; never both |
 
 Leave `eventType=System` out: open-source cyoda-go doesn't emit those events. The audit API has no `level` parameter; filter with `severity` and `eventType`. Present a timeline, newest first: time, change or event, state, transition, transaction, and the reason where there is one. When the question concerns a past moment, read the entity at that time.

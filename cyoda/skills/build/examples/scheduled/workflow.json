@@ -13,7 +13,8 @@
               "next": "expired",
               "manual": false,
               "schedule": {
-                "delayMs": 2000
+                "delayMs": 2000,
+                "timeoutMs": 60000
               },
               "annotations": {
                 "roles": []

@@ -18,7 +18,7 @@ Run `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh <topic...> [--section "<NAME>"]
 
 stderr line 1 is `SOURCE=instance|binary|web VERSION=<v>`. Exit 2: unknown topic (or every source failed). Exit 6: unknown section; stderr lists the sections that exist.
 
-4. **Only if help has no answer**: the docs site. Fetch `https://docs.cyoda.net/llms.txt`, then the page it points to, and say the answer is from the docs site. The getting-started page (`install-and-first-entity`) is wrong on v0.8.4 until Cyoda/cyoda-docs#134 closes (workflow version `"1"`, entities before the model is locked, a transition fired by an empty PUT): take recipes from help.
+4. **Only if help has no answer**: the docs site. Fetch `https://docs.cyoda.net/llms.txt`, then the page it points to, and say the answer is from the docs site. The getting-started page (`install-and-first-entity`) is wrong until Cyoda/cyoda-docs#134 closes (workflow version `"1"`, entities before the model is locked, a transition fired by an empty PUT): take recipes from help.
 
 ## SOURCE=web
 
@@ -39,7 +39,7 @@ Read one section (`crud` and `workflows` are about 12k tokens each):
 
 ## Error codes
 
-Run `cyoda-help.sh errors <CODE>` (e.g. `errors WORKFLOW_FAILED`): every code has its own page. `errors --section "ERROR CODE INDEX"` is incomplete (cyoda-go#684 item N), so a code missing from the index isn't missing from help; the full list is the topic's subtopics: `cyoda help errors --format=json | jq -r '.children[]'` (or SUBTOPICS at the end of `cyoda help errors`). The code is in a response's `.properties.errorCode`; key on it, not on the HTTP status.
+Run `cyoda-help.sh errors <CODE>` (e.g. `errors WORKFLOW_FAILED`): every code has its own page, and `errors --section "ERROR CODE INDEX"` lists them all. The code is in a response's `.properties.errorCode`; key on it, not on the HTTP status.
 
 ## Schemas
 
@@ -52,19 +52,6 @@ Get field names and types from these:
 | REST API (OpenAPI 3.1) | `cyoda-help.sh openapi json` (or `openapi yaml`) | About 0.5 MB; pick one path: `\| jq '.paths["/entity/{entityId}"]'`. Tags: `cyoda-help.sh openapi tags` |
 
 These are actions, not topics: the output is printed verbatim (JSON or text) and `--section` is rejected (exit 6). `cyoda-help.sh workflows schema-version versions` is another, printing `{"current", "supported"}`.
-
-## Known help errata (v0.8.4)
-
-Filed as Cyoda/cyoda-go#684. When an answer touches one of these, give the correct fact and cite the item:
-
-| Item | Help says | Fact |
-|---|---|---|
-| B | `workflows` PROCESSORS: the node must declare *all* `calculationNodesTags` | Overlap: any one shared tag. Use `grpc --section "TAG ROUTING"` |
-| C | `crud` PATCH: `{}` is "consistent with PUT-with-empty-body" | A PUT with an empty body is 400. Fire a transition without changing data with PATCH `{}`, `If-Match: *`, `application/merge-patch+json` |
-| I | `workflows` IMPORT REQUEST / EXPORT RESPONSE say nothing on strictness | Import rejects unknown fields; an export (`{entityName, modelVersion, workflows}`) must be reshaped to `{importMode, workflows}` before re-import |
-| J | `responseTimeoutMs` `0` means "node default" | `0` means the server default of 30 s |
-| A | `helm` CHART REPOSITORY: chart unpublished, 0.1.0 | Published at `https://cyoda.github.io/cyoda-go` |
-| E, F, H | `config` Profile loader, `audit` ENDPOINTS `eventType` list, `helm` VALUES | Incomplete or wrong. Don't answer from these sections alone: say so and check a second source (`run` for env files; `workflows` SCHEDULED TRANSITIONS for the `SCHEDULED_TRANSITION_*` audit events) |
 
 ## Answering
 

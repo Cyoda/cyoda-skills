@@ -58,7 +58,7 @@ Then [Finish](#finish). A `WARN=` from the first status run that this procedure 
 |---|---|
 | 1 | invalid plugin config: show stderr, stop |
 | 3 | no free port block: show stderr, stop |
-| 4 | did not become healthy (it cleaned up): show stderr, stop |
+| 4 | did not become healthy (it cleaned up): show stderr, stop. For `start-repo`, a cyoda-go service whose environment doesn't set `CYODA_HTTP_BIND_ADDRESS` and `CYODA_GRPC_BIND_ADDRESS` to `0.0.0.0` can't be reached through its published ports (`cyoda-help.sh run --section "RUN MODES"`, Docker): say so, and offer to run `start-repo` again once they've added them |
 | 5 | `cyoda` missing → [install](#install) and run it again; `docker` or `lsof` missing → show stderr, stop |
 | 64 | usage error (a missing or wrong argument, no such directory): fix the call |
 
@@ -72,9 +72,7 @@ A directory has one when its `compose.yaml`, `compose.yml`, `docker-compose.yaml
 
 ### Install
 
-`brew install cyoda/cyoda-go/cyoda`. If it fails, `curl -fsSL https://github.com/cyoda/cyoda-go/releases/latest/download/install.sh | sh`. If both fail, show their errors and the other ways (release binaries https://github.com/cyoda/cyoda-go/releases, or Docker with the image `ghcr.io/cyoda/cyoda`) and stop.
-
-<!-- #684-K workaround: `cyoda help` has no install section yet. Remove this list and point to the help topic once Cyoda/cyoda-go#684 item K ships. -->
+Read `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-help.sh install --section ROUTES` and install with its Homebrew route; if that fails, with its install script. If both fail, show their errors and the section's other routes and stop. Skip `cyoda init`.
 
 ## Connect
 

@@ -22,6 +22,6 @@ bash tests/evals/stop.sh [--keep] [id...]       # kills by port; reports how man
 
 - Pick a distinct server id per eval (e.g. skill number × 10 + eval id) so parallel executors don't share an instance. Ids up to 454 keep ports below 65536.
 - `--seed-project` registers the fixture's `src/data/<e>-v1-sample.json`, locks the model and imports `src/workflows/<e>-v1-workflow.json`: use it when the eval starts with models already on the instance.
-- **JWT mode** (`start.sh <id> jwt`) is for auth evals: a fresh RSA signing key and a bootstrap client `evalclient` / `evalsecret`; tokens come from `POST /api/oauth/token` (`cyoda help auth tokens`). Mock mode needs no token.
+- **JWT mode** (`start.sh <id> jwt`) is for auth evals: a fresh RSA signing key `.state/s<id>/k.pem` and an M2M client `evalclient` in tenant `eval`, whose secret is in `.state/s<id>/client.json`; tokens come from `POST /api/tenants/eval/oauth/token` (`cyoda help auth tokens`), admin tokens from `CYODA_JWT_SIGNING_KEY_FILE=… cyoda token --tenant eval` (`cyoda help cli token`). Mock mode needs no token.
 - **Timing:** when an executor's task notification arrives, run `timing.sh` with its `total_tokens` and `duration_ms` before grading; each call is also appended to `.state/tokens.log`.
 - `stop.sh` kills whatever listens on each server's ports, because `.state/s<id>/pid` holds a wrapper's pid, not cyoda's. It then deletes each stopped server's `.state/s<id>/` (RSA signing key, server log); pass `--keep` to keep them for inspection. `.state/tokens.log` is kept.

@@ -4,10 +4,10 @@
     {
       "id": 1,
       "prompt": "How do I move an order to its next state without changing any of its data?",
-      "expected_output": "Runs cyoda-help.sh crud --section ENDPOINTS (one section, not the whole topic), answers that a named transition without a data change is PATCH /api/entity/JSON/{id}/{transition} with Content-Type application/merge-patch+json, If-Match: * (or the transactionId) and body {}, warns that a PUT with an empty body is a 400 despite the crud help wording (#684-C), and ends with the source line naming topic, section, SOURCE and VERSION.",
+      "expected_output": "Runs cyoda-help.sh crud --section ENDPOINTS (one section, not the whole topic), answers that a named transition without a data change is PATCH /api/entity/JSON/{id}/{transition} with Content-Type application/merge-patch+json, If-Match: * (or the transactionId) and body {}, says that a PUT with an empty body is refused with 400 (as the section states), and ends with the source line naming topic, section, SOURCE and VERSION.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
-        "_simulated/help.md": "cyoda-help.sh prints SOURCE=instance VERSION=0.8.4 on stderr. `crud --section ENDPOINTS` returns the ENDPOINTS body, including the PATCH /api/entity/{format}/{entityId}/{transition} entry (merge-patch, If-Match required, `{}` is a valid no-op merge 'consistent with PUT-with-empty-body')."
+        "_simulated/help.md": "cyoda-help.sh prints SOURCE=instance VERSION=0.9.0 on stderr. `crud --section ENDPOINTS` returns the ENDPOINTS body, including the PATCH /api/entity/{format}/{entityId}/{transition} entry (merge-patch, If-Match required: a transactionId or `*`; the empty patch `{}` 'is how to fire a transition without changing the data; `PUT` refuses an empty body') and the PUT entry ('an empty body is refused with `400 BAD_REQUEST`')."
       },
       "assertions": [
         {
@@ -26,13 +26,13 @@
           "type": "behavior"
         },
         {
-          "id": "empty-put-erratum",
-          "text": "Says a PUT with an empty body is rejected (400) even though the crud help implies it's fine, citing #684-C or equivalent",
+          "id": "empty-put",
+          "text": "Says a PUT with an empty body is refused (400), as the crud help states",
           "type": "behavior"
         },
         {
           "id": "cites-source",
-          "text": "Ends with the source: topic and section plus SOURCE (instance) and version 0.8.4",
+          "text": "Ends with the source: topic and section plus SOURCE (instance) and version 0.9.0",
           "type": "format"
         },
         {
@@ -45,10 +45,10 @@
     {
       "id": 2,
       "prompt": "What does WORKFLOW_SCHEMA_VERSION_UNSUPPORTED mean? I don't see it in the error list.",
-      "expected_output": "Runs cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED. With no binary and no instance, the helper falls back to the web help mirror (SOURCE=web); the skill says so, answers from the mirror and asks the developer to type no command. Explains that the ERROR CODE INDEX is incomplete (cyoda-go#684 item N) and every code has its own page, so the code exists; the workflow version must be a supported MAJOR.MINOR, read from `cyoda help workflows schema-version versions`.",
+      "expected_output": "Runs cyoda-help.sh errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED (the code's own page). With no binary and no instance, the helper falls back to the web help mirror (SOURCE=web); the skill says so, answers from the mirror and asks the developer to type no command. Explains from that page that the code exists (400): the workflow `version` must be a supported MAJOR.MINOR, read from `cyoda help workflows schema-version versions`.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{}",
-        "_simulated/machine.md": "`cyoda` is not on PATH. No profile has an endpoint. cyoda-help.sh prints SOURCE=web VERSION=0.8.4 and the whole web page for errors/WORKFLOW_SCHEMA_VERSION_UNSUPPORTED: HTTP 400, the workflow `version` is not in the supported MAJOR.MINOR range; see `cyoda help workflows schema-version versions`."
+        "_simulated/machine.md": "`cyoda` is not on PATH. No profile has an endpoint. cyoda-help.sh prints SOURCE=web VERSION=0.9.0 and the whole web page for errors/WORKFLOW_SCHEMA_VERSION_UNSUPPORTED: HTTP 400, the workflow `version` is not in the supported MAJOR.MINOR range; see `cyoda help workflows schema-version versions`."
       },
       "assertions": [
         {
@@ -57,8 +57,8 @@
           "type": "behavior"
         },
         {
-          "id": "index-gap",
-          "text": "Explains that the ERROR CODE INDEX is incomplete (cyoda-go#684 item N) and every code has its own page via `errors <CODE>`, so a missing index entry doesn't mean the code doesn't exist",
+          "id": "code-page",
+          "text": "Answers from the code's own page (`errors WORKFLOW_SCHEMA_VERSION_UNSUPPORTED`): the code exists and means the workflow `version` is not a supported MAJOR.MINOR",
           "type": "behavior"
         },
         {
@@ -86,7 +86,7 @@
     {
       "id": 3,
       "prompt": "Can I run Trino SQL reports over my entities?",
-      "expected_output": "Says 'SQL analytics is not available in cyoda-go 0.8.4' (the VERSION cyoda-help.sh reported; `cyoda help analytics` describes an interface cyoda-go doesn't serve) and gives the grouped statistics request (POST /api/entity/stats/{entityName}/{modelVersion}/query, from crud ENDPOINTS) or the search request (POST /api/search/direct/{entityName}/{modelVersion}, from search ENDPOINTS), with the request body taken from help.",
+      "expected_output": "Says 'SQL analytics is not available in cyoda-go 0.9.0' (the VERSION cyoda-help.sh reported; `cyoda help analytics` describes an interface cyoda-go doesn't serve) and gives the grouped statistics request (POST /api/entity/stats/{entityName}/{modelVersion}/query, from crud ENDPOINTS) or the search request (POST /api/search/direct/{entityName}/{modelVersion}, from search ENDPOINTS), with the request body taken from help.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}"
       },
@@ -98,7 +98,7 @@
         },
         {
           "id": "sql-not-available",
-          "text": "Says SQL/Trino analytics is not available in cyoda-go 0.8.4 (the version cyoda-help.sh reported)",
+          "text": "Says SQL/Trino analytics is not available in cyoda-go 0.9.0 (the version cyoda-help.sh reported)",
           "type": "behavior"
         },
         {
@@ -116,10 +116,10 @@
     {
       "id": 4,
       "prompt": "I'm writing a criteria handler in Kotlin. Exactly which fields does the criteria response need?",
-      "expected_output": "Gets the schema with cyoda-help.sh cloudevents json piped to jq for processing/EntityCriteriaCalculationResponse.json, reports required requestId and entityId plus matches and the optional reason (2 KiB cap per grpc COMPUTE MEMBER PROTOCOL), and mentions `cyoda-help.sh grpc proto` for stubs.",
+      "expected_output": "Gets the schema with cyoda-help.sh cloudevents json piped to jq for processing/EntityCriteriaCalculationResponse.json, reports required requestId and entityId, matches as required on every response except an explicit `success: false` one (the schema's if/then), and the optional reason (Cyoda keeps the first 2048 characters, per grpc COMPUTE MEMBER PROTOCOL), and mentions `cyoda-help.sh grpc proto` for stubs.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}",
-        "_simulated/help.md": "cyoda-help.sh cloudevents json prints {schemas:{...}}; schemas[\"processing/EntityCriteriaCalculationResponse.json\"] has required [requestId, entityId] and properties entityId, matches, reason, requestId. `cyoda help grpc proto` prints the .proto text."
+        "_simulated/help.md": "cyoda-help.sh cloudevents json prints {schemas:{...}}; schemas[\"processing/EntityCriteriaCalculationResponse.json\"] has allOf [../common/BaseEvent.json], required [requestId, entityId], properties entityId, matches, reason, requestId, and if (not success == false) then required [matches]; the matches description says it is required on any response but an explicit `success: false` one. `cyoda help grpc proto` prints the .proto text."
       },
       "assertions": [
         {
@@ -129,7 +129,7 @@
         },
         {
           "id": "fields-correct",
-          "text": "Lists requestId and entityId as required, plus matches and the optional reason",
+          "text": "Lists requestId and entityId as required, matches as required unless the response is an explicit `success: false`, and the optional reason",
           "type": "behavior"
         },
         {
@@ -147,14 +147,14 @@
     {
       "id": 5,
       "prompt": "The workflows help says my compute node has to declare all of a processor's calculationNodesTags. Is that right?",
-      "expected_output": "Reads grpc --section \"TAG ROUTING\": routing is by overlap (one shared tag), random among matching members, empty tags match any member. Says the workflows PROCESSORS wording is wrong (Cyoda/cyoda-go#684 item B) and cites the grpc section as the source.",
+      "expected_output": "Reads grpc --section \"TAG ROUTING\" (and/or workflows --section PROCESSORS, calculationNodesTags): a member matches when it declares at least one of the tags, the server picks round robin among matching members, and empty tags match any member of the tenant. Corrects the premise from the current help (both sections say at least one, not all) and cites the section it read.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"default\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"}}}"
       },
       "assertions": [
         {
           "id": "consults-help",
-          "text": "Reads `cyoda-help.sh grpc --section \"TAG ROUTING\"` before answering",
+          "text": "Reads `cyoda-help.sh grpc --section \"TAG ROUTING\"` or `cyoda-help.sh workflows --section PROCESSORS` before answering",
           "type": "behavior"
         },
         {
@@ -163,13 +163,13 @@
           "type": "behavior"
         },
         {
-          "id": "erratum-cited",
-          "text": "Says the workflows PROCESSORS wording is wrong and cites #684 item B",
+          "id": "premise-corrected",
+          "text": "Says the current help (workflows PROCESSORS, grpc TAG ROUTING) states that one shared tag is enough, naming the section it read; does not call it a help erratum or cite #684",
           "type": "behavior"
         },
         {
-          "id": "random-and-empty",
-          "text": "Mentions random choice among several matching members, or that empty tags match any member",
+          "id": "round-robin-and-empty",
+          "text": "Mentions round-robin choice among several matching members, or that empty tags match any member of the tenant",
           "type": "behavior"
         }
       ]
