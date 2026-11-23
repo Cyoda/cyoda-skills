@@ -48,16 +48,16 @@ Judgment calls (read the named section before proposing):
 
 | Topic | Read | Guidance |
 |---|---|---|
-| States and transitions | `workflows --section TRANSITIONS` | Keep to the states the developer named. Best practices *Define precise terminal states*, *Use manual transitions for external triggers*, *Declare a general action once per state it is legal from* |
+| States and transitions | `workflows --section TRANSITIONS` | Keep to the states the developer named. Best practices *Name the final states precisely*, *Use manual transitions for steps the outside world triggers*, *Declare a general action once per state it is legal from* |
 | Criteria | `workflows --section CRITERIA`, `search --section "CONDITION DSL"` | Prefer a built-in `simple`/`group` criterion. Use a function criterion only when it needs data that isn't on the entity. Best practice *Put the cheap test before the callout* |
-| Processors | `workflows --section PROCESSORS` | Tags match by **overlap** (any one shared tag). Use `grpc --section "TAG ROUTING"` for routing, not PROCESSORS (#684-B). The processor code itself is a compute node: see the `cyoda:compute` skill |
+| Processors | `workflows --section PROCESSORS` | `config.idempotent: true` only where **Repeating a processor** allows it. The processor code itself is a compute node: see the `cyoda:compute` skill |
 | A function criterion or processor that fails or times out | `workflows --section CRITERIA`, `workflows --section PROCESSORS`, `errors DISPATCH_TIMEOUT` | Answer from these three, naming each next to the fact it gives |
 | Time-based moves | `workflows --section "SCHEDULED TRANSITIONS"` | A `schedule` object on an automated transition, not a separate processor. Best practices *Never put an automated transition with no criterion beside a scheduled transition*, *Give a scheduled transition a `timeoutMs`* |
 | Loop limits | `workflows --section "ENGINE EXECUTION"` | Best practice *Build explicit validation cycles* |
 
-When help doesn't settle how the behaviour you're building plays out (e.g. what a timed-out function criterion does to its transition), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range) before writing files; `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance. On no, carry on with the increment from help.
+When help doesn't settle how the behaviour you're building plays out, say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range) before writing files; `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly; send the spike's calls with `curl` to its own HTTP port (`cyoda help run` PORT LAYOUT), since `cyoda-call.sh` always targets the bound instance. On no, carry on with the increment from help.
 
-The workflow you generate follows the shared best practices. Probe the help topic first: `cyoda-help.sh workflows best-practices`, then `cyoda-help.sh design` (both exit 2 until #684-L ships). Fall back to `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md` and name the practices you applied. Every transition carries `annotations.roles` (best practice *Declare who may fire a transition in its annotations*): ask who fires each transition the developer hasn't covered; `[]` for system-only transitions.
+The workflow you generate follows the best practices in `cyoda-help.sh design` and `${CLAUDE_PLUGIN_ROOT}/skills/design/resources/best-practices.md`; name the practices you applied. Every transition carries `annotations.roles` (best practice *Declare who may fire a transition in its annotations*): ask who fires each transition the developer hasn't covered; `[]` for system-only transitions.
 
 Smoke-tested patterns to start from (each dir has `sample.json`, `workflow.json` and `config.json`):
 
@@ -115,7 +115,7 @@ Show all three and the list of API calls you'll make, then go on. Developer-supp
 
 **Manifest**: `cyoda-manifest.json` at the project root, `{"manifestVersion":1,"entities":[{name, modelVersion, sample, workflow, config}]}` ([templates/cyoda-manifest.json](templates/cyoda-manifest.json)). `modelVersion` is an integer and the paths are relative to the project root. Create it if it's missing, then upsert this entity version's entry, keyed by `name` + `modelVersion`.
 
-**Reshaping an export.** An export is `{entityName, modelVersion, workflows}`, and the import rejects unknown fields (#684-I). Save only `jq '{workflows}'` of it.
+**Reshaping an export.** An export is not an import body (`workflows --section "EXPORT RESPONSE"`). Save only `jq '{workflows}'` of it.
 
 ## Step 7 — Register (canonical order)
 
@@ -137,7 +137,7 @@ Entities are created only after the workflow is imported. Creating them is `cyod
 
 Exit 22 with a status other than 401/403: read `errorCode` from the body (`.properties.errorCode`) and run `cyoda-help.sh errors <errorCode>`. For model calls, also check `models --section ERRORS`. The full index is `errors --section "ERROR CODE INDEX"`, and codes missing from the index are still reachable as subtopics: `errors <CODE>` resolves any code (`cyoda help errors --format=json` lists them all under `children`). Fix the payload, update the saved project file to match, and re-run from the failed step on the same path.
 
-Common causes: `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED` (version not substituted); `BAD_REQUEST` "unknown field" (export posted verbatim: reshape, #684-I); `VALIDATION_FAILED` (the `detail` names the workflow, state or transition); `MODEL_ALREADY_LOCKED` (go back to Step 3).
+Common causes: `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED` (version not substituted); `BAD_REQUEST` naming an undeclared member (export posted verbatim: reshape); `VALIDATION_FAILED` (the `detail` names the workflow, state or transition); `MODEL_ALREADY_LOCKED` (go back to Step 3).
 
 ## Step 8 — Verify and report
 
@@ -152,5 +152,5 @@ Close with: "Registered `{e}` v{v}. Files: `<paths>`, manifest updated."
 | Creating an entity before the workflow import, or leaving the model unlocked | Canonical order, Step 7. Entities need a LOCKED model |
 | Hard-coding the workflow `version` | `${SCHEMA_VERSION}` in the file, substituted from `workflows schema-version versions` |
 | Re-importing a sample into a LOCKED model with entities | New model version (Step 3) |
-| Posting a workflow export as is | `{importMode, workflows}` only (#684-I) |
+| Posting a workflow export as is | `{importMode, workflows}` only (`workflows --section "EXPORT RESPONSE"`) |
 | Retrying the call or looping on the token command after a 401 | The script already retried once: [get a token](#no-instance-or-no-token) |

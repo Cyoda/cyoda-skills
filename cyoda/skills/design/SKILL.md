@@ -14,13 +14,7 @@ Turn an app idea into entities and workflows, review them against the Cyoda best
 
 ## Step 0 — Load the best practices
 
-Before Phase 1, load the list Phase 3 reviews against:
-
-1. Run `cyoda-help.sh workflows best-practices`. Exit 0: that text is the list.
-2. Exit 2: run `cyoda-help.sh design`. Exit 0: that text is the list.
-3. Both exit 2: read [resources/best-practices.md](resources/best-practices.md), the bundled copy kept until Cyoda/cyoda-go#684 item L ships.
-
-Tell the developer in one line which source you used, e.g. "Best practices: bundled copy (the `cyoda help` topic hasn't shipped yet)."
+Before Phase 1, read `cyoda-help.sh design` and [resources/best-practices.md](resources/best-practices.md) (practices help doesn't carry). Together they are the list Phase 3 reviews against.
 
 ## Phase 1 — Orientation
 
@@ -34,7 +28,7 @@ Cyoda is an Entity Database Management System (EDBMS): a database where every re
 
 For each entity:
 
-**Q2:** *"For [entity]: what states does it move through, from creation to every way it can end? What can go wrong along the way?"* Listen for the error path and for several distinct endings (best practices *Model error states explicitly*, *Define precise terminal states*).
+**Q2:** *"For [entity]: what states does it move through, from creation to every way it can end? What can go wrong along the way?"* Listen for the error path and for several distinct endings (best practices *Model error states*, *Name the final states precisely*).
 
 **Q3:** *"What moves it from one state to the next: a person or another system acting, a condition on its data becoming true, or time passing?"* Map the answers:
 
@@ -43,11 +37,11 @@ For each entity:
 | A user, a batch job, another system, a webhook arriving | Manual transition, fired through the API by that caller | `workflows --section TRANSITIONS` |
 | "When X is true" | Automated transition with a criterion | `workflows --section CRITERIA` |
 | "After N minutes", "expires", "escalate if stuck" | Scheduled transition ([patterns.md](resources/patterns.md) § Scheduled Transition) | `workflows --section "SCHEDULED TRANSITIONS"` |
-| "When the child/linked entity finishes" | A processor on that entity's transition fires a transition here | best practice *Use manual transitions for external triggers* |
+| "When the child/linked entity finishes" | A processor on that entity's transition fires a transition here | best practice *Cascade across entities from processors* |
 
 Edge messages (`cyoda help messages`) never fire a transition, so a "message-triggered transition" is a caller firing a manual transition.
 
-**Q4:** *"Do any steps need your own code: calling a third-party API, a calculation, or a check that needs data not on the entity? That's a compute node. Many apps don't need one."* A compute node is also how a criterion returns a rejection reason (best practice *Give a rejection reason when a criterion fails*).
+**Q4:** *"Do any steps need your own code: calling a third-party API, a calculation, or a check that needs data not on the entity? That's a compute node. Many apps don't need one."* A compute node is also how a criterion returns a rejection reason (best practice *Explain a refusal*).
 
 **Q5:** *"Must any field, or combination of fields, be unique across all [entity]s, such as an order number or an email? May a [parent] have only one live [entity] at a time?"* These are unique keys, set before the model is locked (`models --section ENDPOINTS`, unique-keys; best practices *Enforce uniqueness with a unique key, never a criterion*, *"Exactly one live X per Y" is a unique key with a retirement number*).
 
@@ -57,7 +51,7 @@ Edge messages (`cyoda help messages`) never fire a transition, so a "message-tri
 
 Check the proposed design against two lists, then fix it:
 
-1. **The Review checklist of the best-practices list from Step 0** (no checklist: its bullets, by bold name). Show one line per checklist line: `- <practice name>: ok | changed: <what> | n/a`.
+1. **The best practices from Step 0**: the bullets of `design`, by bold name, then the Review checklist of best-practices.md. Show one line per practice: `- <practice name>: ok | changed: <what> | n/a`.
 2. **The anti-patterns below.** List only the ones you found.
 
 For each violation, change the design and say so in one plain sentence that names the practice or anti-pattern, e.g. *"I've removed `processing`: a processor runs on a transition and is not a business state (anti-pattern: technical states)."* Give the reasoning yourself, drawing on the practice and [design-guidelines.md](resources/design-guidelines.md).
@@ -66,20 +60,20 @@ For each violation, change the design and say so in one plain sentence that name
 
 | Developer proposes | Best practice | Produce instead (from the section you read) |
 |---|---|---|
-| A running total, counter or summary entity updated on each write | *Compute aggregations; don't maintain them* | The concrete grouped stats query for their entity, on scalar fields (`crud --section ENDPOINTS`) |
-| SQL or reporting queries | *Compute aggregations; don't maintain them* | The concrete stats query or search for their question (`crud` or `search --section ENDPOINTS`). SQL analytics is not available in cyoda-go |
-| A `retry` state, or "re-run the check" | *Add backward transitions for retries and corrections*, *Re-trigger evaluation with a loopback, not by firing an automated transition* | A backward transition, or a loopback |
+| A running total, counter or summary entity updated on each write | *Compute aggregates; do not maintain them* | The concrete grouped stats query for their entity, on scalar fields (`crud --section ENDPOINTS`) |
+| SQL or reporting queries | *Compute aggregates; do not maintain them* | The concrete stats query or search for their question (`crud` or `search --section ENDPOINTS`). SQL analytics is not available in cyoda-go |
+| A `retry` state, or "re-run the check" | *Add transitions back up the flow*, *Re-evaluate with a loopback, not by naming an automated transition* | A backward transition, or a loopback |
 | A criterion that searches for a duplicate; "only one active X per Y" | *Enforce uniqueness with a unique key, never a criterion*, *"Exactly one live X per Y" is a unique key with a retirement number* | The unique key, and for "one live" the retirement-number field and the processor that sets it on entry to each terminal state |
-| Kinds or variants of one entity, each with its own lifecycle | *End the list with a catch-all workflow*, *Select on a field that you refuse to change* | One workflow per kind selected on the kind field, then the catch-all workflow (`workflows --section CRITERIA`, workflow-level selection) |
+| Kinds or variants of one entity, each with its own lifecycle | *End the list with a catch-all workflow* | One workflow per kind selected on a kind field your API boundary refuses to change, then the catch-all workflow (`workflows --section CRITERIA`, *Workflow-level selection*) |
 | Who may do what; a limit that needs a more senior role; "cancel" from several states | *Declare who may fire a transition in its annotations*, *Give a transition name one set of permitted roles*, *Declare a general action once per state it is legal from* | `roles` on each transition, one transition name per role set, the general action declared in each state |
-| Deleting an entity to end it | *End a lifecycle in a terminal state; never delete* | A terminal state |
+| Deleting an entity to end it | *Prefer a ledger to deletion* | A final state |
 
 **Notifications.** If the developer asks for notifications, alerts, webhooks or subscriptions when an entity enters a state, say: "Notifications are coming soon — check `cyoda help` for availability." Then offer today's options:
 1. Find entities needing action by querying the state: give the concrete state-count or search request for their entity (`crud --section ENDPOINTS`, `search --section ENDPOINTS`).
 2. An `ASYNC_NEW_TX` processor on the transition into the state, whose compute node sends the message. Show the processor entry (`workflows --section PROCESSORS`).
 3. A scheduled transition for escalation, e.g. `errored` → `escalated` after 30 minutes. Show the transition (`workflows --section "SCHEDULED TRANSITIONS"`).
 
-**Behaviour help doesn't settle.** When help doesn't settle how engine features combine (e.g. a failing criterion and a schedule on the same state), say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
+**Behaviour help doesn't settle.** When help doesn't settle how engine features combine, say what it leaves open and ask whether to spike it on a throwaway cyoda-go (in-memory with mock auth, per `cyoda help run`, or the stack in Docker; ports from `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-ports.sh pick` on a temp dir, or `CYODA_PORT_BASE` for a separate range); `cyoda` always loads `~/.config/cyoda/cyoda.env`, so set storage and auth explicitly.
 
 **Other features help doesn't document.** "Coming soon" is only for features known to be planned, which today means notifications. For anything else the developer asks for that `cyoda help` doesn't document, say: "Not available in cyoda-go <VERSION> — check `cyoda help`." `<VERSION>` is the `VERSION=` that `cyoda-help.sh` reported. Then offer the closest documented way, if there is one.
 
@@ -105,8 +99,6 @@ Mention a pattern from [patterns.md](resources/patterns.md) when it fits (approv
 Present the reviewed design in this shape. Don't write the full workflow files; `build` generates them from this summary. Short fragments that show a proposal (a query, one transition) are fine.
 
 ```
-Best practices: <source from Step 0>
-
 Entities:
   - <Entity>
       states: initial=<s>; others=[...]; error=[...]; terminal=[...]

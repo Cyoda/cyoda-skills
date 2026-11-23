@@ -8,6 +8,8 @@ S="$ROOT/cyoda/scripts"
 source "$ROOT/tests/lib/assert.sh"
 # shellcheck source=../lib/server.sh
 source "$ROOT/tests/lib/server.sh"
+# The cyoda-go release the smoke server runs (run.sh checks the binary against it).
+GV="$(cat "$ROOT/tests/smoke/cyoda-go.version")"
 trap 'stop_server; rm -rf "${T:-}"' EXIT
 
 T="$(mktemp -d)"
@@ -29,9 +31,12 @@ test_help_web_lowercase_path() {
   local pid=$!
   for _ in 1 2 3 4 5 6 7 8 9 10; do curl -fs "http://127.0.0.1:$port/index.json" >/dev/null 2>&1 && break; sleep 0.2; done
   out="$(PATH="$T/stub:$PATH" CYODA_HELP_WEB_BASE="http://127.0.0.1:$port" bash "$S/cyoda-help.sh" errors SOME_ERROR_CODE 2>"$T/err")"
-  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
   assert_contains "$out" "WEB PAGE BODY" "lowercased web page"
   assert_contains "$(cat "$T/err")" "SOURCE=web VERSION=9.9.9" "web source"
+  # A dotted topic id (SEE ALSO, .children) is a path on the mirror too.
+  out="$(PATH="$T/stub:$PATH" CYODA_HELP_WEB_BASE="http://127.0.0.1:$port" bash "$S/cyoda-help.sh" errors.SOME_ERROR_CODE 2>/dev/null)"
+  assert_contains "$out" "WEB PAGE BODY" "dotted id on the web mirror"
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
 }
 
 test_help_section_from_binary() {
@@ -39,6 +44,12 @@ test_help_section_from_binary() {
   out="$(bash "$S/cyoda-help.sh" models --section LIFECYCLE 2>"$T/err")"
   assert_contains "$out" LOCKED "section body"
   assert_contains "$(cat "$T/err")" "SOURCE=binary" "binary source"
+}
+
+test_help_dotted_id() {
+  local out
+  out="$(bash "$S/cyoda-help.sh" auth.tokens --section "REQUEST FLOW" 2>/dev/null)"
+  assert_contains "$out" "oauth/token" "dotted id with --section"
 }
 
 test_help_unknown_topic() {
@@ -58,7 +69,7 @@ test_help_prefers_instance() {
   local out
   out="$(CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-help.sh" auth tokens 2>"$T/err")"; local rc=$?
   assert_status 0 "$rc" "instance help ok"
-  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "instance source"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=$GV" "instance source"
   if [ -n "$out" ]; then _ok; else _bad "empty body"; fi
   CYODA_PLUGIN_CONFIG="$T/i.json" bash "$S/cyoda-help.sh" no such topic >/dev/null 2>&1
   assert_status 2 "$?" "unknown topic via instance"
@@ -69,7 +80,7 @@ test_help_ignores_broken_token_command() {
   start_server || return
   echo "{\"active\":\"p\",\"profiles\":{\"p\":{\"endpoint\":\"http://localhost:${SMOKE_HTTP_PORT}\",\"tokenCommand\":\"false\"}}}" >"$T/b.json"
   CYODA_PLUGIN_CONFIG="$T/b.json" bash "$S/cyoda-help.sh" auth tokens >/dev/null 2>"$T/err"
-  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "broken tokenCommand ignored"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=$GV" "broken tokenCommand ignored"
   stop_server
 }
 
@@ -77,7 +88,7 @@ test_help_action_from_binary() {
   local out rc
   out="$(bash "$S/cyoda-help.sh" workflows schema-version versions 2>"$T/err")"; rc=$?
   assert_status 0 "$rc" "action via binary"
-  assert_eq "$(jq -r .current <<<"$out")" "1.4" "action JSON verbatim"
+  assert_eq "$(jq -r .current <<<"$out")" "1.5" "action JSON verbatim"
   assert_contains "$(head -n1 "$T/err")" "SOURCE=binary" "binary source for action"
   bash "$S/cyoda-help.sh" workflows schema-version versions --section X >/dev/null 2>&1
   assert_status 6 "$?" "--section rejected for action"
@@ -89,8 +100,8 @@ test_help_action_from_instance() {
   local out rc
   out="$(CYODA_PLUGIN_CONFIG="$T/a.json" bash "$S/cyoda-help.sh" workflows schema-version versions 2>"$T/err")"; rc=$?
   assert_status 0 "$rc" "action via instance"
-  assert_eq "$(jq -r .current <<<"$out")" "1.4" "instance action JSON verbatim"
-  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "instance source for action"
+  assert_eq "$(jq -r .current <<<"$out")" "1.5" "instance action JSON verbatim"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=$GV" "instance source for action"
   stop_server
 }
 
@@ -118,7 +129,7 @@ test_help_text_action_from_instance() {
   out="$(CYODA_PLUGIN_CONFIG="$T/t.json" bash "$S/cyoda-help.sh" grpc proto 2>"$T/err")"; rc=$?
   assert_status 0 "$rc" "text action via instance"
   assert_contains "$out" 'syntax = "proto3"' "instance proto text verbatim"
-  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "instance source for text action"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=$GV" "instance source for text action"
   CYODA_PLUGIN_CONFIG="$T/t.json" bash "$S/cyoda-help.sh" grpc nosuchaction >/dev/null 2>&1
   assert_status 2 "$?" "unknown action via instance still exits 2"
   stop_server
@@ -127,7 +138,7 @@ test_help_text_action_from_instance() {
 test_help_no_config_uses_default_instance() {
   start_server || return
   CYODA_DEFAULT_ENDPOINT="http://localhost:${SMOKE_HTTP_PORT}" bash "$S/cyoda-help.sh" auth tokens >/dev/null 2>"$T/err"
-  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=0.8.4" "no config: help from the default instance"
+  assert_contains "$(head -n1 "$T/err")" "SOURCE=instance VERSION=$GV" "no config: help from the default instance"
   stop_server
 }
 
@@ -141,6 +152,7 @@ test_help_no_config_fallback_is_fast() {
 }
 
 test_help_section_from_binary
+test_help_dotted_id
 test_help_no_config_uses_default_instance
 test_help_no_config_fallback_is_fast
 test_help_text_action_from_binary

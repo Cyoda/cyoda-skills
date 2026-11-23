@@ -15,7 +15,8 @@ WORDS=(); SECTION=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --section) SECTION="${2:-}"; shift 2 || shift ;;
-    *) WORDS+=("$1"); shift ;;
+    # A dotted topic id (auth.tokens) is the same path as its words.
+    *) IFS=. read -r -a _parts <<<"$1"; WORDS+=("${_parts[@]}"); shift ;;
   esac
 done
 if [ ${#WORDS[@]} -eq 0 ]; then

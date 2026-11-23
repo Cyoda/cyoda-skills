@@ -1,6 +1,6 @@
 # Queries: which entities are where, and what was true when
 
-A walkthrough of the payloads in [queries/](queries/). Smoke scenario `05-queries` posts exactly these two files against v0.8.4, so they're known to work. Endpoint facts: `cyoda help crud` ENDPOINTS (statistics) and `cyoda help search` ENDPOINTS and CONDITION DSL. Each call goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh`. Pass the payload files by their full path under `${CLAUDE_PLUGIN_ROOT}`, as below: a path relative to this file doesn't resolve from the developer's project, curl fails before sending, and the call script reports `HTTP_STATUS=000`.
+A walkthrough of the payloads in [queries/](queries/). Smoke scenario `05-queries` posts exactly these two files against v0.9.0, so they're known to work. Endpoint facts: `cyoda help crud` ENDPOINTS (statistics) and `cyoda help search` ENDPOINTS and CONDITION DSL. Each call goes through `${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh`. Pass the payload files by their full path under `${CLAUDE_PLUGIN_ROOT}`, as below: a path relative to this file doesn't resolve from the developer's project, curl fails before sending, and the call script reports `HTTP_STATUS=000`.
 
 ## How many entities are in each state
 
@@ -32,7 +32,7 @@ Grouped stats give counts, not ids. To list the entities, search with a lifecycl
 ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh POST /search/direct/{e}/{v} -H 'Content-Type: application/json' --data-binary @<file>
 ```
 
-The response is NDJSON: one entity envelope per line. Read `.meta.id`, `.meta.state` and `.meta.lastUpdateTime` from each. State names are as the workflow spells them (`errored`, `Errored`, ...): check the workflow export first. Direct search is bounded: `limit` defaults to 1000 and above the cap it fails with `SEARCH_RESULT_LIMIT` rather than truncating (`search` ENDPOINTS). For larger sets, use the async search jobs in the same section.
+The response is NDJSON: one entity envelope per line. Read `.meta.id`, `.meta.state` and `.meta.lastUpdateTime` from each. State names are as the workflow spells them (`errored`, `Errored`, ...): check the workflow export first. When you write another condition, its operator must fit the field's type (a date takes ordering or range operators, not `CONTAINS`) and an `array` clause needs `operatorType`; otherwise the search is refused with `CONDITION_TYPE_MISMATCH` or `INVALID_CONDITION` (`search` CONDITION DSL, ERRORS). Direct search is bounded: `limit` defaults to 1000 and above the cap it fails with `SEARCH_RESULT_LIMIT` rather than truncating (`search` ENDPOINTS). For larger sets, use the async search jobs in the same section.
 
 Then, for each errored entity, read why: `GET /audit/entity/{id}?eventType=StateMachine` and look for `TRANSITION_NOT_MATCH_CRITERION` (its `data.transition` and `data.reason`). With an inline criterion the reason is the generic `criterion did not match`; only a function criterion gives a specific reason.
 
@@ -47,7 +47,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/cyoda-call.sh POST '/search/direct/{e}/{v}?pointIn
   --data-binary @"${CLAUDE_PLUGIN_ROOT}/skills/debug/examples/queries/search-point-in-time.json"
 ```
 
-The first counts what matches now, the second what matched at that instant. The bound is inclusive (`crud` POINT-IN-TIME SEMANTICS). In scenario 05, five entities match now and three at the earlier instant. The same `pointInTime` parameter works on `GET /entity/{id}`, `/changes`, `/transitions`, entity lists, and the grouped statistics body.
+The first counts what matches now, the second what matched at that instant. The bound is inclusive, and an instant later than the consistency time is refused with `POINT_IN_TIME_AFTER_CONSISTENCY_TIME`: for a reading "as of now" that won't change, pass the instant from `GET /entity/consistency-time` (`crud` POINT-IN-TIME SEMANTICS). In scenario 05, five entities match now and three at the earlier instant. The same `pointInTime` parameter works on `GET /entity/{id}`, `/changes`, `/transitions`, entity lists, and the grouped statistics body.
 
 A soft-deleted entity drops out of a current search but is still returned by a point-in-time search from before the delete.
 

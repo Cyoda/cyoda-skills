@@ -54,7 +54,7 @@ For each model print `Testing <e> v<v>...`, then:
 
 1. **Create**: `POST /entity/JSON/{e}/{v}` with `-H 'Content-Type: application/json' --data-binary @<sample>`. The id is `.[0].entityIds[0]`. Print `  Creating entity... ✓ [id: <id>]` or `✗ <errorCode>`.
 2. **State after create**: `GET /entity/{id}`, `.meta.state`. Automated transitions run inside the create, so the state may be past `initialState` (`workflows --section "ENGINE EXECUTION"`). Work out the expected state by following the automated transitions from `initialState`; if a criterion makes that uncertain, say why. Print `  State after create: <s> ✓` or `✗ (expected <x>)`.
-3. **Manual transitions**: `GET /entity/{id}/transitions` lists what can fire now. Take the first manual transition the workflow declares for the current state that is also in that list. Fire it with **PATCH `{}`**, which keeps the data unchanged (a PUT with no body is a 400, #684-C; a PUT with a body replaces the data):
+3. **Manual transitions**: `GET /entity/{id}/transitions` lists what can fire now. Take the first manual transition the workflow declares for the current state that is also in that list. Fire it with **PATCH `{}`**, which keeps the data unchanged (`crud` § ENDPOINTS: a PUT with no body is a 400; a PUT with a body replaces the data):
    `cyoda-call.sh PATCH /entity/JSON/{id}/{t} -H 'Content-Type: application/merge-patch+json' -H 'If-Match: *' -d '{}'`
    Then `GET /entity/{id}` and compare with the transition's `next` (plus any automated cascade after it). Print `  <t>: <state> ✓` or `✗ (expected <x>)`. Repeat until the state has no manual transition left or a state repeats.
 4. **On a failure**: read `.properties.errorCode` from the body and run `cyoda-help.sh errors <errorCode>` (every code has a page, including the ones the ERROR CODE INDEX leaves out). Put the one-line cause next to the ✗, then continue with the next model.
@@ -87,4 +87,4 @@ The template [templates/smoke-test.sh](templates/smoke-test.sh) reads everything
 
 | Mistake | Instead |
 |---|---|
-| Firing a transition with an empty PUT | PATCH `{}` with `If-Match: *` and merge-patch (#684-C) |
+| Firing a transition with an empty PUT | PATCH `{}` with `If-Match: *` and merge-patch (`crud` § ENDPOINTS) |

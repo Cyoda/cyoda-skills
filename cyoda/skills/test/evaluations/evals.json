@@ -9,7 +9,7 @@
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"local\",\"profiles\":{\"local\":{\"endpoint\":\"http://localhost:8080\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
         "src/data/orders-v1-sample.json": "{\"orderRef\":\"ORD-1\",\"amount\":5000}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=local ENDPOINT=http://localhost:8080 VERSION=0.8.4 SOURCE=profile. GET /model/: [{modelName: orders, modelVersion: 1, currentState: LOCKED}]. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion $.amount LESS_OR_EQUAL 1000)-> approved. Create returns [{entityIds:[e1]}]; GET e1: draft; transitions: [submit]; PATCH submit 200; GET e1: submitted; transitions then: []. DELETE /entity/e1 returns 200."
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=local ENDPOINT=http://localhost:8080 VERSION=0.9.0 SOURCE=profile. GET /model/: [{modelName: orders, modelVersion: 1, currentState: LOCKED}]. Workflow export: draft -submit(manual)-> submitted; submitted -approve(automated, criterion $.amount LESS_OR_EQUAL 1000)-> approved. Create returns [{entityIds:[e1]}]; GET e1: draft; transitions: [submit]; PATCH submit 200; GET e1: submitted; transitions then: [approve] (automated, held by its criterion). DELETE /entity/e1 returns 200."
       },
       "assertions": [
         {
@@ -67,7 +67,7 @@
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
         "scripts/get-token.sh": "#!/usr/bin/env bash\n# prints a JWT",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.8.4. GET /model/ lists orders v1 LOCKED; the workflow is as in the loopback example (draft -submit-> submitted). cyoda-profile.sh prints tokenCommand /home/dev/shop/scripts/get-token.sh."
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.9.0. GET /model/ lists orders v1 LOCKED; the workflow is as in the loopback example (draft -submit-> submitted). cyoda-profile.sh prints tokenCommand /home/dev/shop/scripts/get-token.sh."
       },
       "assertions": [
         {
@@ -139,7 +139,7 @@
       "expected_output": "cyoda-call.sh GET /model/ exits 4: the profile's token command failed. The skill shows the error and carries out auth's procedure itself: runs the token command /home/dev/shop/scripts/get-token.sh once with CYODA_ENDPOINT set, without showing a token; it exits 1 with 'get-token: … HTTP 401 … invalid_client', which it explains as the client id or secret being rejected (wrong env or keychain value, or the client deleted or its secret rotated; `auth clients`). The developer corrects the value in the shell Claude Code is started from and restarts the session. It never asks for the secret, leaves the tokenCommand as it is, runs no test calls while the token command fails, and asks the developer to type no command.",
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"dev\",\"profiles\":{\"dev\":{\"endpoint\":\"https://cyoda-dev.internal.example.com\",\"tokenCommand\":\"/home/dev/shop/scripts/get-token.sh\"}}}",
-        "_simulated/instance.md": "Project root is /home/dev/shop. cyoda-status.sh: STATUS=connected PROFILE=dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.8.4 BINARY_VERSION=0.8.4 SOURCE=profile. Every cyoda-call.sh call exits 4 with stderr 'token command failed: /home/dev/shop/scripts/get-token.sh'. An unauthenticated GET https://cyoda-dev.internal.example.com/api/model/ returns 401. Running /home/dev/shop/scripts/get-token.sh with CYODA_ENDPOINT set exits 1 with stderr: get-token: token request to https://cyoda-dev.internal.example.com/api/oauth/token failed: HTTP 401 {\"error\":\"invalid_client\",\"error_description\":\"invalid_client\"}"
+        "_simulated/instance.md": "Project root is /home/dev/shop. cyoda-status.sh: STATUS=connected PROFILE=dev ENDPOINT=https://cyoda-dev.internal.example.com VERSION=0.9.0 BINARY_VERSION=0.9.0 SOURCE=profile. Every cyoda-call.sh call exits 4 with stderr 'token command failed: /home/dev/shop/scripts/get-token.sh'. An unauthenticated GET https://cyoda-dev.internal.example.com/api/model/ returns 401. Running /home/dev/shop/scripts/get-token.sh with CYODA_ENDPOINT set exits 1 with stderr: get-token: token request to https://cyoda-dev.internal.example.com/api/tenants/shop/oauth/token failed: HTTP 401 {\"error\":\"invalid_client\",\"error_description\":\"client authentication failed\"}"
       },
       "assertions": [
         {
@@ -186,7 +186,7 @@
       "files": {
         "~/.config/cyoda/cyoda-plugin-config.json": "{\"active\":\"ci\",\"profiles\":{\"default\":{\"endpoint\":\"http://localhost:8080\"},\"ci\":{\"endpoint\":\"https://cyoda-ci.internal.example.com\",\"tokenCommand\":\"CYODA_CLIENT_ID=ci CYODA_CLIENT_SECRET_CMD='security find-generic-password -s cyoda-ci -w' /home/dev/shop/scripts/get-token.sh\"}}}",
         "cyoda-manifest.json": "{\"manifestVersion\":1,\"entities\":[{\"name\":\"orders\",\"modelVersion\":1,\"sample\":\"src/data/orders-v1-sample.json\",\"workflow\":\"src/workflows/orders-v1-workflow.json\",\"config\":\"src/config/orders-v1-config.json\"}]}",
-        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=ci ENDPOINT=https://cyoda-ci.internal.example.com VERSION=0.8.4. GET /model/ lists orders v1 LOCKED (draft -submit(manual)-> submitted). cyoda-profile.sh prints the tokenCommand exactly as stored in the config. There is no scripts/ directory."
+        "_simulated/instance.md": "cyoda-status.sh: STATUS=connected PROFILE=ci ENDPOINT=https://cyoda-ci.internal.example.com VERSION=0.9.0. GET /model/ lists orders v1 LOCKED (draft -submit(manual)-> submitted). cyoda-profile.sh prints the tokenCommand exactly as stored in the config. There is no scripts/ directory."
       },
       "assertions": [
         {
